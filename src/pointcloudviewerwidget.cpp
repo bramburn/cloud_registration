@@ -1,0 +1,343 @@
+#include "pointcloudviewerwidget.h"
+#include <QDebug>
+#include <QDir>
+#include <QCoreApplication>
+#include <cmath>
+
+PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
+    : QOpenGLWidget(parent)
+    , m_vertexBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_shaderProgram(nullptr)
+    , m_mvpMatrixLocation(-1)
+    , m_colorLocation(-1)
+    , m_cameraPosition(0.0f, 0.0f, 5.0f)
+    , m_cameraTarget(0.0f, 0.0f, 0.0f)
+    , m_cameraUp(0.0f, 1.0f, 0.0f)
+    , m_cameraDistance(5.0f)
+    , m_cameraYaw(0.0f)
+    , m_cameraPitch(0.0f)
+    , m_mousePressed(false)
+    , m_pressedButton(Qt::NoButton)
+    , m_pointCount(0)
+    , m_boundingBoxMin(0.0f, 0.0f, 0.0f)
+    , m_boundingBoxMax(0.0f, 0.0f, 0.0f)
+    , m_boundingBoxCenter(0.0f, 0.0f, 0.0f)
+    , m_boundingBoxSize(1.0f)
+    , m_pointColor(1.0f, 1.0f, 1.0f)
+    , m_pointSize(2.0f)
+    , m_hasData(false)
+    , m_shadersInitialized(false)
+{
+    setFocusPolicy(Qt::StrongFocus);
+}
+
+PointCloudViewerWidget::~PointCloudViewerWidget()
+{
+    makeCurrent();
+
+    if (m_shaderProgram) {
+        delete m_shaderProgram;
+    }
+
+    doneCurrent();
+}
+
+void PointCloudViewerWidget::initializeGL()
+{
+    initializeOpenGLFunctions();
+
+    // Set clear color to dark gray
+    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+
+    // Enable depth testing
+    glEnable(GL_DEPTH_TEST);
+
+    // Enable point size control from vertex shader
+    glEnable(GL_PROGRAM_POINT_SIZE);
+
+    // Setup shaders
+    setupShaders();
+
+    // Setup buffers
+    setupBuffers();
+
+    qDebug() << "OpenGL initialized successfully";
+    qDebug() << "OpenGL Version:" << reinterpret_cast<const char*>(glGetString(GL_VERSION));
+    qDebug() << "GLSL Version:" << reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+}
+
+void PointCloudViewerWidget::resizeGL(int w, int h)
+{
+    glViewport(0, 0, w, h);
+
+    // Update projection matrix
+    m_projectionMatrix.setToIdentity();
+    float aspect = float(w) / float(h ? h : 1);
+    m_projectionMatrix.perspective(45.0f, aspect, 0.1f, 1000.0f);
+
+    updateCamera();
+}
+
+void PointCloudViewerWidget::paintGL()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (!m_hasData || !m_shadersInitialized) {
+        return;
+    }
+
+    // Use shader program
+    if (!m_shaderProgram->bind()) {
+        qWarning() << "Failed to bind shader program";
+        return;
+    }
+
+    // Calculate MVP matrix
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+
+    // Set uniforms
+    m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
+    m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+
+    // Bind VAO and draw points
+    if (m_vertexArrayObject.bind()) {
+        glPointSize(m_pointSize);
+        glDrawArrays(GL_POINTS, 0, m_pointCount);
+        m_vertexArrayObject.release();
+    }
+
+    m_shaderProgram->release();
+}
+
+void PointCloudViewerWidget::setupShaders()
+{
+    m_shaderProgram = new QOpenGLShaderProgram(this);
+
+    // Vertex shader source (embedded for simplicity)
+    const char* vertexShaderSource = R"(
+        #version 330 core
+
+        layout (location = 0) in vec3 position;
+
+        uniform mat4 mvpMatrix;
+
+        void main()
+        {
+            gl_Position = mvpMatrix * vec4(position, 1.0);
+            gl_PointSize = 2.0;
+        }
+    )";
+
+    // Fragment shader source (embedded for simplicity)
+    const char* fragmentShaderSource = R"(
+        #version 330 core
+
+        uniform vec3 color;
+        out vec4 fragColor;
+
+        void main()
+        {
+            fragColor = vec4(color, 1.0);
+        }
+    )";
+
+    // Compile shaders
+    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource)) {
+        qCritical() << "Failed to compile vertex shader:" << m_shaderProgram->log();
+        return;
+    }
+
+    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource)) {
+        qCritical() << "Failed to compile fragment shader:" << m_shaderProgram->log();
+        return;
+    }
+
+    // Link shader program
+    if (!m_shaderProgram->link()) {
+        qCritical() << "Failed to link shader program:" << m_shaderProgram->log();
+        return;
+    }
+
+    // Get uniform locations
+    m_mvpMatrixLocation = m_shaderProgram->uniformLocation("mvpMatrix");
+    m_colorLocation = m_shaderProgram->uniformLocation("color");
+
+    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1) {
+        qWarning() << "Failed to get uniform locations";
+    }
+
+    m_shadersInitialized = true;
+    qDebug() << "Shaders compiled and linked successfully";
+}
+
+void PointCloudViewerWidget::setupBuffers()
+{
+    // Create VAO
+    if (!m_vertexArrayObject.create()) {
+        qCritical() << "Failed to create VAO";
+        return;
+    }
+
+    // Create VBO
+    if (!m_vertexBuffer.create()) {
+        qCritical() << "Failed to create VBO";
+        return;
+    }
+
+    qDebug() << "OpenGL buffers created successfully";
+}
+
+void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
+{
+    if (points.empty() || points.size() % 3 != 0) {
+        qWarning() << "Invalid point cloud data";
+        return;
+    }
+
+    makeCurrent();
+
+    m_pointData = points;
+    m_pointCount = points.size() / 3;
+
+    // Calculate bounding box
+    calculateBoundingBox();
+
+    // Update camera to fit the point cloud
+    m_cameraDistance = m_boundingBoxSize * 2.0f;
+    m_cameraTarget = m_boundingBoxCenter;
+    updateCamera();
+
+    // Upload data to GPU
+    if (m_vertexArrayObject.bind()) {
+        m_vertexBuffer.bind();
+        m_vertexBuffer.allocate(points.data(), points.size() * sizeof(float));
+
+        // Set vertex attribute
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+
+        m_vertexBuffer.release();
+        m_vertexArrayObject.release();
+    }
+
+    m_hasData = true;
+
+    doneCurrent();
+    update(); // Trigger repaint
+
+    qDebug() << "Loaded point cloud with" << m_pointCount << "points";
+    qDebug() << "Bounding box center:" << m_boundingBoxCenter;
+    qDebug() << "Bounding box size:" << m_boundingBoxSize;
+}
+
+void PointCloudViewerWidget::clearPointCloud()
+{
+    makeCurrent();
+
+    m_pointData.clear();
+    m_pointCount = 0;
+    m_hasData = false;
+
+    doneCurrent();
+    update();
+}
+
+void PointCloudViewerWidget::calculateBoundingBox()
+{
+    if (m_pointData.empty()) {
+        return;
+    }
+
+    // Initialize with first point
+    m_boundingBoxMin = QVector3D(m_pointData[0], m_pointData[1], m_pointData[2]);
+    m_boundingBoxMax = m_boundingBoxMin;
+
+    // Find min/max for each axis
+    for (size_t i = 0; i < m_pointData.size(); i += 3) {
+        QVector3D point(m_pointData[i], m_pointData[i + 1], m_pointData[i + 2]);
+
+        m_boundingBoxMin.setX(std::min(m_boundingBoxMin.x(), point.x()));
+        m_boundingBoxMin.setY(std::min(m_boundingBoxMin.y(), point.y()));
+        m_boundingBoxMin.setZ(std::min(m_boundingBoxMin.z(), point.z()));
+
+        m_boundingBoxMax.setX(std::max(m_boundingBoxMax.x(), point.x()));
+        m_boundingBoxMax.setY(std::max(m_boundingBoxMax.y(), point.y()));
+        m_boundingBoxMax.setZ(std::max(m_boundingBoxMax.z(), point.z()));
+    }
+
+    // Calculate center and size
+    m_boundingBoxCenter = (m_boundingBoxMin + m_boundingBoxMax) * 0.5f;
+    QVector3D size = m_boundingBoxMax - m_boundingBoxMin;
+    m_boundingBoxSize = std::max({size.x(), size.y(), size.z()});
+
+    if (m_boundingBoxSize < 0.001f) {
+        m_boundingBoxSize = 1.0f; // Prevent division by zero
+    }
+}
+
+void PointCloudViewerWidget::updateCamera()
+{
+    // Calculate camera position based on spherical coordinates
+    float x = m_cameraDistance * cos(m_cameraPitch) * cos(m_cameraYaw);
+    float y = m_cameraDistance * sin(m_cameraPitch);
+    float z = m_cameraDistance * cos(m_cameraPitch) * sin(m_cameraYaw);
+
+    m_cameraPosition = m_cameraTarget + QVector3D(x, y, z);
+
+    // Update view matrix
+    m_viewMatrix.setToIdentity();
+    m_viewMatrix.lookAt(m_cameraPosition, m_cameraTarget, m_cameraUp);
+
+    update();
+}
+
+void PointCloudViewerWidget::mousePressEvent(QMouseEvent *event)
+{
+    m_lastMousePosition = event->pos();
+    m_mousePressed = true;
+    m_pressedButton = event->button();
+}
+
+void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!m_mousePressed) {
+        return;
+    }
+
+    QPoint delta = event->pos() - m_lastMousePosition;
+    m_lastMousePosition = event->pos();
+
+    const float sensitivity = 0.01f;
+
+    if (m_pressedButton == Qt::LeftButton) {
+        // Orbit camera
+        m_cameraYaw += delta.x() * sensitivity;
+        m_cameraPitch -= delta.y() * sensitivity;
+
+        // Clamp pitch to prevent flipping
+        m_cameraPitch = std::max(-M_PI/2.0f + 0.1f, std::min(M_PI/2.0f - 0.1f, m_cameraPitch));
+
+        updateCamera();
+    } else if (m_pressedButton == Qt::RightButton) {
+        // Pan camera
+        QVector3D right = QVector3D::crossProduct(m_cameraTarget - m_cameraPosition, m_cameraUp).normalized();
+        QVector3D up = QVector3D::crossProduct(right, m_cameraTarget - m_cameraPosition).normalized();
+
+        float panSpeed = m_boundingBoxSize * 0.001f;
+        QVector3D panOffset = (right * -delta.x() + up * delta.y()) * panSpeed;
+
+        m_cameraTarget += panOffset;
+        updateCamera();
+    }
+}
+
+void PointCloudViewerWidget::wheelEvent(QWheelEvent *event)
+{
+    const float zoomSpeed = 0.1f;
+    float zoomFactor = 1.0f + (event->angleDelta().y() / 120.0f) * zoomSpeed;
+
+    m_cameraDistance *= zoomFactor;
+    m_cameraDistance = std::max(0.1f, std::min(m_boundingBoxSize * 10.0f, m_cameraDistance));
+
+    updateCamera();
+}

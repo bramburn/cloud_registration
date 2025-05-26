@@ -1,0 +1,68 @@
+# Build directories
+build/
+debug/
+release/
+x64/
+Win32/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+.cmake/
+_deps/
+
+# C++ compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.out
+
+# Qt specific
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.qmake.stash
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+.qmake.cache
+.qmake.stash
+
+# IDE specific
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.idea/
+*.cbp
+*.workspace
+*.project
+*.cproject
+
+# Temporary files
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Debug files
+*.pdb
+*.ilk
+*.exp
+*.log
+*.tlog
+*.recipe
+
+# Project specific
+# Add any other project-specific files or directories that should be ignored
