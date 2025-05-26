@@ -10,6 +10,7 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_shaderProgram(nullptr)
     , m_mvpMatrixLocation(-1)
     , m_colorLocation(-1)
+    , m_pointSizeLocation(-1)
     , m_cameraPosition(0.0f, 0.0f, 5.0f)
     , m_cameraTarget(0.0f, 0.0f, 0.0f)
     , m_cameraUp(0.0f, 1.0f, 0.0f)
@@ -98,13 +99,12 @@ void PointCloudViewerWidget::paintGL()
     // Set uniforms
     m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
     m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+    m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
 
     // Bind VAO and draw points
-    if (m_vertexArrayObject.bind()) {
-        glPointSize(m_pointSize);
-        glDrawArrays(GL_POINTS, 0, m_pointCount);
-        m_vertexArrayObject.release();
-    }
+    m_vertexArrayObject.bind();
+    glDrawArrays(GL_POINTS, 0, m_pointCount);
+    m_vertexArrayObject.release();
 
     m_shaderProgram->release();
 }
@@ -120,11 +120,12 @@ void PointCloudViewerWidget::setupShaders()
         layout (location = 0) in vec3 position;
 
         uniform mat4 mvpMatrix;
+        uniform float pointSize;
 
         void main()
         {
             gl_Position = mvpMatrix * vec4(position, 1.0);
-            gl_PointSize = 2.0;
+            gl_PointSize = pointSize;
         }
     )";
 
@@ -161,8 +162,9 @@ void PointCloudViewerWidget::setupShaders()
     // Get uniform locations
     m_mvpMatrixLocation = m_shaderProgram->uniformLocation("mvpMatrix");
     m_colorLocation = m_shaderProgram->uniformLocation("color");
+    m_pointSizeLocation = m_shaderProgram->uniformLocation("pointSize");
 
-    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1) {
+    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1 || m_pointSizeLocation == -1) {
         qWarning() << "Failed to get uniform locations";
     }
 
@@ -197,28 +199,26 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
     makeCurrent();
 
     m_pointData = points;
-    m_pointCount = points.size() / 3;
+    m_pointCount = static_cast<int>(points.size() / 3);
 
     // Calculate bounding box
     calculateBoundingBox();
 
-    // Update camera to fit the point cloud
-    m_cameraDistance = m_boundingBoxSize * 2.0f;
-    m_cameraTarget = m_boundingBoxCenter;
+    // Update camera to fit the point cloud using proper field-of-view calculation
+    fitCameraToPointCloud();
     updateCamera();
 
     // Upload data to GPU
-    if (m_vertexArrayObject.bind()) {
-        m_vertexBuffer.bind();
-        m_vertexBuffer.allocate(points.data(), points.size() * sizeof(float));
+    m_vertexArrayObject.bind();
+    m_vertexBuffer.bind();
+    m_vertexBuffer.allocate(points.data(), static_cast<int>(points.size() * sizeof(float)));
 
-        // Set vertex attribute
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    // Set vertex attribute
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
 
-        m_vertexBuffer.release();
-        m_vertexArrayObject.release();
-    }
+    m_vertexBuffer.release();
+    m_vertexArrayObject.release();
 
     m_hasData = true;
 
@@ -275,6 +275,50 @@ void PointCloudViewerWidget::calculateBoundingBox()
     }
 }
 
+void PointCloudViewerWidget::fitCameraToPointCloud()
+{
+    if (m_boundingBoxSize < 0.001f) {
+        return; // No valid bounding box
+    }
+
+    // Set camera target to bounding box center
+    m_cameraTarget = m_boundingBoxCenter;
+
+    // Calculate optimal camera distance using field of view
+    const float fov = 45.0f; // Field of view in degrees (matches projection matrix)
+    const float aspect = static_cast<float>(width()) / static_cast<float>(height() ? height() : 1);
+
+    // Calculate the maximum extent in any direction
+    QVector3D size = m_boundingBoxMax - m_boundingBoxMin;
+    float maxExtent = std::max({size.x(), size.y(), size.z()});
+
+    // Add some padding (20% extra space around the object)
+    maxExtent *= 1.2f;
+
+    // Calculate distance needed to fit the object in view
+    // For a perspective projection, distance = (extent/2) / tan(fov/2)
+    float fovRadians = qDegreesToRadians(fov / 2.0f);
+    float distance = (maxExtent / 2.0f) / std::tan(fovRadians);
+
+    // Adjust for aspect ratio - use the smaller dimension to ensure everything fits
+    if (aspect < 1.0f) {
+        distance /= aspect;
+    }
+
+    // Set minimum distance to prevent getting too close
+    distance = std::max(distance, maxExtent * 0.5f);
+
+    m_cameraDistance = distance;
+
+    // Reset camera angles for a good initial view
+    m_cameraYaw = 0.0f;
+    m_cameraPitch = 0.0f;
+
+    qDebug() << "Camera fitted - Distance:" << m_cameraDistance
+             << "Target:" << m_cameraTarget
+             << "Max extent:" << maxExtent;
+}
+
 void PointCloudViewerWidget::updateCamera()
 {
     // Calculate camera position based on spherical coordinates
@@ -315,7 +359,7 @@ void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent *event)
         m_cameraPitch -= delta.y() * sensitivity;
 
         // Clamp pitch to prevent flipping
-        m_cameraPitch = std::max(-M_PI/2.0f + 0.1f, std::min(M_PI/2.0f - 0.1f, m_cameraPitch));
+        m_cameraPitch = std::max(-static_cast<float>(M_PI)/2.0f + 0.1f, std::min(static_cast<float>(M_PI)/2.0f - 0.1f, m_cameraPitch));
 
         updateCamera();
     } else if (m_pressedButton == Qt::RightButton) {

@@ -24,42 +24,45 @@ public:
     bool isValidE57File(const QString& filePath);
     QString getLastError() const;
 
+public slots:
+    void startParsing(const QString& filePath);
+
 signals:
     void progressUpdated(int percentage);
-    void parsingFinished(bool success, const QString& message);
+    void parsingFinished(bool success, const QString& message, const std::vector<float>& points);
 
 private:
     // E57 file structure parsing
     bool parseHeader(QDataStream& stream);
     bool parseElementSection(QDataStream& stream);
     std::vector<float> parsePointData(QDataStream& stream, qint64 dataOffset, qint64 dataSize);
-    
+
     // Helper functions
     bool readE57String(QDataStream& stream, QString& result);
     bool readE57Integer(QDataStream& stream, qint64& result);
     bool readE57Float(QDataStream& stream, double& result);
     bool skipBytes(QDataStream& stream, qint64 count);
-    
+
     // Mock data generation for testing (temporary)
     std::vector<float> generateMockPointCloud();
-    
+
     // Error handling
     void setError(const QString& error);
-    
+
     // Member variables
     QString m_lastError;
     bool m_hasError;
-    
+
     // E57 file format constants
     static const quint32 E57_FILE_SIGNATURE;
     static const quint32 E57_MAJOR_VERSION;
     static const quint32 E57_MINOR_VERSION;
-    
+
     // Parsing state
     qint64 m_fileSize;
     qint64 m_currentPosition;
     bool m_headerParsed;
-    
+
     // Point cloud metadata
     qint64 m_pointCount;
     bool m_hasXYZ;

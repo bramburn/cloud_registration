@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.16)
+project(TestLasParser)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find Qt6
+find_package(Qt6 REQUIRED COMPONENTS Core)
+
+# Create test executable
+add_executable(TestLasParser
+    test_las_parser.cpp
+    src/lasparser.cpp
+)
+
+target_link_libraries(TestLasParser Qt6::Core)
+target_include_directories(TestLasParser PRIVATE .)
+
+# Enable Qt's MOC
+set(CMAKE_AUTOMOC ON)
