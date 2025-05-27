@@ -18,7 +18,6 @@ MainWindow::MainWindow(QWidget *parent)
     , m_rightViewButton(nullptr)
     , m_bottomViewButton(nullptr)
     , m_viewer(nullptr)
-    , m_statusLabel(nullptr)
     , m_progressDialog(nullptr)
     , m_topViewAction(nullptr)
     , m_leftViewAction(nullptr)
@@ -219,8 +218,6 @@ void MainWindow::setupMenuBar()
 
 void MainWindow::setupStatusBar()
 {
-    m_statusLabel = new QLabel("Ready", this);
-    statusBar()->addWidget(m_statusLabel);
     statusBar()->showMessage("Ready to load point cloud files");
 }
 
@@ -311,22 +308,8 @@ void MainWindow::onOpenFileClicked()
 
 void MainWindow::onLoadingFinished(bool success, const QString& message)
 {
-    m_isLoading = false;
-    m_openFileButton->setEnabled(true);
-
-    if (m_progressDialog) {
-        m_progressDialog->close();
-        m_progressDialog->deleteLater();
-        m_progressDialog = nullptr;
-    }
-
-    if (success) {
-        statusBar()->showMessage(message);
-        m_statusLabel->setText(message);
-    } else {
-        statusBar()->showMessage("Failed to load file");
-        QMessageBox::warning(this, "Loading Error", message);
-    }
+    cleanupProgressDialog();
+    updateUIAfterParsing(success, message);
 }
 
 void MainWindow::onParsingProgressUpdated(int percentage)
@@ -338,32 +321,17 @@ void MainWindow::onParsingProgressUpdated(int percentage)
 
 void MainWindow::onParsingFinished(bool success, const QString& message, const std::vector<float>& points)
 {
-    // Clean up thread
-    if (m_parserThread) {
-        m_parserThread->quit();
-        m_parserThread->wait();
-        m_parserThread->deleteLater();
-        m_parserThread = nullptr;
-    }
+    // Clean up resources
+    cleanupParsingThread();
+    cleanupProgressDialog();
 
-    // Update UI state
-    m_isLoading = false;
-    m_openFileButton->setEnabled(true);
-
-    if (m_progressDialog) {
-        m_progressDialog->close();
-        m_progressDialog->deleteLater();
-        m_progressDialog = nullptr;
-    }
-
+    // Load point cloud if successful
     if (success && !points.empty()) {
         m_viewer->loadPointCloud(points);
-        statusBar()->showMessage(message);
-        m_statusLabel->setText(message);
-    } else {
-        statusBar()->showMessage("Failed to load file");
-        QMessageBox::warning(this, "Loading Error", message);
     }
+
+    // Update UI
+    updateUIAfterParsing(success, message);
 }
 
 // View control slot implementations
@@ -396,5 +364,38 @@ void MainWindow::onBottomViewClicked()
     if (m_viewer) {
         m_viewer->setBottomView();
         statusBar()->showMessage("Switched to bottom view");
+    }
+}
+
+// Helper methods for cleanup and UI updates
+void MainWindow::cleanupParsingThread()
+{
+    if (m_parserThread) {
+        m_parserThread->quit();
+        m_parserThread->wait();
+        m_parserThread->deleteLater();
+        m_parserThread = nullptr;
+    }
+}
+
+void MainWindow::cleanupProgressDialog()
+{
+    if (m_progressDialog) {
+        m_progressDialog->close();
+        m_progressDialog->deleteLater();
+        m_progressDialog = nullptr;
+    }
+}
+
+void MainWindow::updateUIAfterParsing(bool success, const QString& message)
+{
+    m_isLoading = false;
+    m_openFileButton->setEnabled(true);
+
+    if (success) {
+        statusBar()->showMessage(message);
+    } else {
+        statusBar()->showMessage("Failed to load file");
+        QMessageBox::warning(this, "Loading Error", message);
     }
 }

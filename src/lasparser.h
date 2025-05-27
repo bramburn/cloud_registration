@@ -110,6 +110,12 @@ private:
     template<typename T>
     bool readValue(QFile& file, T& value);
 
+    // Coordinate transformation helper
+    void transformAndAddPoint(std::vector<float>& points, int32_t x, int32_t y, int32_t z, const LasHeader& header);
+
+    // Progress update helper
+    void updateProgressIfNeeded(uint32_t currentPoint, uint32_t totalPoints);
+
     // Error handling
     void setError(const QString& error);
 

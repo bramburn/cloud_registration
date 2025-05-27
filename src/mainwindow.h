@@ -45,6 +45,11 @@ private:
     void setupMenuBar();
     void setupStatusBar();
 
+    // Helper methods for cleanup and UI updates
+    void cleanupParsingThread();
+    void cleanupProgressDialog();
+    void updateUIAfterParsing(bool success, const QString& message);
+
     // UI Components
     QWidget *m_centralWidget;
     QVBoxLayout *m_mainLayout;
@@ -55,7 +60,6 @@ private:
     QPushButton *m_rightViewButton;
     QPushButton *m_bottomViewButton;
     PointCloudViewerWidget *m_viewer;
-    QLabel *m_statusLabel;
     QProgressDialog *m_progressDialog;
 
     // Menu actions

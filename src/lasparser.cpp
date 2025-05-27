@@ -280,20 +280,11 @@ std::vector<float> LasParser::readPointFormat0(QFile& file, const LasHeader& hea
             throw LasParseException(QString("Failed to skip point data for point %1").arg(i));
         }
 
-        // Apply scale and offset to get actual coordinates
-        float actualX = static_cast<float>(x * header.xScaleFactor + header.xOffset);
-        float actualY = static_cast<float>(y * header.yScaleFactor + header.yOffset);
-        float actualZ = static_cast<float>(z * header.zScaleFactor + header.zOffset);
+        // Transform coordinates and add to points vector
+        transformAndAddPoint(points, x, y, z, header);
 
-        points.push_back(actualX);
-        points.push_back(actualY);
-        points.push_back(actualZ);
-
-        // Update progress every 10000 points
-        if (i % 10000 == 0) {
-            int progress = static_cast<int>((i * 100) / header.numberOfPointRecords);
-            emit progressUpdated(progress);
-        }
+        // Update progress if needed
+        updateProgressIfNeeded(i, header.numberOfPointRecords);
     }
 
     return points;
@@ -317,20 +308,11 @@ std::vector<float> LasParser::readPointFormat1(QFile& file, const LasHeader& hea
             throw LasParseException(QString("Failed to skip point data for point %1").arg(i));
         }
 
-        // Apply scale and offset to get actual coordinates
-        float actualX = static_cast<float>(x * header.xScaleFactor + header.xOffset);
-        float actualY = static_cast<float>(y * header.yScaleFactor + header.yOffset);
-        float actualZ = static_cast<float>(z * header.zScaleFactor + header.zOffset);
+        // Transform coordinates and add to points vector
+        transformAndAddPoint(points, x, y, z, header);
 
-        points.push_back(actualX);
-        points.push_back(actualY);
-        points.push_back(actualZ);
-
-        // Update progress every 10000 points
-        if (i % 10000 == 0) {
-            int progress = static_cast<int>((i * 100) / header.numberOfPointRecords);
-            emit progressUpdated(progress);
-        }
+        // Update progress if needed
+        updateProgressIfNeeded(i, header.numberOfPointRecords);
     }
 
     return points;
@@ -354,20 +336,11 @@ std::vector<float> LasParser::readPointFormat2(QFile& file, const LasHeader& hea
             throw LasParseException(QString("Failed to skip point data for point %1").arg(i));
         }
 
-        // Apply scale and offset to get actual coordinates
-        float actualX = static_cast<float>(x * header.xScaleFactor + header.xOffset);
-        float actualY = static_cast<float>(y * header.yScaleFactor + header.yOffset);
-        float actualZ = static_cast<float>(z * header.zScaleFactor + header.zOffset);
+        // Transform coordinates and add to points vector
+        transformAndAddPoint(points, x, y, z, header);
 
-        points.push_back(actualX);
-        points.push_back(actualY);
-        points.push_back(actualZ);
-
-        // Update progress every 10000 points
-        if (i % 10000 == 0) {
-            int progress = static_cast<int>((i * 100) / header.numberOfPointRecords);
-            emit progressUpdated(progress);
-        }
+        // Update progress if needed
+        updateProgressIfNeeded(i, header.numberOfPointRecords);
     }
 
     return points;
@@ -391,23 +364,35 @@ std::vector<float> LasParser::readPointFormat3(QFile& file, const LasHeader& hea
             throw LasParseException(QString("Failed to skip point data for point %1").arg(i));
         }
 
-        // Apply scale and offset to get actual coordinates
-        float actualX = static_cast<float>(x * header.xScaleFactor + header.xOffset);
-        float actualY = static_cast<float>(y * header.yScaleFactor + header.yOffset);
-        float actualZ = static_cast<float>(z * header.zScaleFactor + header.zOffset);
+        // Transform coordinates and add to points vector
+        transformAndAddPoint(points, x, y, z, header);
 
-        points.push_back(actualX);
-        points.push_back(actualY);
-        points.push_back(actualZ);
-
-        // Update progress every 10000 points
-        if (i % 10000 == 0) {
-            int progress = static_cast<int>((i * 100) / header.numberOfPointRecords);
-            emit progressUpdated(progress);
-        }
+        // Update progress if needed
+        updateProgressIfNeeded(i, header.numberOfPointRecords);
     }
 
     return points;
+}
+
+void LasParser::transformAndAddPoint(std::vector<float>& points, int32_t x, int32_t y, int32_t z, const LasHeader& header)
+{
+    // Apply scale and offset to get actual coordinates
+    float actualX = static_cast<float>(x * header.xScaleFactor + header.xOffset);
+    float actualY = static_cast<float>(y * header.yScaleFactor + header.yOffset);
+    float actualZ = static_cast<float>(z * header.zScaleFactor + header.zOffset);
+
+    points.push_back(actualX);
+    points.push_back(actualY);
+    points.push_back(actualZ);
+}
+
+void LasParser::updateProgressIfNeeded(uint32_t currentPoint, uint32_t totalPoints)
+{
+    // Update progress every 10000 points
+    if (currentPoint % 10000 == 0) {
+        int progress = static_cast<int>((currentPoint * 100) / totalPoints);
+        emit progressUpdated(progress);
+    }
 }
 
 void LasParser::setError(const QString& error)
