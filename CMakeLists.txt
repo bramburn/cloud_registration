@@ -78,7 +78,7 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
 endif()
 
 # Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets)
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml)
 
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
@@ -133,6 +133,7 @@ target_link_libraries(CloudRegistration
     Qt6::Widgets
     Qt6::Gui
     Qt6::OpenGLWidgets
+    Qt6::Xml
 )
 
 
@@ -181,6 +182,7 @@ if(TARGET GTest::gtest_main)
     target_link_libraries(E57ParserTests
         GTest::gtest_main
         Qt6::Core
+        Qt6::Xml
     )
 
     target_include_directories(E57ParserTests PRIVATE src)
@@ -218,6 +220,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 1 Functionality Tests
     add_executable(Sprint1FunctionalityTests
         tests/test_sprint1_functionality.cpp
+        src/loadingsettingsdialog.cpp
         ${TEST_COMMON_SOURCES}
     )
 
@@ -231,24 +234,8 @@ if(TARGET GTest::gtest_main)
     target_include_directories(Sprint1FunctionalityTests PRIVATE src)
     add_test(NAME Sprint1FunctionalityTests COMMAND Sprint1FunctionalityTests)
 
-    # Combined test runner for all tests
-    add_executable(AllTests
-        tests/test_e57parser.cpp
-        tests/test_lasparser.cpp
-        tests/test_voxelgridfilter.cpp
-        tests/test_sprint1_functionality.cpp
-        ${TEST_COMMON_SOURCES}
-    )
-
-    target_link_libraries(AllTests
-        GTest::gtest_main
-        Qt6::Core
-        Qt6::Widgets
-        Qt6::Test
-    )
-
-    target_include_directories(AllTests PRIVATE src)
-    add_test(NAME AllTests COMMAND AllTests)
+    # Note: AllTests target removed due to multiple main() conflicts
+    # Individual test executables work fine
 
     # Custom target to run all tests
     add_custom_target(run_tests
@@ -271,7 +258,7 @@ if(TARGET GTest::gtest_main)
                 COMMAND ${GENHTML_PATH} -o coverage_html coverage.info.cleaned
                 COMMAND ${CMAKE_COMMAND} -E remove coverage.info coverage.info.cleaned
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                DEPENDS AllTests
+                DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests
                 COMMENT "Generating code coverage report"
             )
             message(STATUS "Code coverage target 'coverage' available")

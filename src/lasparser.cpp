@@ -47,6 +47,14 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
     m_hasError = false;
     m_lastError.clear();
 
+    // Debug logging for parsing process (User Story 1)
+    qDebug() << "=== LasParser::parse ===";
+    qDebug() << "File path:" << filePath;
+    qDebug() << "Loading method:" << static_cast<int>(settings.method);
+    if (settings.method == LoadingMethod::VoxelGrid) {
+        qDebug() << "Voxel grid parameters:" << settings.parameters;
+    }
+
     try {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly)) {
@@ -54,6 +62,7 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
         }
 
         m_fileSize = file.size();
+        qDebug() << "File size:" << m_fileSize << "bytes";
 
         // Read and validate header
         LasHeader header;
@@ -64,6 +73,13 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
         if (!validateHeader(header)) {
             throw LasParseException("Invalid LAS header");
         }
+
+        qDebug() << "Header parsed successfully - Point count:" << header.numberOfPointRecords;
+        qDebug() << "Point data format:" << header.pointDataFormat;
+        qDebug() << "Header bounding box: Min(" << header.minX << "," << header.minY << "," << header.minZ
+                 << ") Max(" << header.maxX << "," << header.maxY << "," << header.maxZ << ")";
+        qDebug() << "Scale factors: X=" << header.xScaleFactor << " Y=" << header.yScaleFactor << " Z=" << header.zScaleFactor;
+        qDebug() << "Offsets: X=" << header.xOffset << " Y=" << header.yOffset << " Z=" << header.zOffset;
 
         // Store header information
         m_pointCount = header.numberOfPointRecords;
@@ -91,15 +107,19 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
         std::vector<float> points;
         if (settings.method == LoadingMethod::HeaderOnly) {
             // Return empty vector for header-only mode
+            qDebug() << "Header-only mode selected - returning empty points vector";
             emit parsingFinished(true, QString("Header loaded: %1 points").arg(header.numberOfPointRecords), points);
         } else if (settings.method == LoadingMethod::VoxelGrid) {
             // Read point data and apply voxel grid filtering
+            qDebug() << "Reading all points for voxel grid filtering...";
             emit progressUpdated(50);
             std::vector<float> rawPoints = readPointData(file, header);
+            qDebug() << "Read" << (rawPoints.size() / 3) << "points before filtering";
 
             emit progressUpdated(75);
             VoxelGridFilter filter;
             points = filter.filter(rawPoints, settings);
+            qDebug() << "After voxel grid filtering:" << (points.size() / 3) << "points remain";
 
             // Clear raw points to free memory
             std::vector<float>().swap(rawPoints);
@@ -108,18 +128,35 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
                                .arg(points.size() / 3).arg(header.numberOfPointRecords), points);
         } else {
             // Read point data for full load
+            qDebug() << "Full load mode - reading all point data...";
             points = readPointData(file, header);
+            qDebug() << "Successfully read" << (points.size() / 3) << "points";
             emit parsingFinished(true, QString("Successfully loaded %1 points").arg(points.size() / 3), points);
+        }
+
+        // Log sample coordinates if we have data
+        if (!points.empty() && points.size() >= 9) {
+            qDebug() << "Sample coordinates - First point:" << points[0] << points[1] << points[2];
+            if (points.size() >= 6) {
+                size_t midIndex = (points.size() / 6) * 3; // Middle point
+                if (midIndex + 2 < points.size()) {
+                    qDebug() << "Sample coordinates - Middle point:" << points[midIndex] << points[midIndex + 1] << points[midIndex + 2];
+                }
+            }
+            size_t lastIndex = points.size() - 3;
+            qDebug() << "Sample coordinates - Last point:" << points[lastIndex] << points[lastIndex + 1] << points[lastIndex + 2];
         }
 
         return points;
 
     } catch (const LasParseException& e) {
         setError(QString::fromStdString(e.what()));
+        qDebug() << "LAS parsing failed with LasParseException:" << m_lastError;
         emit parsingFinished(false, m_lastError, std::vector<float>());
         return std::vector<float>();
     } catch (const std::exception& e) {
         setError(QString("Unexpected error: %1").arg(QString::fromStdString(e.what())));
+        qDebug() << "LAS parsing failed with unexpected error:" << m_lastError;
         emit parsingFinished(false, m_lastError, std::vector<float>());
         return std::vector<float>();
     }

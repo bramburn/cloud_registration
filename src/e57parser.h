@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QDataStream>
 #include <QByteArray>
+#include <QXmlStreamReader>
+#include <QDomDocument>
 #include <vector>
 #include <stdexcept>
 
@@ -37,6 +39,11 @@ private:
     bool parseElementSection(QDataStream& stream);
     std::vector<float> parsePointData(QDataStream& stream, qint64 dataOffset, qint64 dataSize);
 
+    // XML parsing methods
+    bool parseXmlSection(QFile& file, qint64 xmlOffset, qint64 xmlLength);
+    bool parseData3D(const QDomElement& data3DElement);
+    std::vector<float> extractPointsFromBinarySection(QFile& file, qint64 binaryOffset, qint64 recordCount);
+
     // Helper functions
     bool readE57String(QDataStream& stream, QString& result);
     bool readE57Integer(QDataStream& stream, qint64& result);
@@ -63,11 +70,20 @@ private:
     qint64 m_currentPosition;
     bool m_headerParsed;
 
+    // E57 file structure data
+    qint64 m_xmlOffset;
+    qint64 m_xmlLength;
+    qint64 m_filePhysicalLength;
+
     // Point cloud metadata
     qint64 m_pointCount;
     bool m_hasXYZ;
     bool m_hasColor;
     bool m_hasIntensity;
+
+    // Binary data information
+    qint64 m_binaryDataOffset;
+    qint64 m_recordCount;
 };
 
 // Custom exception for E57 parsing errors

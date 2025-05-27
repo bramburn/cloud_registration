@@ -350,13 +350,38 @@ void MainWindow::onParsingProgressUpdated(int percentage)
 
 void MainWindow::onParsingFinished(bool success, const QString& message, const std::vector<float>& points)
 {
+    // Debug logging for data flow verification (User Story 1)
+    qDebug() << "=== MainWindow::onParsingFinished ===";
+    qDebug() << "Success:" << success;
+    qDebug() << "Message:" << message;
+    qDebug() << "Points vector size:" << points.size();
+    qDebug() << "Number of points:" << (points.size() / 3);
+
+    // Log sample coordinates if we have data
+    if (!points.empty() && points.size() >= 9) {
+        qDebug() << "First point coordinates:" << points[0] << points[1] << points[2];
+        if (points.size() >= 6) {
+            size_t midIndex = (points.size() / 6) * 3; // Middle point
+            if (midIndex + 2 < points.size()) {
+                qDebug() << "Middle point coordinates:" << points[midIndex] << points[midIndex + 1] << points[midIndex + 2];
+            }
+        }
+        size_t lastIndex = points.size() - 3;
+        qDebug() << "Last point coordinates:" << points[lastIndex] << points[lastIndex + 1] << points[lastIndex + 2];
+    }
+
     // Clean up resources
     cleanupParsingThread();
     cleanupProgressDialog();
 
     // Load point cloud if successful
     if (success && !points.empty()) {
+        qDebug() << "Calling m_viewer->loadPointCloud with" << (points.size() / 3) << "points";
         m_viewer->loadPointCloud(points);
+    } else if (success && points.empty()) {
+        qDebug() << "Points vector is empty - this might be due to 'Header-Only' mode or a parsing error";
+    } else {
+        qDebug() << "Parsing failed, not loading to viewer";
     }
 
     // Update UI
@@ -441,8 +466,8 @@ void MainWindow::onLasHeaderParsed(const LasHeaderMetadata& metadata)
     QString statusMessage = QString("File: %1, Points: %2, BBox: (%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f)")
                            .arg(QFileInfo(metadata.filePath).fileName())
                            .arg(metadata.numberOfPointRecords)
-                           .arg(metadata.minBounds.x()).arg(metadata.minBounds.y()).arg(metadata.minBounds.z())
-                           .arg(metadata.maxBounds.x()).arg(metadata.maxBounds.y()).arg(metadata.maxBounds.z());
+                           .arg(metadata.minBounds.x).arg(metadata.minBounds.y).arg(metadata.minBounds.z)
+                           .arg(metadata.maxBounds.x).arg(metadata.maxBounds.y).arg(metadata.maxBounds.z);
 
     statusBar()->showMessage(statusMessage);
 }

@@ -34,6 +34,12 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
+
+    // Initialize matrices
+    m_modelMatrix.setToIdentity();
+    m_viewMatrix.setToIdentity();
+    m_projectionMatrix.setToIdentity();
+
     qDebug() << "PointCloudViewerWidget constructor completed";
 }
 
@@ -67,15 +73,27 @@ void PointCloudViewerWidget::initializeGL()
         qDebug() << "OpenGL Renderer:" << reinterpret_cast<const char*>(glGetString(GL_RENDERER));
         qDebug() << "GLSL Version:" << reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-        // Set clear color to dark gray
+        // Set clear color to dark gray with error checking (User Story 2)
         qDebug() << "Setting OpenGL state...";
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glClearColor:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-        // Enable depth testing
+        // Enable depth testing with error checking
         glEnable(GL_DEPTH_TEST);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glEnable(GL_DEPTH_TEST):" << QString("0x%1").arg(error, 0, 16);
+        }
 
-        // Enable point size control from vertex shader
+        // Enable point size control from vertex shader with error checking
         glEnable(GL_PROGRAM_POINT_SIZE);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glEnable(GL_PROGRAM_POINT_SIZE):" << QString("0x%1").arg(error, 0, 16);
+        }
         qDebug() << "OpenGL state configured";
 
         // Setup shaders
@@ -120,31 +138,74 @@ void PointCloudViewerWidget::resizeGL(int w, int h)
 
 void PointCloudViewerWidget::paintGL()
 {
+    // Clear buffers with error checking (User Story 2)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after glClear:" << QString("0x%1").arg(error, 0, 16);
+    }
 
-    if (!m_hasData || !m_shadersInitialized) {
+    // Debug logging for rendering state (User Story 2)
+    if (!m_hasData) {
+        qDebug() << "paintGL: No data to render (m_hasData = false)";
+        return;
+    }
+    if (!m_shadersInitialized) {
+        qDebug() << "paintGL: Shaders not initialized (m_shadersInitialized = false)";
         return;
     }
 
-    // Use shader program
+    qDebug() << "paintGL: Rendering" << m_pointCount << "points";
+
+    // Use shader program with error checking
     if (!m_shaderProgram->bind()) {
         qWarning() << "Failed to bind shader program";
         return;
+    }
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
     }
 
     // Calculate MVP matrix
     QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
 
-    // Set uniforms
+    // Set uniforms with error checking
     m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
+    }
+
     m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
+    }
+
     m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
+    }
 
-    // Bind VAO and draw points
+    qDebug() << "paintGL: Point size set to:" << m_pointSize;
+
+    // Bind VAO and draw points with error checking
     m_vertexArrayObject.bind();
-    glDrawArrays(GL_POINTS, 0, m_pointCount);
-    m_vertexArrayObject.release();
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
+    }
 
+    qDebug() << "paintGL: Drawing" << m_pointCount << "points with glDrawArrays(GL_POINTS, 0," << m_pointCount << ")";
+    glDrawArrays(GL_POINTS, 0, m_pointCount);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
+    }
+
+    m_vertexArrayObject.release();
     m_shaderProgram->release();
 
     // Draw UCS indicator
@@ -201,17 +262,34 @@ void PointCloudViewerWidget::setupShaders()
         return;
     }
 
-    // Get uniform locations
+    // Get uniform locations with detailed checking (User Story 2)
     m_mvpMatrixLocation = m_shaderProgram->uniformLocation("mvpMatrix");
     m_colorLocation = m_shaderProgram->uniformLocation("color");
     m_pointSizeLocation = m_shaderProgram->uniformLocation("pointSize");
 
-    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1 || m_pointSizeLocation == -1) {
-        qWarning() << "Failed to get uniform locations";
+    qDebug() << "Uniform locations:";
+    qDebug() << "  mvpMatrix:" << m_mvpMatrixLocation;
+    qDebug() << "  color:" << m_colorLocation;
+    qDebug() << "  pointSize:" << m_pointSizeLocation;
+
+    if (m_mvpMatrixLocation == -1) {
+        qCritical() << "Failed to get mvpMatrix uniform location - shader may have optimized it out or name is incorrect";
+    }
+    if (m_colorLocation == -1) {
+        qCritical() << "Failed to get color uniform location - shader may have optimized it out or name is incorrect";
+    }
+    if (m_pointSizeLocation == -1) {
+        qCritical() << "Failed to get pointSize uniform location - shader may have optimized it out or name is incorrect";
     }
 
-    m_shadersInitialized = true;
-    qDebug() << "Shaders compiled and linked successfully";
+    // Only set initialized flag if all uniforms are found
+    if (m_mvpMatrixLocation != -1 && m_colorLocation != -1 && m_pointSizeLocation != -1) {
+        m_shadersInitialized = true;
+        qDebug() << "Shaders compiled and linked successfully - all uniforms found";
+    } else {
+        m_shadersInitialized = false;
+        qCritical() << "Shader setup failed - one or more uniform locations not found";
+    }
 }
 
 void PointCloudViewerWidget::setupBuffers()
@@ -233,8 +311,13 @@ void PointCloudViewerWidget::setupBuffers()
 
 void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 {
+    // Debug logging for data reception (User Story 1)
+    qDebug() << "=== PointCloudViewerWidget::loadPointCloud ===";
+    qDebug() << "Received points vector size:" << points.size();
+    qDebug() << "Number of points:" << (points.size() / 3);
+
     if (points.empty() || points.size() % 3 != 0) {
-        qWarning() << "Invalid point cloud data";
+        qWarning() << "Invalid point cloud data - empty or not divisible by 3";
         return;
     }
 
@@ -242,34 +325,74 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 
     m_pointData = points;
     m_pointCount = static_cast<int>(points.size() / 3);
+    qDebug() << "Point count set to:" << m_pointCount;
 
     // Calculate bounding box
     calculateBoundingBox();
 
+    // Debug logging after bounding box calculation (User Story 1)
+    qDebug() << "Bounding box calculated:";
+    qDebug() << "  Min:" << m_boundingBoxMin;
+    qDebug() << "  Max:" << m_boundingBoxMax;
+    qDebug() << "  Center:" << m_boundingBoxCenter;
+    qDebug() << "  Size:" << m_boundingBoxSize;
+
     // Update camera to fit the point cloud using proper field-of-view calculation
     fitCameraToPointCloud();
+
+    // Debug logging after camera fitting (User Story 1)
+    qDebug() << "Camera fitted:";
+    qDebug() << "  Distance:" << m_cameraDistance;
+
     updateCamera();
 
-    // Upload data to GPU
+    // Debug logging after camera update (User Story 1)
+    qDebug() << "Camera updated:";
+    qDebug() << "  Position:" << m_cameraPosition;
+    qDebug() << "  Target:" << m_cameraTarget;
+
+    // Upload data to GPU with OpenGL error checking (User Story 2)
     m_vertexArrayObject.bind();
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
+    }
+
     m_vertexBuffer.bind();
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after VBO bind:" << QString("0x%1").arg(error, 0, 16);
+    }
+
     m_vertexBuffer.allocate(points.data(), static_cast<int>(points.size() * sizeof(float)));
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after VBO allocate:" << QString("0x%1").arg(error, 0, 16);
+    }
 
     // Set vertex attribute
     glEnableVertexAttribArray(0);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after glEnableVertexAttribArray:" << QString("0x%1").arg(error, 0, 16);
+    }
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        qCritical() << "OpenGL Error after glVertexAttribPointer:" << QString("0x%1").arg(error, 0, 16);
+    }
 
     m_vertexBuffer.release();
     m_vertexArrayObject.release();
 
     m_hasData = true;
+    qDebug() << "m_hasData set to true";
 
     doneCurrent();
     update(); // Trigger repaint
 
-    qDebug() << "Loaded point cloud with" << m_pointCount << "points";
-    qDebug() << "Bounding box center:" << m_boundingBoxCenter;
-    qDebug() << "Bounding box size:" << m_boundingBoxSize;
+    qDebug() << "Point cloud loading completed successfully";
 }
 
 void PointCloudViewerWidget::clearPointCloud()
