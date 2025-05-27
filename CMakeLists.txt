@@ -48,14 +48,16 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
         set(Qt6_DIR $ENV{Qt6_DIR})
         message(STATUS "Using Qt6 from environment variable: ${Qt6_DIR}")
     else()
-        # Try common Qt6 installation paths
+        # Try common Qt6 installation paths - prioritize Qt 6.9.0
         set(QT_POSSIBLE_PATHS
+            "C:/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
             "C:/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
             "C:/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
             "C:/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
             "C:/Qt/6.5.3/msvc2019_64/lib/cmake/Qt6"
             "C:/Qt/6.5.0/msvc2019_64/lib/cmake/Qt6"
             "C:/Qt/6.5.0/msvc2022_64/lib/cmake/Qt6"
+            "$ENV{PROGRAMFILES}/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
             "$ENV{PROGRAMFILES}/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
             "$ENV{PROGRAMFILES}/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
             "$ENV{PROGRAMFILES}/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
@@ -75,8 +77,11 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
     endif()
 endif()
 
-# Find Qt6 components
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets)
+# Find Qt6 components - require minimum version 6.9.0
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets)
+
+# Add compile definitions to disable deprecated APIs up to Qt 5.15
+add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
 
 # Enable Qt's MOC (Meta-Object Compiler)
 set(CMAKE_AUTOMOC ON)

@@ -29,18 +29,42 @@ MainWindow::MainWindow(QWidget *parent)
     , m_parserThread(nullptr)
     , m_isLoading(false)
 {
-    setupUI();
-    setupMenuBar();
-    setupStatusBar();
+    qDebug() << "MainWindow constructor started";
 
-    // Initialize parsers
-    m_e57Parser = new E57Parser(this);
-    m_lasParser = new LasParser(this);
+    try {
+        qDebug() << "Setting up UI...";
+        setupUI();
+        qDebug() << "UI setup completed";
 
-    // Set window properties
-    setWindowTitle("Cloud Registration - Point Cloud Viewer");
-    setMinimumSize(800, 600);
-    resize(1200, 800);
+        qDebug() << "Setting up menu bar...";
+        setupMenuBar();
+        qDebug() << "Menu bar setup completed";
+
+        qDebug() << "Setting up status bar...";
+        setupStatusBar();
+        qDebug() << "Status bar setup completed";
+
+        // Initialize parsers
+        qDebug() << "Initializing parsers...";
+        m_e57Parser = new E57Parser(this);
+        m_lasParser = new LasParser(this);
+        qDebug() << "Parsers initialized";
+
+        // Set window properties
+        qDebug() << "Setting window properties...";
+        setWindowTitle("Cloud Registration - Point Cloud Viewer");
+        setMinimumSize(800, 600);
+        resize(1200, 800);
+        qDebug() << "Window properties set";
+
+        qDebug() << "MainWindow constructor completed successfully";
+    } catch (const std::exception& e) {
+        qCritical() << "Exception in MainWindow constructor:" << e.what();
+        throw;
+    } catch (...) {
+        qCritical() << "Unknown exception in MainWindow constructor";
+        throw;
+    }
 }
 
 MainWindow::~MainWindow()

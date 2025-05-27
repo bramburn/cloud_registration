@@ -32,7 +32,9 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_hasData(false)
     , m_shadersInitialized(false)
 {
+    qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
+    qDebug() << "PointCloudViewerWidget constructor completed";
 }
 
 PointCloudViewerWidget::~PointCloudViewerWidget()
@@ -52,28 +54,56 @@ PointCloudViewerWidget::~PointCloudViewerWidget()
 
 void PointCloudViewerWidget::initializeGL()
 {
-    initializeOpenGLFunctions();
+    qDebug() << "PointCloudViewerWidget::initializeGL() started";
 
-    // Set clear color to dark gray
-    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+    try {
+        qDebug() << "Initializing OpenGL functions...";
+        initializeOpenGLFunctions();
+        qDebug() << "OpenGL functions initialized";
 
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
+        // Log OpenGL information
+        qDebug() << "OpenGL Version:" << reinterpret_cast<const char*>(glGetString(GL_VERSION));
+        qDebug() << "OpenGL Vendor:" << reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+        qDebug() << "OpenGL Renderer:" << reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        qDebug() << "GLSL Version:" << reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-    // Enable point size control from vertex shader
-    glEnable(GL_PROGRAM_POINT_SIZE);
+        // Set clear color to dark gray
+        qDebug() << "Setting OpenGL state...";
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-    // Setup shaders
-    setupShaders();
-    setupUCSShaders();
+        // Enable depth testing
+        glEnable(GL_DEPTH_TEST);
 
-    // Setup buffers
-    setupBuffers();
-    setupUCSBuffers();
+        // Enable point size control from vertex shader
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        qDebug() << "OpenGL state configured";
 
-    qDebug() << "OpenGL initialized successfully";
-    qDebug() << "OpenGL Version:" << reinterpret_cast<const char*>(glGetString(GL_VERSION));
-    qDebug() << "GLSL Version:" << reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+        // Setup shaders
+        qDebug() << "Setting up main shaders...";
+        setupShaders();
+        qDebug() << "Main shaders setup completed";
+
+        qDebug() << "Setting up UCS shaders...";
+        setupUCSShaders();
+        qDebug() << "UCS shaders setup completed";
+
+        // Setup buffers
+        qDebug() << "Setting up main buffers...";
+        setupBuffers();
+        qDebug() << "Main buffers setup completed";
+
+        qDebug() << "Setting up UCS buffers...";
+        setupUCSBuffers();
+        qDebug() << "UCS buffers setup completed";
+
+        qDebug() << "OpenGL initialized successfully";
+    } catch (const std::exception& e) {
+        qCritical() << "Exception in initializeGL:" << e.what();
+        throw;
+    } catch (...) {
+        qCritical() << "Unknown exception in initializeGL";
+        throw;
+    }
 }
 
 void PointCloudViewerWidget::resizeGL(int w, int h)
