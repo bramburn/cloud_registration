@@ -8,9 +8,12 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     : QOpenGLWidget(parent)
     , m_vertexBuffer(QOpenGLBuffer::VertexBuffer)
     , m_shaderProgram(nullptr)
+    , m_ucsVertexBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_ucsShaderProgram(nullptr)
     , m_mvpMatrixLocation(-1)
     , m_colorLocation(-1)
     , m_pointSizeLocation(-1)
+    , m_ucsMvpMatrixLocation(-1)
     , m_cameraPosition(0.0f, 0.0f, 5.0f)
     , m_cameraTarget(0.0f, 0.0f, 0.0f)
     , m_cameraUp(0.0f, 1.0f, 0.0f)
@@ -40,6 +43,10 @@ PointCloudViewerWidget::~PointCloudViewerWidget()
         delete m_shaderProgram;
     }
 
+    if (m_ucsShaderProgram) {
+        delete m_ucsShaderProgram;
+    }
+
     doneCurrent();
 }
 
@@ -58,9 +65,11 @@ void PointCloudViewerWidget::initializeGL()
 
     // Setup shaders
     setupShaders();
+    setupUCSShaders();
 
     // Setup buffers
     setupBuffers();
+    setupUCSBuffers();
 
     qDebug() << "OpenGL initialized successfully";
     qDebug() << "OpenGL Version:" << reinterpret_cast<const char*>(glGetString(GL_VERSION));
@@ -107,6 +116,9 @@ void PointCloudViewerWidget::paintGL()
     m_vertexArrayObject.release();
 
     m_shaderProgram->release();
+
+    // Draw UCS indicator
+    drawUCS();
 }
 
 void PointCloudViewerWidget::setupShaders()
@@ -384,4 +396,216 @@ void PointCloudViewerWidget::wheelEvent(QWheelEvent *event)
     m_cameraDistance = std::max(0.1f, std::min(m_boundingBoxSize * 10.0f, m_cameraDistance));
 
     updateCamera();
+}
+
+// View control methods
+void PointCloudViewerWidget::setTopView()
+{
+    // Top view: Camera directly above target, looking down
+    m_cameraYaw = 0.0f;
+    m_cameraPitch = static_cast<float>(M_PI) / 2.0f - 0.1f; // Almost 90 degrees, avoid singularity
+    m_cameraUp = QVector3D(0.0f, 0.0f, -1.0f); // Z-axis points forward in top view
+    updateCamera();
+}
+
+void PointCloudViewerWidget::setLeftView()
+{
+    // Left view: Camera to the left of target, looking right
+    m_cameraYaw = -static_cast<float>(M_PI) / 2.0f; // -90 degrees
+    m_cameraPitch = 0.0f;
+    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f); // Y-axis points up
+    updateCamera();
+}
+
+void PointCloudViewerWidget::setRightView()
+{
+    // Right view: Camera to the right of target, looking left
+    m_cameraYaw = static_cast<float>(M_PI) / 2.0f; // 90 degrees
+    m_cameraPitch = 0.0f;
+    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f); // Y-axis points up
+    updateCamera();
+}
+
+void PointCloudViewerWidget::setBottomView()
+{
+    // Bottom view: Camera directly below target, looking up
+    m_cameraYaw = 0.0f;
+    m_cameraPitch = -static_cast<float>(M_PI) / 2.0f + 0.1f; // Almost -90 degrees, avoid singularity
+    m_cameraUp = QVector3D(0.0f, 0.0f, 1.0f); // Z-axis points forward in bottom view
+    updateCamera();
+}
+
+// UCS implementation
+void PointCloudViewerWidget::setupUCSShaders()
+{
+    m_ucsShaderProgram = new QOpenGLShaderProgram(this);
+
+    // UCS Vertex shader - simple line rendering
+    const char* ucsVertexShaderSource = R"(
+        #version 330 core
+
+        layout (location = 0) in vec3 position;
+        layout (location = 1) in vec3 color;
+
+        uniform mat4 mvpMatrix;
+
+        out vec3 vertexColor;
+
+        void main()
+        {
+            gl_Position = mvpMatrix * vec4(position, 1.0);
+            vertexColor = color;
+        }
+    )";
+
+    // UCS Fragment shader
+    const char* ucsFragmentShaderSource = R"(
+        #version 330 core
+
+        in vec3 vertexColor;
+        out vec4 fragColor;
+
+        void main()
+        {
+            fragColor = vec4(vertexColor, 1.0);
+        }
+    )";
+
+    // Compile and link UCS shaders
+    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, ucsVertexShaderSource)) {
+        qCritical() << "Failed to compile UCS vertex shader:" << m_ucsShaderProgram->log();
+        return;
+    }
+
+    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, ucsFragmentShaderSource)) {
+        qCritical() << "Failed to compile UCS fragment shader:" << m_ucsShaderProgram->log();
+        return;
+    }
+
+    if (!m_ucsShaderProgram->link()) {
+        qCritical() << "Failed to link UCS shader program:" << m_ucsShaderProgram->log();
+        return;
+    }
+
+    // Get UCS uniform locations
+    m_ucsMvpMatrixLocation = m_ucsShaderProgram->uniformLocation("mvpMatrix");
+
+    if (m_ucsMvpMatrixLocation == -1) {
+        qWarning() << "Failed to get UCS uniform locations";
+    }
+
+    qDebug() << "UCS shaders compiled and linked successfully";
+}
+
+void PointCloudViewerWidget::setupUCSBuffers()
+{
+    // Create UCS VAO
+    if (!m_ucsVertexArrayObject.create()) {
+        qCritical() << "Failed to create UCS VAO";
+        return;
+    }
+
+    // Create UCS VBO
+    if (!m_ucsVertexBuffer.create()) {
+        qCritical() << "Failed to create UCS VBO";
+        return;
+    }
+
+    // Define UCS axes data (position + color)
+    // Each axis: origin to endpoint, with color
+    // X-axis: Red (1,0,0), Y-axis: Green (0,1,0), Z-axis: Blue (0,0,1)
+    float ucsVertices[] = {
+        // X-axis (Red)
+        0.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Origin, Red
+        1.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // X endpoint, Red
+
+        // Y-axis (Green)
+        0.0f, 0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Origin, Green
+        0.0f, 1.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Y endpoint, Green
+
+        // Z-axis (Blue)
+        0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  // Origin, Blue
+        0.0f, 0.0f, 1.0f,  0.0f, 0.0f, 1.0f   // Z endpoint, Blue
+    };
+
+    // Upload UCS data to GPU
+    m_ucsVertexArrayObject.bind();
+    m_ucsVertexBuffer.bind();
+    m_ucsVertexBuffer.allocate(ucsVertices, sizeof(ucsVertices));
+
+    // Set vertex attributes for UCS
+    // Position attribute (location 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+
+    // Color attribute (location 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+
+    m_ucsVertexBuffer.release();
+    m_ucsVertexArrayObject.release();
+
+    qDebug() << "UCS buffers created successfully";
+}
+
+void PointCloudViewerWidget::drawUCS()
+{
+    if (!m_ucsShaderProgram || m_ucsMvpMatrixLocation == -1) {
+        return;
+    }
+
+    // Save current OpenGL state
+    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    GLfloat lineWidth;
+    glGetFloatv(GL_LINE_WIDTH, &lineWidth);
+
+    // Configure OpenGL for UCS rendering
+    glDisable(GL_DEPTH_TEST); // UCS should always be visible
+    glLineWidth(3.0f); // Make UCS lines thicker
+
+    // Use UCS shader program
+    if (!m_ucsShaderProgram->bind()) {
+        qWarning() << "Failed to bind UCS shader program";
+        return;
+    }
+
+    // Calculate UCS transformation matrix
+    // Position UCS in top-right corner of screen
+    QMatrix4x4 ucsProjectionMatrix;
+    QMatrix4x4 ucsViewMatrix;
+    QMatrix4x4 ucsModelMatrix;
+
+    // Create orthographic projection for screen-space positioning
+    float aspectRatio = static_cast<float>(width()) / static_cast<float>(height() ? height() : 1);
+    ucsProjectionMatrix.ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f, -10.0f, 10.0f);
+
+    // Extract rotation from current view matrix (remove translation)
+    QMatrix4x4 rotationMatrix = m_viewMatrix;
+    rotationMatrix.setColumn(3, QVector4D(0, 0, 0, 1)); // Remove translation
+
+    // Position UCS in top-right corner
+    ucsModelMatrix.translate(aspectRatio * 0.7f, 0.7f, 0.0f); // Top-right corner
+    ucsModelMatrix.scale(0.15f); // Scale down the UCS
+
+    // Apply only rotation from camera (not translation)
+    ucsViewMatrix = rotationMatrix;
+
+    // Calculate final MVP matrix for UCS
+    QMatrix4x4 ucsMvpMatrix = ucsProjectionMatrix * ucsViewMatrix * ucsModelMatrix;
+
+    // Set UCS uniforms
+    m_ucsShaderProgram->setUniformValue(m_ucsMvpMatrixLocation, ucsMvpMatrix);
+
+    // Bind UCS VAO and draw lines
+    m_ucsVertexArrayObject.bind();
+    glDrawArrays(GL_LINES, 0, 6); // 6 vertices (3 lines, 2 vertices each)
+    m_ucsVertexArrayObject.release();
+
+    m_ucsShaderProgram->release();
+
+    // Restore OpenGL state
+    if (depthTestEnabled) {
+        glEnable(GL_DEPTH_TEST);
+    }
+    glLineWidth(lineWidth);
 }

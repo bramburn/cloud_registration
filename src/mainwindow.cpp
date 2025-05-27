@@ -13,9 +13,17 @@ MainWindow::MainWindow(QWidget *parent)
     , m_mainLayout(nullptr)
     , m_buttonLayout(nullptr)
     , m_openFileButton(nullptr)
+    , m_topViewButton(nullptr)
+    , m_leftViewButton(nullptr)
+    , m_rightViewButton(nullptr)
+    , m_bottomViewButton(nullptr)
     , m_viewer(nullptr)
     , m_statusLabel(nullptr)
     , m_progressDialog(nullptr)
+    , m_topViewAction(nullptr)
+    , m_leftViewAction(nullptr)
+    , m_rightViewAction(nullptr)
+    , m_bottomViewAction(nullptr)
     , m_e57Parser(nullptr)
     , m_lasParser(nullptr)
     , m_parserThread(nullptr)
@@ -73,9 +81,49 @@ void MainWindow::setupUI()
 
     connect(m_openFileButton, &QPushButton::clicked, this, &MainWindow::onOpenFileClicked);
 
-    // Add button to layout
+    // Create view control buttons
+    m_topViewButton = new QPushButton("Top View", this);
+    m_leftViewButton = new QPushButton("Left View", this);
+    m_rightViewButton = new QPushButton("Right View", this);
+    m_bottomViewButton = new QPushButton("Bottom View", this);
+
+    // Style view buttons
+    QString viewButtonStyle =
+        "QPushButton {"
+        "    background-color: #2196F3;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 6px 12px;"
+        "    font-size: 12px;"
+        "    border-radius: 3px;"
+        "    min-width: 80px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #1976D2;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #1565C0;"
+        "}";
+
+    m_topViewButton->setStyleSheet(viewButtonStyle);
+    m_leftViewButton->setStyleSheet(viewButtonStyle);
+    m_rightViewButton->setStyleSheet(viewButtonStyle);
+    m_bottomViewButton->setStyleSheet(viewButtonStyle);
+
+    // Connect view buttons
+    connect(m_topViewButton, &QPushButton::clicked, this, &MainWindow::onTopViewClicked);
+    connect(m_leftViewButton, &QPushButton::clicked, this, &MainWindow::onLeftViewClicked);
+    connect(m_rightViewButton, &QPushButton::clicked, this, &MainWindow::onRightViewClicked);
+    connect(m_bottomViewButton, &QPushButton::clicked, this, &MainWindow::onBottomViewClicked);
+
+    // Add buttons to layout
     m_buttonLayout->addWidget(m_openFileButton);
-    m_buttonLayout->addStretch(); // Push button to the left
+    m_buttonLayout->addSpacing(20); // Add some space
+    m_buttonLayout->addWidget(m_topViewButton);
+    m_buttonLayout->addWidget(m_leftViewButton);
+    m_buttonLayout->addWidget(m_rightViewButton);
+    m_buttonLayout->addWidget(m_bottomViewButton);
+    m_buttonLayout->addStretch(); // Push buttons to the left
 
     // Create 3D viewer widget
     m_viewer = new PointCloudViewerWidget(this);
@@ -103,6 +151,33 @@ void MainWindow::setupMenuBar()
     exitAction->setStatusTip("Exit the application");
     connect(exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(exitAction);
+
+    // Create View menu
+    QMenu *viewMenu = menuBar()->addMenu("&View");
+
+    m_topViewAction = new QAction("&Top View", this);
+    m_topViewAction->setShortcut(QKeySequence("Ctrl+1"));
+    m_topViewAction->setStatusTip("Switch to top view");
+    connect(m_topViewAction, &QAction::triggered, this, &MainWindow::onTopViewClicked);
+    viewMenu->addAction(m_topViewAction);
+
+    m_leftViewAction = new QAction("&Left View", this);
+    m_leftViewAction->setShortcut(QKeySequence("Ctrl+2"));
+    m_leftViewAction->setStatusTip("Switch to left view");
+    connect(m_leftViewAction, &QAction::triggered, this, &MainWindow::onLeftViewClicked);
+    viewMenu->addAction(m_leftViewAction);
+
+    m_rightViewAction = new QAction("&Right View", this);
+    m_rightViewAction->setShortcut(QKeySequence("Ctrl+3"));
+    m_rightViewAction->setStatusTip("Switch to right view");
+    connect(m_rightViewAction, &QAction::triggered, this, &MainWindow::onRightViewClicked);
+    viewMenu->addAction(m_rightViewAction);
+
+    m_bottomViewAction = new QAction("&Bottom View", this);
+    m_bottomViewAction->setShortcut(QKeySequence("Ctrl+4"));
+    m_bottomViewAction->setStatusTip("Switch to bottom view");
+    connect(m_bottomViewAction, &QAction::triggered, this, &MainWindow::onBottomViewClicked);
+    viewMenu->addAction(m_bottomViewAction);
 
     // Create Help menu
     QMenu *helpMenu = menuBar()->addMenu("&Help");
@@ -264,5 +339,38 @@ void MainWindow::onParsingFinished(bool success, const QString& message, const s
     } else {
         statusBar()->showMessage("Failed to load file");
         QMessageBox::warning(this, "Loading Error", message);
+    }
+}
+
+// View control slot implementations
+void MainWindow::onTopViewClicked()
+{
+    if (m_viewer) {
+        m_viewer->setTopView();
+        statusBar()->showMessage("Switched to top view");
+    }
+}
+
+void MainWindow::onLeftViewClicked()
+{
+    if (m_viewer) {
+        m_viewer->setLeftView();
+        statusBar()->showMessage("Switched to left view");
+    }
+}
+
+void MainWindow::onRightViewClicked()
+{
+    if (m_viewer) {
+        m_viewer->setRightView();
+        statusBar()->showMessage("Switched to right view");
+    }
+}
+
+void MainWindow::onBottomViewClicked()
+{
+    if (m_viewer) {
+        m_viewer->setBottomView();
+        statusBar()->showMessage("Switched to bottom view");
     }
 }

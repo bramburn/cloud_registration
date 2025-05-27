@@ -34,6 +34,12 @@ private slots:
     void onParsingProgressUpdated(int percentage);
     void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
 
+    // View control slots
+    void onTopViewClicked();
+    void onLeftViewClicked();
+    void onRightViewClicked();
+    void onBottomViewClicked();
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -44,9 +50,19 @@ private:
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_buttonLayout;
     QPushButton *m_openFileButton;
+    QPushButton *m_topViewButton;
+    QPushButton *m_leftViewButton;
+    QPushButton *m_rightViewButton;
+    QPushButton *m_bottomViewButton;
     PointCloudViewerWidget *m_viewer;
     QLabel *m_statusLabel;
     QProgressDialog *m_progressDialog;
+
+    // Menu actions
+    QAction *m_topViewAction;
+    QAction *m_leftViewAction;
+    QAction *m_rightViewAction;
+    QAction *m_bottomViewAction;
 
     // Data processing
     E57Parser *m_e57Parser;

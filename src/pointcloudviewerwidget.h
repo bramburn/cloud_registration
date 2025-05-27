@@ -24,6 +24,13 @@ public:
     void loadPointCloud(const std::vector<float>& points);
     void clearPointCloud();
 
+public slots:
+    // View control slots
+    void setTopView();
+    void setLeftView();
+    void setRightView();
+    void setBottomView();
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -42,15 +49,28 @@ private:
     void calculateBoundingBox();
     void fitCameraToPointCloud();
 
+    // UCS methods
+    void setupUCSShaders();
+    void setupUCSBuffers();
+    void drawUCS();
+
     // OpenGL objects
     QOpenGLBuffer m_vertexBuffer;
     QOpenGLVertexArrayObject m_vertexArrayObject;
     QOpenGLShaderProgram *m_shaderProgram;
 
+    // UCS OpenGL objects
+    QOpenGLBuffer m_ucsVertexBuffer;
+    QOpenGLVertexArrayObject m_ucsVertexArrayObject;
+    QOpenGLShaderProgram *m_ucsShaderProgram;
+
     // Shader uniform locations
     int m_mvpMatrixLocation;
     int m_colorLocation;
     int m_pointSizeLocation;
+
+    // UCS uniform locations
+    int m_ucsMvpMatrixLocation;
 
     // Camera parameters
     QMatrix4x4 m_projectionMatrix;
