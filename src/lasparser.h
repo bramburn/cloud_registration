@@ -6,8 +6,13 @@
 #include <QFile>
 #include <QDataStream>
 #include <QByteArray>
+#include <QVector3D>
 #include <vector>
 #include <stdexcept>
+
+// Forward declarations
+struct LoadingSettings;
+struct LasHeaderMetadata;
 
 class LasParser : public QObject
 {
@@ -19,6 +24,7 @@ public:
 
     // Main parsing function
     std::vector<float> parse(const QString& filePath);
+    std::vector<float> parse(const QString& filePath, const LoadingSettings& settings);
 
     // Utility functions
     bool isValidLasFile(const QString& filePath);
@@ -26,10 +32,12 @@ public:
 
 public slots:
     void startParsing(const QString& filePath);
+    void startParsing(const QString& filePath, const LoadingSettings& settings);
 
 signals:
     void progressUpdated(int percentage);
     void parsingFinished(bool success, const QString& message, const std::vector<float>& points);
+    void headerParsed(const LasHeaderMetadata& metadata);
 
 private:
     // LAS file header structure
@@ -106,7 +114,6 @@ private:
     std::vector<float> readPointFormat3(QFile& file, const LasHeader& header);
 
     // Helper functions
-    bool readLittleEndian(QFile& file, void* data, size_t size);
     template<typename T>
     bool readValue(QFile& file, T& value);
 
@@ -140,6 +147,10 @@ private:
     uint8_t m_pointFormat;
     double m_xScale, m_yScale, m_zScale;
     double m_xOffset, m_yOffset, m_zOffset;
+
+    // Header metadata for signals
+    QVector3D m_boundingBoxMin;
+    QVector3D m_boundingBoxMax;
 };
 
 // Custom exception for LAS parsing errors

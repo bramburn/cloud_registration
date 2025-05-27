@@ -102,6 +102,7 @@ set(SOURCES
     src/pointcloudviewerwidget.cpp
     src/e57parser.cpp
     src/lasparser.cpp
+    src/loadingsettingsdialog.cpp
 )
 
 # Header files
@@ -110,6 +111,9 @@ set(HEADERS
     src/pointcloudviewerwidget.h
     src/e57parser.h
     src/lasparser.h
+    src/loadingsettingsdialog.h
+    src/loadingsettings.h
+    src/lasheadermetadata.h
 )
 
 # Shader files

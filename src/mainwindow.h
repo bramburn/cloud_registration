@@ -19,6 +19,7 @@
 class PointCloudViewerWidget;
 class E57Parser;
 class LasParser;
+struct LasHeaderMetadata;
 
 class MainWindow : public QMainWindow
 {
@@ -33,6 +34,12 @@ private slots:
     void onLoadingFinished(bool success, const QString& message);
     void onParsingProgressUpdated(int percentage);
     void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
+
+    // Settings dialog slot
+    void onLoadingSettingsTriggered();
+
+    // Header metadata slot
+    void onLasHeaderParsed(const LasHeaderMetadata& metadata);
 
     // View control slots
     void onTopViewClicked();
@@ -63,6 +70,7 @@ private:
     QProgressDialog *m_progressDialog;
 
     // Menu actions
+    QAction *m_loadingSettingsAction;
     QAction *m_topViewAction;
     QAction *m_leftViewAction;
     QAction *m_rightViewAction;

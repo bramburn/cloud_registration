@@ -2,10 +2,14 @@
 #include "pointcloudviewerwidget.h"
 #include "e57parser.h"
 #include "lasparser.h"
+#include "loadingsettingsdialog.h"
+#include "lasheadermetadata.h"
+#include "loadingsettings.h"
 #include <QApplication>
 #include <QThread>
 #include <QTimer>
 #include <QFileInfo>
+#include <QSettings>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_bottomViewButton(nullptr)
     , m_viewer(nullptr)
     , m_progressDialog(nullptr)
+    , m_loadingSettingsAction(nullptr)
     , m_topViewAction(nullptr)
     , m_leftViewAction(nullptr)
     , m_rightViewAction(nullptr)
@@ -169,6 +174,14 @@ void MainWindow::setupMenuBar()
 
     fileMenu->addSeparator();
 
+    // Add Loading Settings action
+    m_loadingSettingsAction = new QAction("Loading &Settings...", this);
+    m_loadingSettingsAction->setStatusTip("Configure point cloud loading options");
+    connect(m_loadingSettingsAction, &QAction::triggered, this, &MainWindow::onLoadingSettingsTriggered);
+    fileMenu->addAction(m_loadingSettingsAction);
+
+    fileMenu->addSeparator();
+
     QAction *exitAction = new QAction("E&xit", this);
     exitAction->setShortcut(QKeySequence::Quit);
     exitAction->setStatusTip("Exit the application");
@@ -239,6 +252,13 @@ void MainWindow::onOpenFileClicked()
         return;
     }
 
+    // Load current settings from QSettings
+    QSettings settings("CloudRegistration", "PointCloudViewer");
+    LoadingSettings loadingSettings;
+    int methodValue = settings.value("PointCloudLoading/DefaultMethod",
+                                    static_cast<int>(LoadingMethod::FullLoad)).toInt();
+    loadingSettings.method = static_cast<LoadingMethod>(methodValue);
+
     m_currentFilePath = fileName;
     m_isLoading = true;
 
@@ -281,10 +301,11 @@ void MainWindow::onOpenFileClicked()
 
         // Connect signals
         connect(m_parserThread, &QThread::started, lasWorker, [=]() {
-            lasWorker->startParsing(m_currentFilePath);
+            lasWorker->startParsing(m_currentFilePath, loadingSettings);
         });
         connect(lasWorker, &LasParser::progressUpdated, this, &MainWindow::onParsingProgressUpdated, Qt::QueuedConnection);
         connect(lasWorker, &LasParser::parsingFinished, this, &MainWindow::onParsingFinished, Qt::QueuedConnection);
+        connect(lasWorker, &LasParser::headerParsed, this, &MainWindow::onLasHeaderParsed, Qt::QueuedConnection);
 
     } else {
         // Cleanup and show error
@@ -398,4 +419,22 @@ void MainWindow::updateUIAfterParsing(bool success, const QString& message)
         statusBar()->showMessage("Failed to load file");
         QMessageBox::warning(this, "Loading Error", message);
     }
+}
+
+void MainWindow::onLoadingSettingsTriggered()
+{
+    LoadingSettingsDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::onLasHeaderParsed(const LasHeaderMetadata& metadata)
+{
+    // Update status bar with header metadata
+    QString statusMessage = QString("File: %1, Points: %2, BBox: (%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f)")
+                           .arg(QFileInfo(metadata.filePath).fileName())
+                           .arg(metadata.numberOfPointRecords)
+                           .arg(metadata.minBounds.x()).arg(metadata.minBounds.y()).arg(metadata.minBounds.z())
+                           .arg(metadata.maxBounds.x()).arg(metadata.maxBounds.y()).arg(metadata.maxBounds.z());
+
+    statusBar()->showMessage(statusMessage);
 }

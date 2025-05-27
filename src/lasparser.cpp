@@ -1,4 +1,6 @@
 #include "lasparser.h"
+#include "loadingsettings.h"
+#include "lasheadermetadata.h"
 #include <QDebug>
 #include <QFileInfo>
 #include <QtEndian>
@@ -34,6 +36,14 @@ LasParser::~LasParser()
 
 std::vector<float> LasParser::parse(const QString& filePath)
 {
+    // Default to full load for backward compatibility
+    LoadingSettings defaultSettings;
+    defaultSettings.method = LoadingMethod::FullLoad;
+    return parse(filePath, defaultSettings);
+}
+
+std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettings& settings)
+{
     m_hasError = false;
     m_lastError.clear();
 
@@ -65,10 +75,33 @@ std::vector<float> LasParser::parse(const QString& filePath)
         m_yOffset = header.yOffset;
         m_zOffset = header.zOffset;
 
-        // Read point data
-        std::vector<float> points = readPointData(file, header);
+        // Store bounding box information
+        m_boundingBoxMin = QVector3D(static_cast<float>(header.minX),
+                                    static_cast<float>(header.minY),
+                                    static_cast<float>(header.minZ));
+        m_boundingBoxMax = QVector3D(static_cast<float>(header.maxX),
+                                    static_cast<float>(header.maxY),
+                                    static_cast<float>(header.maxZ));
 
-        emit parsingFinished(true, QString("Successfully loaded %1 points").arg(points.size() / 3), points);
+        // Emit header metadata
+        LasHeaderMetadata metadata;
+        metadata.numberOfPointRecords = header.numberOfPointRecords;
+        metadata.minBounds = m_boundingBoxMin;
+        metadata.maxBounds = m_boundingBoxMax;
+        metadata.filePath = filePath;
+        emit headerParsed(metadata);
+
+        // Conditional parsing based on loading method
+        std::vector<float> points;
+        if (settings.method == LoadingMethod::HeaderOnly) {
+            // Return empty vector for header-only mode
+            emit parsingFinished(true, QString("Header loaded: %1 points").arg(header.numberOfPointRecords), points);
+        } else {
+            // Read point data for full load
+            points = readPointData(file, header);
+            emit parsingFinished(true, QString("Successfully loaded %1 points").arg(points.size() / 3), points);
+        }
+
         return points;
 
     } catch (const LasParseException& e) {
@@ -84,9 +117,17 @@ std::vector<float> LasParser::parse(const QString& filePath)
 
 void LasParser::startParsing(const QString& filePath)
 {
+    // Default to full load for backward compatibility
+    LoadingSettings defaultSettings;
+    defaultSettings.method = LoadingMethod::FullLoad;
+    startParsing(filePath, defaultSettings);
+}
+
+void LasParser::startParsing(const QString& filePath, const LoadingSettings& settings)
+{
     // This slot is called from the worker thread
     try {
-        std::vector<float> points = parse(filePath);
+        std::vector<float> points = parse(filePath, settings);
         // The parse() method already emits the parsingFinished signal
     } catch (const std::exception& e) {
         emit parsingFinished(false, QString("Error in startParsing: %1").arg(e.what()), std::vector<float>());
