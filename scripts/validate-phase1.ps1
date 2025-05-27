@@ -33,78 +33,67 @@ $allChecks = @()
 $passedChecks = 0
 $totalChecks = 0
 
-function Test-Component {
+function Test-Check {
     param(
         [string]$Name,
-        [scriptblock]$Test,
+        [bool]$Result,
         [string]$SuccessMessage,
         [string]$FailureMessage
     )
-    
-    $global:totalChecks++
+
+    $script:totalChecks++
     Write-Host "Checking $Name..." -ForegroundColor Cyan
-    
-    try {
-        $result = & $Test
-        if ($result) {
-            Write-Host "  ✓ $SuccessMessage" -ForegroundColor Green
-            $global:passedChecks++
-            $global:allChecks += @{Name=$Name; Status="PASS"; Message=$SuccessMessage}
-        } else {
-            Write-Host "  ✗ $FailureMessage" -ForegroundColor Red
-            $global:allChecks += @{Name=$Name; Status="FAIL"; Message=$FailureMessage}
-        }
-    } catch {
-        Write-Host "  ✗ $FailureMessage (Exception: $($_.Exception.Message))" -ForegroundColor Red
-        $global:allChecks += @{Name=$Name; Status="ERROR"; Message="$FailureMessage (Exception: $($_.Exception.Message))"}
+
+    if ($Result) {
+        Write-Host "  ✓ $SuccessMessage" -ForegroundColor Green
+        $script:passedChecks++
+        $script:allChecks += @{Name=$Name; Status="PASS"; Message=$SuccessMessage}
+    } else {
+        Write-Host "  ✗ $FailureMessage" -ForegroundColor Red
+        $script:allChecks += @{Name=$Name; Status="FAIL"; Message=$FailureMessage}
     }
 }
 
 # 1. Check CMakeLists.txt enhancements
-Test-Component "CMakeLists.txt Integration" {
-    $cmakeContent = Get-Content "CMakeLists.txt" -Raw
-    return ($cmakeContent -match "enable_testing\(\)" -and 
-            $cmakeContent -match "ENABLE_COVERAGE" -and
-            $cmakeContent -match "add_test\(NAME.*COMMAND" -and
-            $cmakeContent -match "run_tests")
-} "CMake integration properly configured" "CMake integration missing or incomplete"
+$cmakeContent = Get-Content "CMakeLists.txt" -Raw
+$cmakeIntegration = ($cmakeContent -match "enable_testing\(\)" -and
+                    $cmakeContent -match "ENABLE_COVERAGE" -and
+                    $cmakeContent -match "add_test\(NAME.*COMMAND" -and
+                    $cmakeContent -match "run_tests")
+Test-Check "CMakeLists.txt Integration" $cmakeIntegration "CMake integration properly configured" "CMake integration missing or incomplete"
 
 # 2. Check test files exist
 $testFiles = @(
     "tests/test_e57parser.cpp",
-    "tests/test_lasparser.cpp", 
+    "tests/test_lasparser.cpp",
     "tests/test_voxelgridfilter.cpp",
     "tests/test_sprint1_functionality.cpp"
 )
 
 foreach ($testFile in $testFiles) {
-    Test-Component "Test File: $testFile" {
-        return (Test-Path $testFile)
-    } "Test file exists" "Test file missing"
+    $exists = Test-Path $testFile
+    Test-Check "Test File: $testFile" $exists "Test file exists" "Test file missing"
 }
 
 # 3. Check test file structure and content
-Test-Component "E57Parser Test Structure" {
-    $content = Get-Content "tests/test_e57parser.cpp" -Raw
-    return ($content -match "class E57ParserTest.*::testing::Test" -and
-            $content -match "TEST_F\(E57ParserTest" -and
-            $content -match "SetUp\(\)" -and
-            $content -match "TearDown\(\)")
-} "E57Parser tests properly structured" "E57Parser test structure incomplete"
+$e57Content = Get-Content "tests/test_e57parser.cpp" -Raw
+$e57Structure = ($e57Content -match "class E57ParserTest.*::testing::Test" -and
+                $e57Content -match "TEST_F\(E57ParserTest" -and
+                $e57Content -match "SetUp\(\)" -and
+                $e57Content -match "TearDown\(\)")
+Test-Check "E57Parser Test Structure" $e57Structure "E57Parser tests properly structured" "E57Parser test structure incomplete"
 
-Test-Component "LasParser Test Structure" {
-    $content = Get-Content "tests/test_lasparser.cpp" -Raw
-    return ($content -match "class LasParserTest.*::testing::Test" -and
-            $content -match "TEST_F\(LasParserTest" -and
-            $content -match "createMockLasFile")
-} "LasParser tests properly structured" "LasParser test structure incomplete"
+$lasContent = Get-Content "tests/test_lasparser.cpp" -Raw
+$lasStructure = ($lasContent -match "class LasParserTest.*::testing::Test" -and
+                $lasContent -match "TEST_F\(LasParserTest" -and
+                $lasContent -match "createMockLasFile")
+Test-Check "LasParser Test Structure" $lasStructure "LasParser tests properly structured" "LasParser test structure incomplete"
 
-Test-Component "VoxelGridFilter Test Structure" {
-    $content = Get-Content "tests/test_voxelgridfilter.cpp" -Raw
-    return ($content -match "class VoxelGridFilterTest.*::testing::Test" -and
-            $content -match "TEST_F\(VoxelGridFilterTest" -and
-            $content -match "EmptyInput\|SinglePoint\|Performance")
-} "VoxelGridFilter tests properly structured" "VoxelGridFilter test structure incomplete"
+$voxelContent = Get-Content "tests/test_voxelgridfilter.cpp" -Raw
+$voxelStructure = ($voxelContent -match "class VoxelGridFilterTest.*::testing::Test" -and
+                  $voxelContent -match "TEST_F\(VoxelGridFilterTest" -and
+                  $voxelContent -match "EmptyInput|SinglePoint|Performance")
+Test-Check "VoxelGridFilter Test Structure" $voxelStructure "VoxelGridFilter tests properly structured" "VoxelGridFilter test structure incomplete"
 
 # 4. Check documentation files
 $docFiles = @(
@@ -114,9 +103,8 @@ $docFiles = @(
 )
 
 foreach ($docFile in $docFiles) {
-    Test-Component "Documentation: $docFile" {
-        return (Test-Path $docFile)
-    } "Documentation file exists" "Documentation file missing"
+    $exists = Test-Path $docFile
+    Test-Check "Documentation: $docFile" $exists "Documentation file exists" "Documentation file missing"
 }
 
 # 5. Check script files
@@ -126,67 +114,56 @@ $scriptFiles = @(
 )
 
 foreach ($scriptFile in $scriptFiles) {
-    Test-Component "Script: $scriptFile" {
-        return (Test-Path $scriptFile)
-    } "Script file exists" "Script file missing"
+    $exists = Test-Path $scriptFile
+    Test-Check "Script: $scriptFile" $exists "Script file exists" "Script file missing"
 }
 
 # 6. Check script functionality
-Test-Component "PowerShell Script Functionality" {
-    $content = Get-Content "scripts/run-tests.ps1" -Raw
-    return ($content -match "param\(" -and
-            $content -match "ctest" -and
-            $content -match "Coverage" -and
-            $content -match "Show-Help")
-} "PowerShell script properly implemented" "PowerShell script incomplete"
+$psContent = Get-Content "scripts/run-tests.ps1" -Raw
+$psFunction = ($psContent -match "param\(" -and
+              $psContent -match "ctest" -and
+              $psContent -match "Coverage" -and
+              $psContent -match "Show-Help")
+Test-Check "PowerShell Script Functionality" $psFunction "PowerShell script properly implemented" "PowerShell script incomplete"
 
-Test-Component "Bash Script Functionality" {
-    $content = Get-Content "scripts/run-tests.sh" -Raw
-    return ($content -match "#!/bin/bash" -and
-            $content -match "ctest" -and
-            $content -match "coverage" -and
-            $content -match "show_help")
-} "Bash script properly implemented" "Bash script incomplete"
+$bashContent = Get-Content "scripts/run-tests.sh" -Raw
+$bashFunction = ($bashContent -match "#!/bin/bash" -and
+                $bashContent -match "ctest" -and
+                $bashContent -match "coverage" -and
+                $bashContent -match "show_help")
+Test-Check "Bash Script Functionality" $bashFunction "Bash script properly implemented" "Bash script incomplete"
 
 # 7. Check build directory and configuration
-Test-Component "Build Directory" {
-    return (Test-Path "build")
-} "Build directory exists" "Build directory missing - run cmake configuration"
+$buildExists = Test-Path "build"
+Test-Check "Build Directory" $buildExists "Build directory exists" "Build directory missing - run cmake configuration"
 
 if (Test-Path "build") {
-    Test-Component "CMake Configuration" {
-        return (Test-Path "build/CMakeCache.txt")
-    } "CMake has been configured" "CMake not configured - run cmake -B build -S ."
-    
-    Test-Component "CTest Integration" {
-        return (Test-Path "build/CTestTestfile.cmake")
-    } "CTest integration active" "CTest integration missing"
+    $cmakeConfigured = Test-Path "build/CMakeCache.txt"
+    Test-Check "CMake Configuration" $cmakeConfigured "CMake has been configured" "CMake not configured - run cmake -B build -S ."
+
+    $ctestIntegration = Test-Path "build/CTestTestfile.cmake"
+    Test-Check "CTest Integration" $ctestIntegration "CTest integration active" "CTest integration missing"
 }
 
 # 8. Check Google Test availability
-Test-Component "Google Test Installation" {
-    if (Test-Path "build/CMakeCache.txt") {
-        $cacheContent = Get-Content "build/CMakeCache.txt" -Raw
-        return ($cacheContent -match "GTest_FOUND:BOOL=TRUE")
-    }
-    return $false
-} "Google Test found and configured" "Google Test not installed - see setup guide"
+$gtestFound = $false
+if (Test-Path "build/CMakeCache.txt") {
+    $cacheContent = Get-Content "build/CMakeCache.txt" -Raw
+    $gtestFound = ($cacheContent -match "GTest_FOUND:BOOL=TRUE")
+}
+Test-Check "Google Test Installation" $gtestFound "Google Test found and configured" "Google Test not installed - see setup guide"
 
 # 9. Check source file integration
-Test-Component "Source File Integration" {
-    $cmakeContent = Get-Content "CMakeLists.txt" -Raw
-    return ($cmakeContent -match "src/e57parser.cpp" -and
-            $cmakeContent -match "src/lasparser.cpp" -and
-            $cmakeContent -match "src/voxelgridfilter.cpp")
-} "Source files properly integrated" "Source file integration incomplete"
+$sourceIntegration = ($cmakeContent -match "src/e57parser.cpp" -and
+                     $cmakeContent -match "src/lasparser.cpp" -and
+                     $cmakeContent -match "src/voxelgridfilter.cpp")
+Test-Check "Source File Integration" $sourceIntegration "Source files properly integrated" "Source file integration incomplete"
 
 # 10. Check test coverage setup
-Test-Component "Coverage Configuration" {
-    $cmakeContent = Get-Content "CMakeLists.txt" -Raw
-    return ($cmakeContent -match "ENABLE_COVERAGE" -and
-            $cmakeContent -match "lcov" -and
-            $cmakeContent -match "genhtml")
-} "Coverage reporting configured" "Coverage configuration incomplete"
+$coverageConfig = ($cmakeContent -match "ENABLE_COVERAGE" -and
+                  $cmakeContent -match "lcov" -and
+                  $cmakeContent -match "genhtml")
+Test-Check "Coverage Configuration" $coverageConfig "Coverage reporting configured" "Coverage configuration incomplete"
 
 # Summary
 Write-Host ""
@@ -223,12 +200,12 @@ if ($passedChecks -eq $totalChecks) {
 } else {
     Write-Host "Phase 1 implementation needs attention:" -ForegroundColor Yellow
     Write-Host ""
-    
+
     $failedChecks = $allChecks | Where-Object { $_.Status -ne "PASS" }
     foreach ($failed in $failedChecks) {
         Write-Host "  • Fix: $($failed.Name)" -ForegroundColor Red
     }
-    
+
     Write-Host ""
     Write-Host "Refer to docs/phase1-setup-guide.md for detailed instructions" -ForegroundColor Cyan
 }

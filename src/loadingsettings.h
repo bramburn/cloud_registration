@@ -6,8 +6,8 @@
 // Enum to define the available point cloud loading methods
 enum class LoadingMethod {
     FullLoad,    // Loads all points and attributes (current baseline)
-    HeaderOnly   // Reads only the file header for metadata
-    // Future methods will be added here (e.g., VoxelGrid, PoissonDisk)
+    HeaderOnly,  // Reads only the file header for metadata
+    VoxelGrid    // Applies voxel grid subsampling for reduced point count with uniform density
 };
 
 // Struct to hold the selected loading method and its parameters

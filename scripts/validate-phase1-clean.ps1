@@ -51,7 +51,7 @@ Check-Item "Build Directory" $buildExists "Build directory exists" "Build direct
 if ($buildExists) {
     $cmakeConfigured = Test-Path "build/CMakeCache.txt"
     Check-Item "CMake Configuration" $cmakeConfigured "CMake configured" "CMake not configured"
-    
+
     $ctestExists = Test-Path "build/CTestTestfile.cmake"
     Check-Item "CTest Integration" $ctestExists "CTest integrated" "CTest missing"
 }
@@ -60,7 +60,10 @@ if ($buildExists) {
 $gtestFound = $false
 if (Test-Path "build/CMakeCache.txt") {
     $cacheContent = Get-Content "build/CMakeCache.txt" -Raw
-    $gtestFound = ($cacheContent -match "GTest_FOUND:BOOL=TRUE")
+    # Check for either the old pattern or the new vcpkg pattern
+    $gtestFound = ($cacheContent -match "GTest_FOUND:BOOL=TRUE" -or
+                  $cacheContent -match "Google Test found - building unit tests" -or
+                  $cacheContent -match "GTest_DIR.*gtest")
 }
 Check-Item "Google Test" $gtestFound "Google Test found" "Google Test not installed"
 

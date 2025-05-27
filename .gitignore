@@ -1,9 +1,7 @@
-# Build directories
+# Build directories - organized structure
 build/
-debug/
-release/
-x64/
-Win32/
+cmake-build-*/
+out/
 
 # CMake generated files
 CMakeFiles/

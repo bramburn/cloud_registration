@@ -8,11 +8,11 @@
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "toolset": "v143",
-      "binaryDir": "${sourceDir}/build/debug",
+      "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.0/msvc2022_64/lib/cmake;C:/Qt/6.7.0/msvc2022_64/lib/cmake;C:/Qt/6.6.0/msvc2022_64/lib/cmake;C:/Qt/6.5.3/msvc2019_64/lib/cmake;C:/Qt/6.5.0/msvc2019_64/lib/cmake;C:/Qt/6.5.0/msvc2022_64/lib/cmake",
-        "CMAKE_TOOLCHAIN_FILE": "",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.9.0/msvc2022_64/lib/cmake;C:/Qt/6.8.0/msvc2022_64/lib/cmake;C:/Qt/6.7.0/msvc2022_64/lib/cmake;C:/Qt/6.6.0/msvc2022_64/lib/cmake;C:/Qt/6.5.3/msvc2019_64/lib/cmake",
+        "CMAKE_TOOLCHAIN_FILE": "c:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       },
       "environment": {
@@ -26,11 +26,11 @@
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "toolset": "v143",
-      "binaryDir": "${sourceDir}/build/release",
+      "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.0/msvc2022_64/lib/cmake;C:/Qt/6.7.0/msvc2022_64/lib/cmake;C:/Qt/6.6.0/msvc2022_64/lib/cmake;C:/Qt/6.5.3/msvc2019_64/lib/cmake;C:/Qt/6.5.0/msvc2019_64/lib/cmake;C:/Qt/6.5.0/msvc2022_64/lib/cmake",
-        "CMAKE_TOOLCHAIN_FILE": "",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.9.0/msvc2022_64/lib/cmake;C:/Qt/6.8.0/msvc2022_64/lib/cmake;C:/Qt/6.7.0/msvc2022_64/lib/cmake;C:/Qt/6.6.0/msvc2022_64/lib/cmake;C:/Qt/6.5.3/msvc2019_64/lib/cmake",
+        "CMAKE_TOOLCHAIN_FILE": "c:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       },
       "environment": {
@@ -47,7 +47,7 @@
     },
     {
       "name": "msvc-release",
-      "displayName": "Build MSVC Release", 
+      "displayName": "Build MSVC Release",
       "configurePreset": "msvc-release",
       "configuration": "Release"
     }
@@ -62,7 +62,7 @@
     {
       "name": "msvc-release-test",
       "displayName": "Test MSVC Release",
-      "configurePreset": "msvc-release", 
+      "configurePreset": "msvc-release",
       "configuration": "Release"
     }
   ]

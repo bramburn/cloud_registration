@@ -76,12 +76,8 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
         m_zOffset = header.zOffset;
 
         // Store bounding box information
-        m_boundingBoxMin = QVector3D(static_cast<float>(header.minX),
-                                    static_cast<float>(header.minY),
-                                    static_cast<float>(header.minZ));
-        m_boundingBoxMax = QVector3D(static_cast<float>(header.maxX),
-                                    static_cast<float>(header.maxY),
-                                    static_cast<float>(header.maxZ));
+        m_boundingBoxMin = {header.minX, header.minY, header.minZ};
+        m_boundingBoxMax = {header.maxX, header.maxY, header.maxZ};
 
         // Emit header metadata
         LasHeaderMetadata metadata;
@@ -96,6 +92,20 @@ std::vector<float> LasParser::parse(const QString& filePath, const LoadingSettin
         if (settings.method == LoadingMethod::HeaderOnly) {
             // Return empty vector for header-only mode
             emit parsingFinished(true, QString("Header loaded: %1 points").arg(header.numberOfPointRecords), points);
+        } else if (settings.method == LoadingMethod::VoxelGrid) {
+            // Read point data and apply voxel grid filtering
+            emit progressUpdated(50);
+            std::vector<float> rawPoints = readPointData(file, header);
+
+            emit progressUpdated(75);
+            VoxelGridFilter filter;
+            points = filter.filter(rawPoints, settings);
+
+            // Clear raw points to free memory
+            std::vector<float>().swap(rawPoints);
+
+            emit parsingFinished(true, QString("Successfully loaded %1 points (filtered from %2)")
+                               .arg(points.size() / 3).arg(header.numberOfPointRecords), points);
         } else {
             // Read point data for full load
             points = readPointData(file, header);

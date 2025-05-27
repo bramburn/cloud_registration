@@ -28,32 +28,27 @@ This sprint implements the foundational application structure with basic E57 fil
 
 ## Building
 
-### Windows with Qt6 installed in C:\Qt
+### Windows
 
-1. **Configure Qt6 Path** (if needed):
+1. **Using Build Scripts** (Recommended):
    ```powershell
-   $env:Qt6_DIR = "C:\Qt\6.5.0\msvc2019_64\lib\cmake\Qt6"
+   # Clean all build directories
+   .\scripts\build-clean.ps1 -BuildType Clean
+
+   # Build Release version
+   .\scripts\build-clean.ps1 -BuildType Release
    ```
 
-2. **Create Build Directory**:
+2. **Using CMake Presets Directly**:
    ```powershell
-   mkdir build
-   cd build
+   # Configure and build Release version
+   cmake --preset msvc-release
+   cmake --build --preset msvc-release
    ```
 
-3. **Configure with CMake**:
+3. **Run the Application**:
    ```powershell
-   cmake .. -DQt6_DIR="C:\Qt\6.5.0\msvc2019_64\lib\cmake\Qt6"
-   ```
-
-4. **Build**:
-   ```powershell
-   cmake --build . --config Release
-   ```
-
-5. **Run**:
-   ```powershell
-   .\bin\Release\CloudRegistration.exe
+   .\build\release\bin\CloudRegistration.exe
    ```
 
 ### Linux/macOS
@@ -69,10 +64,17 @@ This sprint implements the foundational application structure with basic E57 fil
 
 2. **Build**:
    ```bash
-   mkdir build && cd build
-   cmake ..
-   make -j$(nproc)
-   ./bin/CloudRegistration
+   # Clean build
+   rm -rf build/
+   
+   # Configure and build
+   cmake --preset gcc-release
+   cmake --build --preset gcc-release
+   ```
+
+3. **Run**:
+   ```bash
+   ./build/release/bin/CloudRegistration
    ```
 
 ## Usage

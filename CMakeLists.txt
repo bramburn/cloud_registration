@@ -103,6 +103,7 @@ set(SOURCES
     src/e57parser.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
+    src/voxelgridfilter.cpp
 )
 
 # Header files
@@ -114,6 +115,7 @@ set(HEADERS
     src/loadingsettingsdialog.h
     src/loadingsettings.h
     src/lasheadermetadata.h
+    src/voxelgridfilter.h
 )
 
 # Shader files
@@ -147,8 +149,29 @@ set_target_properties(CloudRegistration PROPERTIES
 enable_testing()
 
 # Find Google Test
-find_package(GTest QUIET)
-if(GTest_FOUND)
+find_package(GTest CONFIG QUIET)
+if(TARGET GTest::gtest_main)
+    message(STATUS "Google Test found - building unit tests")
+
+    # Enable code coverage if requested
+    option(ENABLE_COVERAGE "Enable code coverage" OFF)
+    if(ENABLE_COVERAGE)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            message(STATUS "Code coverage enabled")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
+            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+        else()
+            message(WARNING "Code coverage only supported with GCC or Clang")
+        endif()
+    endif()
+
+    # Common test sources (excluding main.cpp)
+    set(TEST_COMMON_SOURCES
+        src/e57parser.cpp
+        src/lasparser.cpp
+        src/voxelgridfilter.cpp
+    )
+
     # E57 Parser Tests
     add_executable(E57ParserTests
         tests/test_e57parser.cpp
@@ -161,13 +184,13 @@ if(GTest_FOUND)
     )
 
     target_include_directories(E57ParserTests PRIVATE src)
-
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
 
     # LAS Parser Tests
     add_executable(LasParserTests
         tests/test_lasparser.cpp
         src/lasparser.cpp
+        src/voxelgridfilter.cpp
     )
 
     target_link_libraries(LasParserTests
@@ -176,6 +199,89 @@ if(GTest_FOUND)
     )
 
     target_include_directories(LasParserTests PRIVATE src)
-
     add_test(NAME LasParserTests COMMAND LasParserTests)
+
+    # VoxelGridFilter Tests
+    add_executable(VoxelGridFilterTests
+        tests/test_voxelgridfilter.cpp
+        src/voxelgridfilter.cpp
+    )
+
+    target_link_libraries(VoxelGridFilterTests
+        GTest::gtest_main
+        Qt6::Core
+    )
+
+    target_include_directories(VoxelGridFilterTests PRIVATE src)
+    add_test(NAME VoxelGridFilterTests COMMAND VoxelGridFilterTests)
+
+    # Sprint 1 Functionality Tests
+    add_executable(Sprint1FunctionalityTests
+        tests/test_sprint1_functionality.cpp
+        ${TEST_COMMON_SOURCES}
+    )
+
+    target_link_libraries(Sprint1FunctionalityTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint1FunctionalityTests PRIVATE src)
+    add_test(NAME Sprint1FunctionalityTests COMMAND Sprint1FunctionalityTests)
+
+    # Combined test runner for all tests
+    add_executable(AllTests
+        tests/test_e57parser.cpp
+        tests/test_lasparser.cpp
+        tests/test_voxelgridfilter.cpp
+        tests/test_sprint1_functionality.cpp
+        ${TEST_COMMON_SOURCES}
+    )
+
+    target_link_libraries(AllTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+    )
+
+    target_include_directories(AllTests PRIVATE src)
+    add_test(NAME AllTests COMMAND AllTests)
+
+    # Custom target to run all tests
+    add_custom_target(run_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests
+        COMMENT "Running all unit tests"
+    )
+
+    # Code coverage target (if enabled)
+    if(ENABLE_COVERAGE)
+        find_program(LCOV_PATH lcov)
+        find_program(GENHTML_PATH genhtml)
+
+        if(LCOV_PATH AND GENHTML_PATH)
+            add_custom_target(coverage
+                COMMAND ${LCOV_PATH} --directory . --zerocounters
+                COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+                COMMAND ${LCOV_PATH} --directory . --capture --output-file coverage.info
+                COMMAND ${LCOV_PATH} --remove coverage.info '/usr/*' '*/tests/*' '*/build/*' --output-file coverage.info.cleaned
+                COMMAND ${GENHTML_PATH} -o coverage_html coverage.info.cleaned
+                COMMAND ${CMAKE_COMMAND} -E remove coverage.info coverage.info.cleaned
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                DEPENDS AllTests
+                COMMENT "Generating code coverage report"
+            )
+            message(STATUS "Code coverage target 'coverage' available")
+        else()
+            message(WARNING "lcov and/or genhtml not found - coverage target not available")
+        endif()
+    endif()
+
+else()
+    message(STATUS "Google Test not found - unit tests will not be built")
+    message(STATUS "To install Google Test on Ubuntu/Debian: sudo apt-get install libgtest-dev")
+    message(STATUS "To install Google Test on Windows: vcpkg install gtest")
 endif()

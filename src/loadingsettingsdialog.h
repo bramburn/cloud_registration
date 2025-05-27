@@ -8,6 +8,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSettings>
+#include <QDoubleSpinBox>
+#include <QSpinBox>
+#include <QGroupBox>
 #include "loadingsettings.h"
 
 class LoadingSettingsDialog : public QDialog
@@ -43,6 +46,14 @@ private:
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_buttonLayout;
     QLabel *m_methodLabel;
+
+    // Voxel Grid specific controls
+    QGroupBox *m_voxelParametersGroup;
+    QVBoxLayout *m_voxelParametersLayout;
+    QLabel *m_leafSizeLabel;
+    QDoubleSpinBox *m_leafSizeSpinBox;
+    QLabel *m_minPointsLabel;
+    QSpinBox *m_minPointsSpinBox;
 
     // Internal state
     LoadingSettings m_currentSettings;

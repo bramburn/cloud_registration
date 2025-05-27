@@ -51,7 +51,7 @@ Check-Item "Build Directory" $buildExists "Build directory exists" "Build direct
 if ($buildExists) {
     $cmakeConfigured = Test-Path "build/CMakeCache.txt"
     Check-Item "CMake Configuration" $cmakeConfigured "CMake configured" "CMake not configured"
-    
+
     $ctestExists = Test-Path "build/CTestTestfile.cmake"
     Check-Item "CTest Integration" $ctestExists "CTest integrated" "CTest missing"
 }
@@ -73,13 +73,13 @@ Write-Host "Success Rate: $percentage%" -ForegroundColor $(if ($percentage -ge 9
 
 Write-Host ""
 if ($passedChecks -eq $totalChecks) {
-    Write-Host "🎉 Phase 1 implementation is complete!" -ForegroundColor Green
+    Write-Host "Phase 1 implementation is complete!" -ForegroundColor Green
     Write-Host "Next: Install Google Test and run tests" -ForegroundColor Cyan
 } elseif ($percentage -ge 80) {
-    Write-Host "✅ Phase 1 implementation is mostly complete!" -ForegroundColor Green
+    Write-Host "Phase 1 implementation is mostly complete!" -ForegroundColor Green
     Write-Host "Only Google Test installation remaining" -ForegroundColor Yellow
 } else {
-    Write-Host "⚠️ Phase 1 implementation needs attention" -ForegroundColor Yellow
+    Write-Host "Phase 1 implementation needs attention" -ForegroundColor Yellow
     Write-Host "See docs/phase1-setup-guide.md for instructions" -ForegroundColor Cyan
 }
 

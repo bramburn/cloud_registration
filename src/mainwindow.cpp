@@ -259,6 +259,14 @@ void MainWindow::onOpenFileClicked()
                                     static_cast<int>(LoadingMethod::FullLoad)).toInt();
     loadingSettings.method = static_cast<LoadingMethod>(methodValue);
 
+    // Load VoxelGrid parameters if needed
+    if (loadingSettings.method == LoadingMethod::VoxelGrid) {
+        double leafSize = settings.value("PointCloudLoading/VoxelGrid/LeafSize", 0.1).toDouble();
+        int minPointsPerVoxel = settings.value("PointCloudLoading/VoxelGrid/MinPointsPerVoxel", 1).toInt();
+        loadingSettings.parameters["leafSize"] = leafSize;
+        loadingSettings.parameters["minPointsPerVoxel"] = minPointsPerVoxel;
+    }
+
     m_currentFilePath = fileName;
     m_isLoading = true;
 

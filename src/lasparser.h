@@ -6,13 +6,14 @@
 #include <QFile>
 #include <QDataStream>
 #include <QByteArray>
-#include <QVector3D>
+// #include <QVector3D>  // Commented out for testing compatibility
 #include <vector>
 #include <stdexcept>
+#include "voxelgridfilter.h"
+#include "lasheadermetadata.h"
 
 // Forward declarations
 struct LoadingSettings;
-struct LasHeaderMetadata;
 
 class LasParser : public QObject
 {
@@ -148,9 +149,10 @@ private:
     double m_xScale, m_yScale, m_zScale;
     double m_xOffset, m_yOffset, m_zOffset;
 
-    // Header metadata for signals
-    QVector3D m_boundingBoxMin;
-    QVector3D m_boundingBoxMax;
+    // Header metadata for signals (simplified for testing)
+    // Use Vector3D from lasheadermetadata.h to avoid conflicts
+    Vector3D m_boundingBoxMin;
+    Vector3D m_boundingBoxMax;
 };
 
 // Custom exception for LAS parsing errors
