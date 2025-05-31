@@ -87,19 +87,39 @@ std::vector<float> E57Parser::parse(const QString& filePath)
 
             // Extract actual point data from binary section
             if (m_recordCount > 0 && m_binaryDataOffset > 0) {
+                qDebug() << "=== ATTEMPTING REAL E57 POINT EXTRACTION ===";
                 qDebug() << "Extracting" << m_recordCount << "points from binary section at offset" << m_binaryDataOffset;
                 std::vector<float> points = extractPointsFromBinarySection(file, m_binaryDataOffset, m_recordCount);
 
                 if (!points.empty()) {
+                    qDebug() << "=== SUCCESS: REAL E57 DATA EXTRACTED ===";
                     qDebug() << "Successfully extracted" << (points.size() / 3) << "points from E57 file";
+                    qDebug() << "This is ACTUAL point cloud data, not mock data!";
+
+                    // Log sample coordinates to verify real data validity (User Story 1)
+                    if (points.size() >= 9) {
+                        qDebug() << "Sample real E57 coordinates - First point:" << points[0] << points[1] << points[2];
+                        if (points.size() >= 6) {
+                            size_t midIndex = (points.size() / 6) * 3; // Middle point
+                            if (midIndex + 2 < points.size()) {
+                                qDebug() << "Sample real E57 coordinates - Middle point:" << points[midIndex] << points[midIndex + 1] << points[midIndex + 2];
+                            }
+                        }
+                        size_t lastIndex = points.size() - 3;
+                        qDebug() << "Sample real E57 coordinates - Last point:" << points[lastIndex] << points[lastIndex + 1] << points[lastIndex + 2];
+                    }
+
                     emit progressUpdated(100);
                     emit parsingFinished(true, QString("Successfully loaded %1 points from E57 file").arg(points.size() / 3), points);
                     return points;
                 } else {
+                    qWarning() << "=== FAILED: E57 extraction returned empty, falling back to mock data ===";
                     qWarning() << "Failed to extract points from binary section, generating mock data instead";
                     return generateMockPointCloud();
                 }
             } else {
+                qWarning() << "=== FAILED: No valid E57 point data found, falling back to mock data ===";
+                qWarning() << "Record count:" << m_recordCount << "Binary offset:" << m_binaryDataOffset;
                 qWarning() << "No valid point data found in E57 file, generating mock data instead";
                 return generateMockPointCloud();
             }
@@ -227,6 +247,7 @@ std::vector<float> E57Parser::generateMockPointCloud()
     // Debug logging for mock data generation (User Story 1)
     qDebug() << "=== E57Parser::generateMockPointCloud ===";
     qDebug() << "Generating mock point cloud for testing";
+    qDebug() << "NOTE: This is mock data - E57 parsing is not fully implemented yet";
 
     std::vector<float> points;
     const int numPoints = 10000; // Generate 10,000 points

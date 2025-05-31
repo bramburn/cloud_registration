@@ -94,6 +94,9 @@ private:
     std::vector<float> m_pointData;
     int m_pointCount;
 
+    // Coordinate transformation (User Story 3)
+    QVector3D m_globalOffset;  // Original global center offset
+
     // Bounding box for auto-centering
     QVector3D m_boundingBoxMin;
     QVector3D m_boundingBoxMax;
