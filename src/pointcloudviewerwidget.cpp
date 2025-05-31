@@ -23,6 +23,7 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_mousePressed(false)
     , m_pressedButton(Qt::NoButton)
     , m_pointCount(0)
+    , m_globalOffset(0.0f, 0.0f, 0.0f)
     , m_boundingBoxMin(0.0f, 0.0f, 0.0f)
     , m_boundingBoxMax(0.0f, 0.0f, 0.0f)
     , m_boundingBoxCenter(0.0f, 0.0f, 0.0f)
@@ -323,11 +324,50 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 
     makeCurrent();
 
-    m_pointData = points;
-    m_pointCount = static_cast<int>(points.size() / 3);
+    // First, calculate the global offset from the original data (User Story 3)
+    QVector3D originalMin, originalMax;
+    if (!points.empty()) {
+        originalMin = QVector3D(points[0], points[1], points[2]);
+        originalMax = originalMin;
+
+        for (size_t i = 0; i < points.size(); i += 3) {
+            if (i + 2 < points.size()) {
+                QVector3D point(points[i], points[i + 1], points[i + 2]);
+                originalMin.setX(std::min(originalMin.x(), point.x()));
+                originalMin.setY(std::min(originalMin.y(), point.y()));
+                originalMin.setZ(std::min(originalMin.z(), point.z()));
+                originalMax.setX(std::max(originalMax.x(), point.x()));
+                originalMax.setY(std::max(originalMax.y(), point.y()));
+                originalMax.setZ(std::max(originalMax.z(), point.z()));
+            }
+        }
+
+        // Calculate global offset as the center of the original bounding box
+        m_globalOffset = (originalMin + originalMax) * 0.5f;
+
+        qDebug() << "Original bounding box - Min:" << originalMin << "Max:" << originalMax;
+        qDebug() << "Global offset calculated:" << m_globalOffset;
+
+        // Apply coordinate transformation - center points around origin
+        m_pointData = points; // Copy the data first
+        for (size_t i = 0; i < m_pointData.size(); i += 3) {
+            if (i + 2 < m_pointData.size()) {
+                m_pointData[i] -= m_globalOffset.x();
+                m_pointData[i + 1] -= m_globalOffset.y();
+                m_pointData[i + 2] -= m_globalOffset.z();
+            }
+        }
+
+        qDebug() << "Applied coordinate transformation - points centered around origin";
+    } else {
+        m_pointData = points;
+        m_globalOffset = QVector3D(0, 0, 0);
+    }
+
+    m_pointCount = static_cast<int>(m_pointData.size() / 3);
     qDebug() << "Point count set to:" << m_pointCount;
 
-    // Calculate bounding box
+    // Calculate bounding box (now on transformed coordinates)
     calculateBoundingBox();
 
     // Debug logging after bounding box calculation (User Story 1)
@@ -364,7 +404,7 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
         qCritical() << "OpenGL Error after VBO bind:" << QString("0x%1").arg(error, 0, 16);
     }
 
-    m_vertexBuffer.allocate(points.data(), static_cast<int>(points.size() * sizeof(float)));
+    m_vertexBuffer.allocate(m_pointData.data(), static_cast<int>(m_pointData.size() * sizeof(float)));
     error = glGetError();
     if (error != GL_NO_ERROR) {
         qCritical() << "OpenGL Error after VBO allocate:" << QString("0x%1").arg(error, 0, 16);

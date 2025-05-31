@@ -24,6 +24,9 @@ public:
     void loadPointCloud(const std::vector<float>& points);
     void clearPointCloud();
 
+    // Coordinate transformation access (User Story 3)
+    QVector3D getGlobalOffset() const { return m_globalOffset; }
+
 public slots:
     // View control slots
     void setTopView();
