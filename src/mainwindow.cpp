@@ -1,4 +1,9 @@
 #include "mainwindow.h"
+#include "projecthubwidget.h"
+#include "sidebarwidget.h"
+#include "createprojectdialog.h"
+#include "projectmanager.h"
+#include "project.h"
 #include "pointcloudviewerwidget.h"
 #include "e57parser.h"
 #include "lasparser.h"
@@ -11,19 +16,29 @@
 #include <QTimer>
 #include <QFileInfo>
 #include <QSettings>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QMenuBar>
+#include <QStatusBar>
+#include <QMessageBox>
+#include <QFileDialog>
+#include <QProgressDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , m_centralWidget(nullptr)
-    , m_mainLayout(nullptr)
-    , m_buttonLayout(nullptr)
-    , m_openFileButton(nullptr)
-    , m_topViewButton(nullptr)
-    , m_leftViewButton(nullptr)
-    , m_rightViewButton(nullptr)
-    , m_bottomViewButton(nullptr)
+    , m_centralStack(nullptr)
+    , m_projectHub(nullptr)
+    , m_projectView(nullptr)
+    , m_projectSplitter(nullptr)
+    , m_sidebar(nullptr)
+    , m_mainContentArea(nullptr)
     , m_viewer(nullptr)
     , m_progressDialog(nullptr)
+    , m_projectManager(new ProjectManager(this))
+    , m_currentProject(nullptr)
+    , m_newProjectAction(nullptr)
+    , m_openProjectAction(nullptr)
+    , m_closeProjectAction(nullptr)
     , m_loadingSettingsAction(nullptr)
     , m_topViewAction(nullptr)
     , m_leftViewAction(nullptr)
@@ -52,21 +67,22 @@ MainWindow::MainWindow(QWidget *parent)
         setupStatusBar();
         qDebug() << "Status bar setup completed";
 
-        // Initialize parsers
+        // Initialize legacy parsers for point cloud loading
         qDebug() << "Initializing parsers...";
         m_e57Parser = new E57Parser(this);
         m_lasParser = new LasParser(this);
         qDebug() << "Parsers initialized";
 
-        // Sprint 2.3: Initialize in ready state
-        setStatusReady();
-
         // Set window properties
         qDebug() << "Setting window properties...";
-        setWindowTitle("Cloud Registration - Point Cloud Viewer");
-        setMinimumSize(800, 600);
+        updateWindowTitle();
+        setMinimumSize(1000, 700);
         resize(1200, 800);
         qDebug() << "Window properties set";
+
+        // Start with Project Hub
+        m_centralStack->setCurrentWidget(m_projectHub);
+        setStatusReady();
 
         qDebug() << "MainWindow constructor completed successfully";
     } catch (const std::exception& e) {
@@ -80,92 +96,50 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // Cleanup is handled by Qt's parent-child relationship
+    delete m_currentProject;
 }
 
 void MainWindow::setupUI()
 {
-    // Create central widget and main layout
-    m_centralWidget = new QWidget(this);
-    setCentralWidget(m_centralWidget);
+    m_centralStack = new QStackedWidget(this);
+    setCentralWidget(m_centralStack);
 
-    m_mainLayout = new QVBoxLayout(m_centralWidget);
+    // Create Project Hub
+    m_projectHub = new ProjectHubWidget(this);
+    connect(m_projectHub, &ProjectHubWidget::projectOpened,
+            this, &MainWindow::onProjectOpened);
 
-    // Create button layout
-    m_buttonLayout = new QHBoxLayout();
+    // Create Project View
+    m_projectView = new QWidget();
+    m_projectSplitter = new QSplitter(Qt::Horizontal, m_projectView);
 
-    // Create Open File button
-    m_openFileButton = new QPushButton("Open Point Cloud File", this);
-    m_openFileButton->setMinimumHeight(40);
-    m_openFileButton->setStyleSheet(
-        "QPushButton {"
-        "    background-color: #4CAF50;"
-        "    color: white;"
-        "    border: none;"
-        "    padding: 8px 16px;"
-        "    font-size: 14px;"
-        "    border-radius: 4px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #45a049;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #3d8b40;"
-        "}"
-    );
+    // Create Sidebar
+    m_sidebar = new SidebarWidget(this);
+    m_sidebar->setMinimumWidth(250);
+    m_sidebar->setMaximumWidth(400);
 
-    connect(m_openFileButton, &QPushButton::clicked, this, &MainWindow::onOpenFileClicked);
+    // Create main content area with point cloud viewer
+    m_mainContentArea = new QWidget();
+    auto *contentLayout = new QVBoxLayout(m_mainContentArea);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
 
-    // Create view control buttons
-    m_topViewButton = new QPushButton("Top View", this);
-    m_leftViewButton = new QPushButton("Left View", this);
-    m_rightViewButton = new QPushButton("Right View", this);
-    m_bottomViewButton = new QPushButton("Bottom View", this);
-
-    // Style view buttons
-    QString viewButtonStyle =
-        "QPushButton {"
-        "    background-color: #2196F3;"
-        "    color: white;"
-        "    border: none;"
-        "    padding: 6px 12px;"
-        "    font-size: 12px;"
-        "    border-radius: 3px;"
-        "    min-width: 80px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #1976D2;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #1565C0;"
-        "}";
-
-    m_topViewButton->setStyleSheet(viewButtonStyle);
-    m_leftViewButton->setStyleSheet(viewButtonStyle);
-    m_rightViewButton->setStyleSheet(viewButtonStyle);
-    m_bottomViewButton->setStyleSheet(viewButtonStyle);
-
-    // Connect view buttons
-    connect(m_topViewButton, &QPushButton::clicked, this, &MainWindow::onTopViewClicked);
-    connect(m_leftViewButton, &QPushButton::clicked, this, &MainWindow::onLeftViewClicked);
-    connect(m_rightViewButton, &QPushButton::clicked, this, &MainWindow::onRightViewClicked);
-    connect(m_bottomViewButton, &QPushButton::clicked, this, &MainWindow::onBottomViewClicked);
-
-    // Add buttons to layout
-    m_buttonLayout->addWidget(m_openFileButton);
-    m_buttonLayout->addSpacing(20); // Add some space
-    m_buttonLayout->addWidget(m_topViewButton);
-    m_buttonLayout->addWidget(m_leftViewButton);
-    m_buttonLayout->addWidget(m_rightViewButton);
-    m_buttonLayout->addWidget(m_bottomViewButton);
-    m_buttonLayout->addStretch(); // Push buttons to the left
-
-    // Create 3D viewer widget
+    // Create legacy point cloud viewer
     m_viewer = new PointCloudViewerWidget(this);
+    contentLayout->addWidget(m_viewer);
 
-    // Add components to main layout
-    m_mainLayout->addLayout(m_buttonLayout);
-    m_mainLayout->addWidget(m_viewer, 1); // Give viewer most of the space
+    // Setup splitter
+    m_projectSplitter->addWidget(m_sidebar);
+    m_projectSplitter->addWidget(m_mainContentArea);
+    m_projectSplitter->setStretchFactor(0, 0); // Sidebar doesn't stretch
+    m_projectSplitter->setStretchFactor(1, 1); // Main content stretches
+
+    auto *projectLayout = new QHBoxLayout(m_projectView);
+    projectLayout->setContentsMargins(0, 0, 0, 0);
+    projectLayout->addWidget(m_projectSplitter);
+
+    // Add both views to stack
+    m_centralStack->addWidget(m_projectHub);
+    m_centralStack->addWidget(m_projectView);
 }
 
 void MainWindow::setupMenuBar()
@@ -173,13 +147,30 @@ void MainWindow::setupMenuBar()
     // Create File menu
     QMenu *fileMenu = menuBar()->addMenu("&File");
 
-    QAction *openAction = new QAction("&Open Point Cloud File...", this);
-    openAction->setShortcut(QKeySequence::Open);
-    openAction->setStatusTip("Open a point cloud file (E57 or LAS)");
-    connect(openAction, &QAction::triggered, this, &MainWindow::onOpenFileClicked);
-    fileMenu->addAction(openAction);
+    m_newProjectAction = fileMenu->addAction("&New Project...");
+    m_newProjectAction->setShortcut(QKeySequence::New);
+    m_newProjectAction->setStatusTip("Create a new project");
+    connect(m_newProjectAction, &QAction::triggered, this, &MainWindow::onFileNewProject);
+
+    m_openProjectAction = fileMenu->addAction("&Open Project...");
+    m_openProjectAction->setShortcut(QKeySequence::Open);
+    m_openProjectAction->setStatusTip("Open an existing project");
+    connect(m_openProjectAction, &QAction::triggered, this, &MainWindow::onFileOpenProject);
 
     fileMenu->addSeparator();
+
+    m_closeProjectAction = fileMenu->addAction("&Close Project");
+    m_closeProjectAction->setEnabled(false);
+    m_closeProjectAction->setStatusTip("Close the current project");
+    connect(m_closeProjectAction, &QAction::triggered, this, &MainWindow::closeCurrentProject);
+
+    fileMenu->addSeparator();
+
+    QAction *openFileAction = new QAction("Open Point Cloud &File...", this);
+    openFileAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
+    openFileAction->setStatusTip("Open a point cloud file (E57 or LAS)");
+    connect(openFileAction, &QAction::triggered, this, &MainWindow::onOpenFileClicked);
+    fileMenu->addAction(openFileAction);
 
     // Add Loading Settings action
     m_loadingSettingsAction = new QAction("Loading &Settings...", this);
@@ -293,8 +284,8 @@ void MainWindow::onOpenFileClicked()
     setStatusLoading(m_currentFileName);
     m_viewer->onLoadingStarted();
 
-    // Update UI
-    m_openFileButton->setEnabled(false);
+    // Update UI - disable relevant actions during loading
+    // Note: No longer have m_openFileButton in project-based UI
 
     // Determine file type
     QString extension = fileInfo.suffix().toLower();
@@ -503,7 +494,7 @@ void MainWindow::cleanupProgressDialog()
 void MainWindow::updateUIAfterParsing(bool success, const QString& message)
 {
     m_isLoading = false;
-    m_openFileButton->setEnabled(true);
+    // Note: No longer have m_openFileButton in project-based UI
 
     // Sprint 2.3: Status bar is now handled by standardized methods in onParsingFinished
     // Only show error dialog for failures
@@ -640,4 +631,110 @@ void MainWindow::setStatusViewChanged(const QString &viewName)
     statusBar()->showMessage(tempMessage, 3000); // Show for 3 seconds
 
     // After timeout, message will revert to permanent widget content
+}
+
+// Project management methods
+void MainWindow::onProjectOpened(const QString &projectPath)
+{
+    try {
+        // Load project using ProjectManager
+        auto projectInfo = m_projectManager->loadProject(projectPath);
+
+        // Create Project object
+        delete m_currentProject;
+        m_currentProject = new Project(projectInfo, this);
+
+        transitionToProjectView(projectPath);
+
+    } catch (const std::exception &e) {
+        QMessageBox::critical(this, "Project Load Error",
+                             QString("Failed to load project: %1").arg(e.what()));
+    }
+}
+
+void MainWindow::transitionToProjectView(const QString &projectPath)
+{
+    if (m_currentProject) {
+        // Update sidebar with project root
+        m_sidebar->setProject(m_currentProject->projectName(), projectPath);
+
+        // Update window title
+        updateWindowTitle(m_currentProject->projectName());
+
+        // Enable project-specific menu items
+        m_closeProjectAction->setEnabled(true);
+
+        // Switch to project view
+        m_centralStack->setCurrentWidget(m_projectView);
+
+        // Update status bar
+        statusBar()->showMessage(QString("Project loaded: %1").arg(m_currentProject->projectName()));
+    }
+}
+
+void MainWindow::updateWindowTitle(const QString &projectName)
+{
+    QString title = "Cloud Registration";
+    if (!projectName.isEmpty()) {
+        title += QString(" - %1").arg(projectName);
+    }
+    setWindowTitle(title);
+}
+
+void MainWindow::showProjectHub()
+{
+    m_centralStack->setCurrentWidget(m_projectHub);
+    m_projectHub->refreshRecentProjects();
+}
+
+void MainWindow::onFileNewProject()
+{
+    CreateProjectDialog dialog(this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QString projectName = dialog.projectName().trimmed();
+        QString basePath = dialog.projectPath();
+
+        try {
+            QString projectPath = m_projectManager->createProject(projectName, basePath);
+            if (!projectPath.isEmpty()) {
+                onProjectOpened(projectPath);
+            }
+        } catch (const std::exception &e) {
+            QMessageBox::critical(this, "Project Creation Failed", e.what());
+        }
+    }
+}
+
+void MainWindow::onFileOpenProject()
+{
+    QString projectPath = QFileDialog::getExistingDirectory(this, "Select Project Folder");
+    if (!projectPath.isEmpty()) {
+        if (m_projectManager->isValidProject(projectPath)) {
+            onProjectOpened(projectPath);
+        } else {
+            QMessageBox::warning(this, "Invalid Project", "Selected folder is not a valid project.");
+        }
+    }
+}
+
+void MainWindow::closeCurrentProject()
+{
+    delete m_currentProject;
+    m_currentProject = nullptr;
+
+    // Clear sidebar
+    m_sidebar->clearProject();
+
+    // Update window title
+    updateWindowTitle();
+
+    // Disable project-specific menu items
+    m_closeProjectAction->setEnabled(false);
+
+    // Switch back to Project Hub
+    showProjectHub();
+
+    // Update status bar
+    statusBar()->showMessage("Project closed", 2000);
 }

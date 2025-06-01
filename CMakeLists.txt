@@ -102,6 +102,12 @@ endif()
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
+    src/projecthubwidget.cpp
+    src/createprojectdialog.cpp
+    src/projectmanager.cpp
+    src/recentprojectsmanager.cpp
+    src/sidebarwidget.cpp
+    src/project.cpp
     src/pointcloudviewerwidget.cpp
     src/e57parser.cpp
     src/e57parserlib.cpp
@@ -115,6 +121,12 @@ set(SOURCES
 # Header files
 set(HEADERS
     src/mainwindow.h
+    src/projecthubwidget.h
+    src/createprojectdialog.h
+    src/projectmanager.h
+    src/recentprojectsmanager.h
+    src/sidebarwidget.h
+    src/project.h
     src/pointcloudviewerwidget.h
     src/e57parser.h
     src/e57parserlib.h
@@ -518,15 +530,45 @@ if(TARGET GTest::gtest_main)
     target_include_directories(Sprint24AdvancedTests PRIVATE src tests)
     add_test(NAME Sprint24AdvancedTests COMMAND Sprint24AdvancedTests)
 
+    # Sprint 1.1: Project Management Tests
+    add_executable(ProjectManagerTests
+        tests/test_projectmanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+    )
+
+    target_link_libraries(ProjectManagerTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+    )
+
+    target_include_directories(ProjectManagerTests PRIVATE src)
+    add_test(NAME ProjectManagerTests COMMAND ProjectManagerTests)
+
+    add_executable(RecentProjectsManagerTests
+        tests/test_recentprojectsmanager.cpp
+        src/recentprojectsmanager.cpp
+    )
+
+    target_link_libraries(RecentProjectsManagerTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+    )
+
+    target_include_directories(RecentProjectsManagerTests PRIVATE src)
+    add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests
-        COMMENT "Running all unit tests including Sprint 1 E57ParserLib and Sprint 2.4 advanced testing framework"
-    )
+        DEPENDS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests
+        COMMENT "Running all unit tests including Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+)
 
-    # Sprint 1: E57ParserLib testing targets
-    add_custom_target(run_sprint1_tests
+# Sprint 1: E57ParserLib testing targets
+add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57ParserLib.*"
         DEPENDS E57ParserLibTests
         COMMENT "Running Sprint 1 E57ParserLib tests"

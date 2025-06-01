@@ -79,10 +79,10 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    // Set application properties for logging
+    // Set application properties for logging and QSettings
     app.setApplicationName("CloudRegistration");
-    app.setApplicationVersion("1.0");
-    app.setOrganizationName("CloudRegistration");
+    app.setApplicationVersion("1.0.0");
+    app.setOrganizationName("CloudRegistrationApp");
 
     // Setup logging first
     setupLogging();
