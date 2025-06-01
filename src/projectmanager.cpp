@@ -150,7 +150,16 @@ ProjectInfo ProjectManager::loadProject(const QString &projectPath)
         if (!info.isValid()) {
             throw ProjectLoadException("Project metadata is incomplete or invalid");
         }
-        
+
+        // Store current project info for cluster management
+        m_currentProject = info;
+
+        // Open the project database
+        QString dbPath = getDatabasePath(projectPath);
+        if (!m_sqliteManager->openDatabase(dbPath)) {
+            qWarning() << "Failed to open project database:" << dbPath;
+        }
+
         qInfo() << "Project loaded successfully:" << info.projectName;
         return info;
         
@@ -347,4 +356,156 @@ void ProjectManager::updateProjectMetadata(const QString &projectPath)
     // This method can be used to update project metadata with database references
     // For now, it's a placeholder for future enhancements
     Q_UNUSED(projectPath)
+}
+
+// New cluster management methods for Sprint 1.3
+QString ProjectManager::createCluster(const QString &clusterName, const QString &parentClusterId)
+{
+    if (clusterName.trimmed().isEmpty()) {
+        qWarning() << "Cluster name cannot be empty";
+        return QString();
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return QString();
+    }
+
+    // Generate unique cluster ID
+    QString clusterId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    ClusterInfo cluster;
+    cluster.clusterId = clusterId;
+    cluster.projectId = m_currentProject.projectId;
+    cluster.clusterName = clusterName.trimmed();
+    cluster.parentClusterId = parentClusterId;
+    cluster.creationDate = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    if (m_sqliteManager->insertCluster(cluster)) {
+        emit clusterCreated(cluster);
+        qDebug() << "Cluster created successfully:" << clusterName;
+        return clusterId;
+    }
+
+    qWarning() << "Failed to create cluster:" << clusterName;
+    return QString();
+}
+
+bool ProjectManager::deleteCluster(const QString &clusterId)
+{
+    if (clusterId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    if (m_sqliteManager->deleteCluster(clusterId)) {
+        emit clusterDeleted(clusterId);
+        qDebug() << "Cluster deleted successfully:" << clusterId;
+        return true;
+    }
+
+    qWarning() << "Failed to delete cluster:" << clusterId;
+    return false;
+}
+
+bool ProjectManager::renameCluster(const QString &clusterId, const QString &newName)
+{
+    if (clusterId.isEmpty() || newName.trimmed().isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    ClusterInfo cluster = m_sqliteManager->getClusterById(clusterId);
+    if (!cluster.isValid()) {
+        qWarning() << "Cluster not found:" << clusterId;
+        return false;
+    }
+
+    cluster.clusterName = newName.trimmed();
+
+    if (m_sqliteManager->updateCluster(cluster)) {
+        emit clusterRenamed(clusterId, newName);
+        qDebug() << "Cluster renamed successfully:" << clusterId << "to" << newName;
+        return true;
+    }
+
+    qWarning() << "Failed to rename cluster:" << clusterId;
+    return false;
+}
+
+QList<ClusterInfo> ProjectManager::getProjectClusters()
+{
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return QList<ClusterInfo>();
+    }
+
+    return m_sqliteManager->getAllClusters();
+}
+
+QList<ClusterInfo> ProjectManager::getChildClusters(const QString &parentClusterId)
+{
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return QList<ClusterInfo>();
+    }
+
+    return m_sqliteManager->getChildClusters(parentClusterId);
+}
+
+bool ProjectManager::moveScanToCluster(const QString &scanId, const QString &clusterId)
+{
+    if (scanId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    if (m_sqliteManager->updateScanCluster(scanId, clusterId)) {
+        emit scanMovedToCluster(scanId, clusterId);
+        qDebug() << "Scan moved to cluster successfully:" << scanId << "to" << clusterId;
+        return true;
+    }
+
+    qWarning() << "Failed to move scan to cluster:" << scanId;
+    return false;
+}
+
+bool ProjectManager::moveScansToCluster(const QStringList &scanIds, const QString &clusterId)
+{
+    if (scanIds.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    bool allSuccess = true;
+    for (const QString &scanId : scanIds) {
+        if (!m_sqliteManager->updateScanCluster(scanId, clusterId)) {
+            allSuccess = false;
+            qWarning() << "Failed to move scan to cluster:" << scanId;
+        } else {
+            emit scanMovedToCluster(scanId, clusterId);
+        }
+    }
+
+    if (allSuccess) {
+        qDebug() << "All scans moved to cluster successfully:" << scanIds.size() << "scans to" << clusterId;
+    }
+
+    return allSuccess;
 }
