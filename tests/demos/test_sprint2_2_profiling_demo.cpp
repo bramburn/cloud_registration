@@ -113,13 +113,10 @@ private:
     {
         qDebug() << "\n--- Test 2: E57 File Profiling ---";
 
-        // Get project root
-        QString projectRoot = "C:/dev/cloud_registration";
-
-        // Test with both E57 sample files
+        // Test with both E57 sample files - use relative paths from tests/demos/
         QStringList e57Files = {
-            projectRoot + "/sample/bunnyDouble.e57",
-            projectRoot + "/sample/bunnyInt32.e57"
+            "../../sample/bunnyDouble.e57",
+            "../../sample/bunnyInt32.e57"
         };
         
         for (const QString &filePath : e57Files) {
@@ -191,13 +188,11 @@ private:
         // Collect all available sample files
         QStringList testFiles;
 
-        // Get project root
-        QString projectRoot = "C:/dev/cloud_registration";
-
+        // Use relative paths from tests/demos/
         QStringList candidates = {
-            projectRoot + "/sample/bunnyDouble.e57",
-            projectRoot + "/sample/bunnyInt32.e57",
-            projectRoot + "/sample/S2max-Power line202503.las"
+            "../../sample/bunnyDouble.e57",
+            "../../sample/bunnyInt32.e57",
+            "../../sample/S2max-Power line202503.las"
         };
         
         for (const QString &file : candidates) {
@@ -274,17 +269,14 @@ int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
     
-    // Determine project root directory - use hardcoded path for now
-    QString projectRoot = "C:/dev/cloud_registration";
-
     qDebug() << "Application directory:" << QCoreApplication::applicationDirPath();
-    qDebug() << "Project root:" << projectRoot;
+    qDebug() << "Current working directory:" << QDir::currentPath();
 
-    // Check if sample files exist with absolute paths
+    // Check if sample files exist with relative paths from tests/demos/
     QStringList sampleFiles = {
-        projectRoot + "/sample/bunnyDouble.e57",
-        projectRoot + "/sample/bunnyInt32.e57",
-        projectRoot + "/sample/S2max-Power line202503.las"
+        "../../sample/bunnyDouble.e57",
+        "../../sample/bunnyInt32.e57",
+        "../../sample/S2max-Power line202503.las"
     };
     for (const QString &file : sampleFiles) {
         qDebug() << "Sample file" << file << "exists:" << QFileInfo::exists(file);

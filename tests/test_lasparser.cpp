@@ -27,11 +27,10 @@ protected:
         QString currentDir = QDir::currentPath();
         qDebug() << "Current directory:" << currentDir;
 
-        // Try different possible paths for the sample file
+        // Try different possible paths for the sample file from tests/ directory
         QStringList possiblePaths = {
             "../sample/S2max-Power line202503.las",
             "../../sample/S2max-Power line202503.las",
-            "../../../sample/S2max-Power line202503.las",
             "sample/S2max-Power line202503.las"
         };
 

@@ -202,14 +202,14 @@ void testBenchmarkSuite()
 {
     qDebug() << "\n=== Testing Benchmark Suite ===";
     
-    // Collect all available test files
+    // Collect all available test files - use relative path from tests/demos/
     QStringList testFiles;
-    QDir sampleDir("sample");
+    QDir sampleDir("../../sample");
     if (sampleDir.exists()) {
         QStringList filters;
         filters << "*.e57" << "*.las";
         QFileInfoList fileList = sampleDir.entryInfoList(filters, QDir::Files);
-        
+
         for (const QFileInfo &fileInfo : fileList) {
             testFiles << fileInfo.absoluteFilePath();
         }

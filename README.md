@@ -88,24 +88,41 @@ This sprint implements the foundational application structure with basic E57 fil
 
 ## Testing
 
-### Unit Tests
+### Automated Tests
 
-Run the E57 parser unit tests:
+Run all tests using the test script:
+
+```powershell
+# Windows - Run all tests
+.\scripts\run-tests.ps1
+
+# Run tests with coverage and verbose output
+.\scripts\run-tests.ps1 -Coverage -Verbose
+```
+
+### Individual Test Executables
+
+You can also run individual test executables directly:
 
 ```powershell
 # Windows
-.\CloudRegistrationTests.exe
+.\build\bin\E57ParserTests.exe
+.\build\bin\LasParserTests.exe
+.\build\bin\ProjectManagerTests.exe
 
 # Linux/macOS
-./CloudRegistrationTests
+./build/bin/E57ParserTests
+./build/bin/LasParserTests
+./build/bin/ProjectManagerTests
 ```
 
 ### Manual Testing
 
 1. **Application Launch**: Verify the application opens with an empty 3D viewport
-2. **File Loading**: Test with various file types (E57, invalid files)
+2. **File Loading**: Test with various file types (E57, LAS, invalid files)
 3. **Camera Controls**: Test mouse interactions for smooth navigation
 4. **Error Handling**: Try loading non-existent or invalid files
+5. **Project Management**: Test creating and opening projects
 
 ## Project Structure
 
@@ -113,18 +130,54 @@ Run the E57 parser unit tests:
 cloud_registration/
 ├── CMakeLists.txt              # Build configuration
 ├── README.md                   # This file
-├── src/                        # Source files
+├── src/                        # Main application source code
 │   ├── main.cpp               # Application entry point
 │   ├── mainwindow.h/cpp       # Main application window
 │   ├── pointcloudviewerwidget.h/cpp  # OpenGL 3D viewer
-│   └── e57parser.h/cpp        # E57 file parser
+│   ├── e57parserlib.h/cpp     # E57 file parser library
+│   ├── lasparser.h/cpp        # LAS file parser
+│   ├── projectmanager.h/cpp   # Project management
+│   ├── projecthubwidget.h/cpp # Project hub interface
+│   ├── sidebarwidget.h/cpp    # Sidebar interface
+│   └── ...                    # Other source files
+├── tests/                      # Unit and integration tests
+│   ├── test_e57parser.cpp     # E57 parser tests
+│   ├── test_lasparser.cpp     # LAS parser tests
+│   ├── test_projectmanager.cpp # Project manager tests
+│   ├── demos/                 # Simple test and demo programs
+│   │   ├── test_e57_simple.cpp
+│   │   ├── test_las_parser.cpp
+│   │   ├── test_sprint1_implementation.cpp
+│   │   └── ...                # Other demo files
+│   └── ...                    # Other test files
+├── scripts/                    # Build and utility scripts
+│   ├── build-clean.ps1        # Build cleanup script
+│   ├── run-tests.ps1          # Test execution script
+│   ├── setup_libe57format.ps1 # E57 library setup
+│   ├── tests/                 # Test-specific scripts
+│   │   ├── test_app.ps1
+│   │   ├── verify_sprint1_implementation.ps1
+│   │   └── ...                # Other test scripts
+│   └── ...                    # Other utility scripts
+├── docs/                       # General documentation
+│   ├── build-instructions.md  # Build instructions
+│   ├── testing-best-practices.md # Testing guidelines
+│   ├── sprints/               # Sprint-specific documentation
+│   │   ├── SPRINT_1_IMPLEMENTATION_COMPLETE.md
+│   │   ├── E57_PARSING_FIX_SUMMARY.md
+│   │   └── ...                # Other sprint documents
+│   └── ...                    # Other documentation
 ├── shaders/                    # OpenGL shaders
 │   ├── point.vert            # Vertex shader
 │   └── point.frag            # Fragment shader
-├── tests/                      # Unit tests
-│   └── test_e57parser.cpp     # E57 parser tests
-└── docs/                       # Documentation
-    └── phase 1-sprint 1.md    # Sprint requirements
+├── sample/                     # Sample point cloud files
+│   ├── bunnyDouble.e57
+│   ├── bunnyInt32.e57
+│   └── S2max-Power line202503.las
+└── test_data/                  # Test data files
+    ├── test_3_points_line.e57
+    ├── test_triangle.e57
+    └── ...                     # Other test files
 ```
 
 ## Current Limitations

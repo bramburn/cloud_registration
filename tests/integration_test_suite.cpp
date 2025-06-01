@@ -117,10 +117,10 @@ void IntegrationTestSuite::compileComprehensiveTestScenarios() {
         0
     });
     
-    // Real-world test files
-    if (QFile::exists("sample/bunnyDouble.e57")) {
+    // Real-world test files - use relative paths from tests/ directory
+    if (QFile::exists("../sample/bunnyDouble.e57")) {
         m_comprehensiveTestScenarios.push_back({
-            "sample/bunnyDouble.e57",
+            "../sample/bunnyDouble.e57",
             "real_world", "e57", "success",
             "Real-world E57 file - bunnyDouble",
             {"real_world", "sprint_1_1"},
@@ -129,10 +129,10 @@ void IntegrationTestSuite::compileComprehensiveTestScenarios() {
             -1
         });
     }
-    
-    if (QFile::exists("sample/S2max-Power line202503.las")) {
+
+    if (QFile::exists("../sample/S2max-Power line202503.las")) {
         m_comprehensiveTestScenarios.push_back({
-            "sample/S2max-Power line202503.las",
+            "../sample/S2max-Power line202503.las",
             "real_world", "las", "success",
             "Real-world LAS file - S2max Power line",
             {"real_world", "sprint_1_3"},

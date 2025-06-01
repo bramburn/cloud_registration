@@ -6,9 +6,14 @@
 Write-Host "=== Sprint 1.1 Implementation Test ===" -ForegroundColor Green
 Write-Host "Testing Project Hub, Project Management, and Sidebar functionality" -ForegroundColor Yellow
 
+# Set working directory to project root (scripts are now in scripts/tests/)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+Set-Location $projectRoot
+
 # Check if we're in the right directory
 if (-not (Test-Path "CMakeLists.txt")) {
-    Write-Host "Error: Please run this script from the project root directory" -ForegroundColor Red
+    Write-Host "Error: Could not find project root directory" -ForegroundColor Red
     exit 1
 }
 

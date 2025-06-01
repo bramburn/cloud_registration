@@ -12,11 +12,11 @@ int main(int argc, char *argv[])
     qDebug() << "=== LAS Parser Real File Test ===";
     qDebug() << "Current directory:" << QDir::currentPath();
     
-    // Try to find the real LAS file
+    // Try to find the real LAS file - adjust paths for tests/demos/ location
     QStringList possiblePaths = {
-        "sample/S2max-Power line202503.las",
-        "../sample/S2max-Power line202503.las",
-        "../../sample/S2max-Power line202503.las"
+        "../../sample/S2max-Power line202503.las",
+        "../../../sample/S2max-Power line202503.las",
+        "sample/S2max-Power line202503.las"
     };
     
     QString realLasFile;

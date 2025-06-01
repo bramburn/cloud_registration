@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     
     // Test 2: File opening
     std::cout << "\n--- Test 2: File Opening ---" << std::endl;
-    std::string testFile = "sample/bunnyDouble.e57";
+    std::string testFile = "../../sample/bunnyDouble.e57";
     
     if (parser.openFile(testFile)) {
         std::cout << "✓ File opened successfully: " << testFile << std::endl;
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Error: " << parser.getLastError() << std::endl;
         
         // Try with alternative file
-        std::string altFile = "sample/bunnyInt32.e57";
+        std::string altFile = "../../sample/bunnyInt32.e57";
         std::cout << "\nTrying alternative file: " << altFile << std::endl;
         
         if (parser.openFile(altFile)) {
