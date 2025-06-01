@@ -78,7 +78,7 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
 endif()
 
 # Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml)
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network)
 
 # Find E57Format library for enhanced E57 parsing (Sprint 1.2)
 find_package(E57Format CONFIG REQUIRED)

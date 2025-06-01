@@ -179,7 +179,7 @@ void AdvancedTestExecutor::onParsingFinished(bool success, const QString &messag
     m_currentTest.loadTimeMs = m_testTimer.elapsed();
     m_currentTest.success = success;
     m_currentTest.errorMessage = message;
-    m_currentTest.pointsLoaded = points.size() / 3;
+    m_currentTest.pointsLoaded = static_cast<int>(points.size()) / 3;
     m_currentTest.memoryUsageMB = (m_peakMemoryUsage - m_baselineMemoryUsage) / (1024 * 1024);
     
     // Analyze performance
@@ -387,8 +387,9 @@ qint64 AdvancedTestExecutor::measureMemoryUsage()
     // Windows implementation would use GetProcessMemoryInfo
     // For now, return a placeholder
     return 0;
-#endif
+#else
     return 0;
+#endif
 }
 
 void AdvancedTestExecutor::detectMemoryLeaks()

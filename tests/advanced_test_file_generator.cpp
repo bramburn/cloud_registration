@@ -63,15 +63,28 @@ bool AdvancedTestFileGenerator::generateVeryLargeE57(const QString &filePath, in
     quint32 minorVersion = 0;
     stream << majorVersion << minorVersion;
     
-    // Calculate offsets
-    qint64 xmlOffset = 24; // After header
-    QString xml = generateE57XmlHeader(pointCount, xmlOffset + 1000); // Reserve space for XML
+    // Calculate proper offsets for E57 file structure
+    qint64 headerSize = 48; // E57 header is 48 bytes
+    qint64 xmlOffset = headerSize;
+    qint64 binaryDataSize = pointCount * 3 * sizeof(double);
+
+    // Generate XML with placeholder binary offset
+    QString xml = generateE57XmlHeader(pointCount, 0);
     QByteArray xmlData = xml.toUtf8();
     qint64 xmlLength = xmlData.size();
-    qint64 binaryOffset = xmlOffset + xmlLength + 100; // Add padding
-    
-    // Write XML offset and length
-    stream << xmlOffset << xmlLength;
+    qint64 binaryOffset = xmlOffset + xmlLength;
+
+    // Update XML with correct binary offset
+    xml = generateE57XmlHeader(pointCount, binaryOffset);
+    xmlData = xml.toUtf8();
+    xmlLength = xmlData.size();
+
+    qint64 filePhysicalLength = binaryOffset + binaryDataSize;
+
+    // Write proper E57 header structure
+    stream << filePhysicalLength;  // File physical length
+    stream << xmlOffset;           // XML offset
+    stream << xmlLength;           // XML length
     
     // Write page size (dummy)
     quint64 pageSize = 1024;
@@ -167,7 +180,7 @@ bool AdvancedTestFileGenerator::generateMultiScanE57(const QString &filePath, in
     
     // Write binary data for each scan
     file.seek(binaryOffset);
-    qint64 currentOffset = binaryOffset;
+    Q_UNUSED(binaryOffset); // Used for seek above
     
     for (int i = 0; i < scanCount; ++i) {
         std::vector<float> scanPoints;
@@ -478,9 +491,9 @@ void AdvancedTestFileGenerator::generateRandomPointData(std::vector<float> &poin
     points.reserve(count);
 
     for (int i = 0; i < count; i += 3) {
-        points.push_back(m_randomGenerator->bounded(xMin, xMax));   // X
-        points.push_back(m_randomGenerator->bounded(yMin, yMax));   // Y
-        points.push_back(m_randomGenerator->bounded(zMin, zMax));   // Z
+        points.push_back(static_cast<float>(xMin + m_randomGenerator->generateDouble() * (xMax - xMin)));   // X
+        points.push_back(static_cast<float>(yMin + m_randomGenerator->generateDouble() * (yMax - yMin)));   // Y
+        points.push_back(static_cast<float>(zMin + m_randomGenerator->generateDouble() * (zMax - zMin)));   // Z
     }
 }
 
