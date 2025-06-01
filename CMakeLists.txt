@@ -218,6 +218,21 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57ParserLibTests PRIVATE src)
     add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
 
+    # E57ParserLib Sprint 3 Tests (Intensity, Color, and CompressedVector Handling)
+    add_executable(E57ParserLibSprint3Tests
+        tests/test_e57parserlib_sprint3.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(E57ParserLibSprint3Tests
+        GTest::gtest_main
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(E57ParserLibSprint3Tests PRIVATE src)
+    add_test(NAME E57ParserLibSprint3Tests COMMAND E57ParserLibSprint3Tests)
+
     # Sprint 2 Simple Test
     add_executable(Sprint2SimpleTest
         test_sprint2_simple.cpp

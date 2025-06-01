@@ -2,6 +2,7 @@
 #include <E57Format.h>
 #include <sstream>
 #include <QString>
+#include <QDebug>
 
 E57ParserLib::E57ParserLib(QObject *parent)
     : QObject(parent), m_imageFile(nullptr)
@@ -366,6 +367,439 @@ bool E57ParserLib::extractUncompressedXYZData(const e57::StructureNode& scanHead
 
     } catch (const e57::E57Exception& ex) {
         setError(std::string("E57 Exception during point data extraction: ") + ex.what());
+        return false;
+    }
+}
+
+// Sprint 3: Enhanced point data extraction with intensity and color
+
+std::vector<E57ParserLib::PointData> E57ParserLib::extractEnhancedPointData(int scanIndex) {
+    try {
+        clearError();
+        std::vector<PointData> points;
+
+        if (!isOpen()) {
+            setError("No E57 file is open");
+            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            return points;
+        }
+
+        if (scanIndex < 0 || scanIndex >= getScanCount()) {
+            setError("Invalid scan index: " + std::to_string(scanIndex));
+            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            return points;
+        }
+
+        emit progressUpdated(10, "Accessing scan data...");
+
+        // Access the scan data
+        e57::StructureNode root = m_imageFile->root();
+        e57::VectorNode data3DVectorNode = static_cast<e57::VectorNode>(root.get("/data3D"));
+        e57::StructureNode scanHeaderNode = static_cast<e57::StructureNode>(data3DVectorNode.get(scanIndex));
+
+        emit progressUpdated(20, "Inspecting enhanced prototype...");
+
+        // Task 3.1.1 & 3.2.1: Enhanced prototype inspection for intensity and color
+        if (!inspectEnhancedPrototype(scanHeaderNode)) {
+            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            return points;
+        }
+
+        emit progressUpdated(25, "Extracting data limits...");
+
+        // Task 3.1.4 & 3.2.4: Extract intensity and color limits for normalization
+        if (!extractDataLimits(scanHeaderNode)) {
+            // Non-fatal error - continue with default limits
+            qDebug() << "Warning: Could not extract data limits, using defaults";
+        }
+
+        emit progressUpdated(30, "Extracting enhanced point data...");
+
+        // Task 3.3: Extract point data with all available attributes
+        if (!extractEnhancedPointData(scanHeaderNode, points)) {
+            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            return points;
+        }
+
+        emit progressUpdated(100, "Enhanced point extraction complete");
+        emit parsingFinished(true, QString("Successfully extracted %1 enhanced points").arg(points.size()), std::vector<float>());
+
+        return points;
+
+    } catch (const e57::E57Exception& ex) {
+        setError(std::string("E57 Exception during enhanced point extraction: ") + ex.what());
+        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        return std::vector<PointData>();
+    } catch (const std::exception& ex) {
+        setError(std::string("Standard exception during enhanced point extraction: ") + ex.what());
+        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        return std::vector<PointData>();
+    }
+}
+
+// Sprint 3: Enhanced prototype inspection for intensity and color fields
+
+bool E57ParserLib::inspectEnhancedPrototype(const e57::StructureNode& scanHeaderNode) {
+    try {
+        // First, do the basic XYZ prototype inspection
+        if (!inspectPointPrototype(scanHeaderNode)) {
+            return false;
+        }
+
+        // Get the CompressedVectorNode for points
+        e57::CompressedVectorNode cvNode = static_cast<e57::CompressedVectorNode>(scanHeaderNode.get("points"));
+        e57::StructureNode prototype = cvNode.prototype();
+
+        // Task 3.1.1: Check for intensity field
+        if (prototype.isDefined("intensity")) {
+            m_prototypeInfo.hasIntensity = true;
+            e57::Node intensityNode = prototype.get("intensity");
+
+            switch (intensityNode.type()) {
+                case e57::E57_FLOAT:
+                    m_prototypeInfo.intensityDataType = "float";
+                    break;
+                case e57::E57_INTEGER:
+                    m_prototypeInfo.intensityDataType = "integer";
+                    break;
+                case e57::E57_SCALED_INTEGER:
+                    m_prototypeInfo.intensityDataType = "scaledInteger";
+                    break;
+                default:
+                    qDebug() << "Warning: Unsupported intensity data type, treating as float";
+                    m_prototypeInfo.intensityDataType = "float";
+                    break;
+            }
+
+            qDebug() << "Found intensity field with type:" << QString::fromStdString(m_prototypeInfo.intensityDataType);
+        } else {
+            m_prototypeInfo.hasIntensity = false;
+            qDebug() << "No intensity field found in prototype";
+        }
+
+        // Task 3.2.1: Check for color fields
+        m_prototypeInfo.hasColorRed = prototype.isDefined("colorRed");
+        m_prototypeInfo.hasColorGreen = prototype.isDefined("colorGreen");
+        m_prototypeInfo.hasColorBlue = prototype.isDefined("colorBlue");
+
+        if (m_prototypeInfo.hasColorRed || m_prototypeInfo.hasColorGreen || m_prototypeInfo.hasColorBlue) {
+            // Determine color data type from the first available color channel
+            e57::Node colorNode;
+            if (m_prototypeInfo.hasColorRed) {
+                colorNode = prototype.get("colorRed");
+            } else if (m_prototypeInfo.hasColorGreen) {
+                colorNode = prototype.get("colorGreen");
+            } else {
+                colorNode = prototype.get("colorBlue");
+            }
+
+            switch (colorNode.type()) {
+                case e57::E57_INTEGER:
+                    m_prototypeInfo.colorDataType = "integer";
+                    break;
+                case e57::E57_SCALED_INTEGER:
+                    m_prototypeInfo.colorDataType = "scaledInteger";
+                    break;
+                default:
+                    qDebug() << "Warning: Unsupported color data type, treating as integer";
+                    m_prototypeInfo.colorDataType = "integer";
+                    break;
+            }
+
+            qDebug() << "Found color fields - Red:" << m_prototypeInfo.hasColorRed
+                     << "Green:" << m_prototypeInfo.hasColorGreen
+                     << "Blue:" << m_prototypeInfo.hasColorBlue
+                     << "Type:" << QString::fromStdString(m_prototypeInfo.colorDataType);
+        } else {
+            qDebug() << "No color fields found in prototype";
+        }
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        setError(std::string("E57 Exception during enhanced prototype inspection: ") + ex.what());
+        return false;
+    }
+}
+
+// Sprint 3: Extract intensity and color limits for normalization
+
+bool E57ParserLib::extractDataLimits(const e57::StructureNode& scanHeaderNode) {
+    try {
+        // Reset limits to defaults
+        m_dataLimits = DataLimits();
+
+        // Task 3.1.4: Extract intensity limits
+        if (m_prototypeInfo.hasIntensity && scanHeaderNode.isDefined("intensityLimits")) {
+            e57::StructureNode intensityLimits = static_cast<e57::StructureNode>(scanHeaderNode.get("intensityLimits"));
+
+            if (intensityLimits.isDefined("intensityMinimum")) {
+                e57::Node minNode = intensityLimits.get("intensityMinimum");
+                if (minNode.type() == e57::E57_FLOAT) {
+                    m_dataLimits.intensityMin = static_cast<e57::FloatNode>(minNode).value();
+                } else if (minNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.intensityMin = static_cast<double>(static_cast<e57::IntegerNode>(minNode).value());
+                } else if (minNode.type() == e57::E57_SCALED_INTEGER) {
+                    m_dataLimits.intensityMin = static_cast<e57::ScaledIntegerNode>(minNode).scaledValue();
+                }
+            }
+
+            if (intensityLimits.isDefined("intensityMaximum")) {
+                e57::Node maxNode = intensityLimits.get("intensityMaximum");
+                if (maxNode.type() == e57::E57_FLOAT) {
+                    m_dataLimits.intensityMax = static_cast<e57::FloatNode>(maxNode).value();
+                } else if (maxNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.intensityMax = static_cast<double>(static_cast<e57::IntegerNode>(maxNode).value());
+                } else if (maxNode.type() == e57::E57_SCALED_INTEGER) {
+                    m_dataLimits.intensityMax = static_cast<e57::ScaledIntegerNode>(maxNode).scaledValue();
+                }
+            }
+
+            m_dataLimits.hasIntensityLimits = true;
+            qDebug() << "Extracted intensity limits: min=" << m_dataLimits.intensityMin
+                     << "max=" << m_dataLimits.intensityMax;
+        }
+
+        // Task 3.2.4: Extract color limits
+        if ((m_prototypeInfo.hasColorRed || m_prototypeInfo.hasColorGreen || m_prototypeInfo.hasColorBlue)
+            && scanHeaderNode.isDefined("colorLimits")) {
+
+            e57::StructureNode colorLimits = static_cast<e57::StructureNode>(scanHeaderNode.get("colorLimits"));
+
+            // Extract red limits
+            if (colorLimits.isDefined("colorRedMinimum") && colorLimits.isDefined("colorRedMaximum")) {
+                e57::Node redMinNode = colorLimits.get("colorRedMinimum");
+                e57::Node redMaxNode = colorLimits.get("colorRedMaximum");
+
+                if (redMinNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorRedMin = static_cast<double>(static_cast<e57::IntegerNode>(redMinNode).value());
+                }
+                if (redMaxNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorRedMax = static_cast<double>(static_cast<e57::IntegerNode>(redMaxNode).value());
+                }
+            }
+
+            // Extract green limits
+            if (colorLimits.isDefined("colorGreenMinimum") && colorLimits.isDefined("colorGreenMaximum")) {
+                e57::Node greenMinNode = colorLimits.get("colorGreenMinimum");
+                e57::Node greenMaxNode = colorLimits.get("colorGreenMaximum");
+
+                if (greenMinNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorGreenMin = static_cast<double>(static_cast<e57::IntegerNode>(greenMinNode).value());
+                }
+                if (greenMaxNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorGreenMax = static_cast<double>(static_cast<e57::IntegerNode>(greenMaxNode).value());
+                }
+            }
+
+            // Extract blue limits
+            if (colorLimits.isDefined("colorBlueMinimum") && colorLimits.isDefined("colorBlueMaximum")) {
+                e57::Node blueMinNode = colorLimits.get("colorBlueMinimum");
+                e57::Node blueMaxNode = colorLimits.get("colorBlueMaximum");
+
+                if (blueMinNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorBlueMin = static_cast<double>(static_cast<e57::IntegerNode>(blueMinNode).value());
+                }
+                if (blueMaxNode.type() == e57::E57_INTEGER) {
+                    m_dataLimits.colorBlueMax = static_cast<double>(static_cast<e57::IntegerNode>(blueMaxNode).value());
+                }
+            }
+
+            m_dataLimits.hasColorLimits = true;
+            qDebug() << "Extracted color limits: R(" << m_dataLimits.colorRedMin << "-" << m_dataLimits.colorRedMax << ")"
+                     << "G(" << m_dataLimits.colorGreenMin << "-" << m_dataLimits.colorGreenMax << ")"
+                     << "B(" << m_dataLimits.colorBlueMin << "-" << m_dataLimits.colorBlueMax << ")";
+        }
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        setError(std::string("E57 Exception during data limits extraction: ") + ex.what());
+        return false;
+    }
+}
+
+// Sprint 3: Normalization helper methods
+
+float E57ParserLib::normalizeIntensity(float rawValue) const {
+    if (!m_dataLimits.hasIntensityLimits) {
+        // No limits available, assume already normalized or use as-is
+        return std::max(0.0f, std::min(1.0f, rawValue));
+    }
+
+    // Check for degenerate case where min == max
+    if (std::abs(m_dataLimits.intensityMax - m_dataLimits.intensityMin) < 1e-6) {
+        qDebug() << "Warning: Intensity min equals max, returning 0.5";
+        return 0.5f;
+    }
+
+    // Apply normalization formula: (rawValue - min) / (max - min)
+    float normalized = static_cast<float>((rawValue - m_dataLimits.intensityMin) /
+                                         (m_dataLimits.intensityMax - m_dataLimits.intensityMin));
+
+    // Clamp to [0.0, 1.0] range
+    return std::max(0.0f, std::min(1.0f, normalized));
+}
+
+uint8_t E57ParserLib::normalizeColorChannel(float rawValue, double minVal, double maxVal) const {
+    // Check for degenerate case where min == max
+    if (std::abs(maxVal - minVal) < 1e-6) {
+        qDebug() << "Warning: Color channel min equals max, returning 128";
+        return 128;
+    }
+
+    // Apply normalization formula and scale to 0-255 range
+    double normalized = (rawValue - minVal) / (maxVal - minVal);
+    int result = static_cast<int>(normalized * 255.0 + 0.5); // +0.5 for rounding
+
+    // Clamp to [0, 255] range
+    return static_cast<uint8_t>(std::max(0, std::min(255, result)));
+}
+
+// Sprint 3: Enhanced point data extraction with intensity and color
+
+bool E57ParserLib::extractEnhancedPointData(const e57::StructureNode& scanHeaderNode, std::vector<PointData>& points) {
+    try {
+        // Get the CompressedVectorNode for points
+        e57::CompressedVectorNode cvNode = static_cast<e57::CompressedVectorNode>(scanHeaderNode.get("points"));
+        int64_t totalPoints = cvNode.childCount();
+
+        if (totalPoints == 0) {
+            setError("No points found in scan");
+            return false;
+        }
+
+        // Task 3.3.1: Prepare SourceDestBuffer objects for all available attributes
+        const int64_t POINTS_PER_READ_BLOCK = 65536; // Read in blocks
+        int64_t bufferSize = std::min(totalPoints, POINTS_PER_READ_BLOCK);
+
+        // Prepare buffers for XYZ coordinates (required)
+        std::vector<double> xBuffer_d(bufferSize);
+        std::vector<double> yBuffer_d(bufferSize);
+        std::vector<double> zBuffer_d(bufferSize);
+
+        // Prepare buffers for intensity (optional)
+        std::vector<float> intensityBuffer_f(bufferSize);
+
+        // Prepare buffers for color channels (optional)
+        std::vector<uint8_t> rBuffer_u8(bufferSize);
+        std::vector<uint8_t> gBuffer_u8(bufferSize);
+        std::vector<uint8_t> bBuffer_u8(bufferSize);
+
+        // Task 3.1.2 & 3.2.2: Setup SourceDestBuffer vector
+        std::vector<e57::SourceDestBuffer> sdbufs;
+
+        // Always add XYZ buffers
+        sdbufs.emplace_back(*m_imageFile, "cartesianX", xBuffer_d.data(), bufferSize, true, false, sizeof(double));
+        sdbufs.emplace_back(*m_imageFile, "cartesianY", yBuffer_d.data(), bufferSize, true, false, sizeof(double));
+        sdbufs.emplace_back(*m_imageFile, "cartesianZ", zBuffer_d.data(), bufferSize, true, false, sizeof(double));
+
+        // Add intensity buffer if available
+        if (m_prototypeInfo.hasIntensity) {
+            sdbufs.emplace_back(*m_imageFile, "intensity", intensityBuffer_f.data(), bufferSize, true, true, sizeof(float));
+            qDebug() << "Added intensity buffer to SourceDestBuffer vector";
+        }
+
+        // Add color buffers if available
+        if (m_prototypeInfo.hasColorRed) {
+            sdbufs.emplace_back(*m_imageFile, "colorRed", rBuffer_u8.data(), bufferSize, true, true, sizeof(uint8_t));
+            qDebug() << "Added colorRed buffer to SourceDestBuffer vector";
+        }
+        if (m_prototypeInfo.hasColorGreen) {
+            sdbufs.emplace_back(*m_imageFile, "colorGreen", gBuffer_u8.data(), bufferSize, true, true, sizeof(uint8_t));
+            qDebug() << "Added colorGreen buffer to SourceDestBuffer vector";
+        }
+        if (m_prototypeInfo.hasColorBlue) {
+            sdbufs.emplace_back(*m_imageFile, "colorBlue", bBuffer_u8.data(), bufferSize, true, true, sizeof(uint8_t));
+            qDebug() << "Added colorBlue buffer to SourceDestBuffer vector";
+        }
+
+        // Task 3.3.2: Create CompressedVectorReader
+        e57::CompressedVectorReader reader = cvNode.reader(sdbufs);
+
+        // Reserve space for the final point data
+        points.reserve(totalPoints);
+
+        int64_t pointsRead = 0;
+        int lastProgressPercent = 30;
+
+        // Task 3.3.3: Read point data in blocks
+        try {
+            while (pointsRead < totalPoints) {
+                // Read a block of points
+                uint64_t actualPointsRead = reader.read();
+
+                if (actualPointsRead == 0) {
+                    break; // No more data
+                }
+
+                // Task 3.1.3, 3.2.3: Process all attributes for each point
+                for (uint64_t i = 0; i < actualPointsRead; ++i) {
+                    PointData point;
+
+                    // XYZ coordinates (always present)
+                    point.x = static_cast<float>(xBuffer_d[i]);
+                    point.y = static_cast<float>(yBuffer_d[i]);
+                    point.z = static_cast<float>(zBuffer_d[i]);
+
+                    // Task 3.1.4: Process intensity if available
+                    if (m_prototypeInfo.hasIntensity) {
+                        float rawIntensity = intensityBuffer_f[i];
+                        point.intensity = normalizeIntensity(rawIntensity);
+                        point.hasIntensity = true;
+                    }
+
+                    // Task 3.2.4: Process color if available
+                    if (m_prototypeInfo.hasColorRed || m_prototypeInfo.hasColorGreen || m_prototypeInfo.hasColorBlue) {
+                        if (m_prototypeInfo.hasColorRed) {
+                            point.r = rBuffer_u8[i];
+                        }
+                        if (m_prototypeInfo.hasColorGreen) {
+                            point.g = gBuffer_u8[i];
+                        }
+                        if (m_prototypeInfo.hasColorBlue) {
+                            point.b = bBuffer_u8[i];
+                        }
+                        point.hasColor = true;
+                    }
+
+                    points.push_back(point);
+                }
+
+                pointsRead += actualPointsRead;
+
+                // Emit progress updates
+                int progressPercent = 30 + static_cast<int>((pointsRead * 70) / totalPoints);
+                if (progressPercent > lastProgressPercent + 5) { // Update every 5%
+                    emit progressUpdated(progressPercent, QString("Reading enhanced points... %1/%2").arg(pointsRead).arg(totalPoints));
+                    lastProgressPercent = progressPercent;
+                }
+            }
+
+            // Close the reader
+            reader.close();
+
+        } catch (const e57::E57Exception& ex) {
+            // Handle reader errors
+            reader.close();
+            setError(std::string("E57 Exception during enhanced point reading: ") + ex.what());
+            return false;
+        }
+
+        if (pointsRead != totalPoints) {
+            setError("Warning: Read " + std::to_string(pointsRead) + " points, expected " + std::to_string(totalPoints));
+            // Don't return false - partial data might still be useful
+        }
+
+        qDebug() << "Successfully extracted" << points.size() << "enhanced points with attributes:";
+        qDebug() << "  XYZ: always present";
+        qDebug() << "  Intensity:" << (m_prototypeInfo.hasIntensity ? "present" : "not present");
+        qDebug() << "  Color:" << (m_prototypeInfo.hasColorRed || m_prototypeInfo.hasColorGreen || m_prototypeInfo.hasColorBlue ? "present" : "not present");
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        setError(std::string("E57 Exception during enhanced point data extraction: ") + ex.what());
         return false;
     }
 }
