@@ -1,8 +1,11 @@
 #include "sidebarwidget.h"
+#include "projecttreemodel.h"
+#include "sqlitemanager.h"
+#include "projectmanager.h"
 #include <QStandardItem>
 #include <QHeaderView>
 
-SidebarWidget::SidebarWidget(QWidget *parent) 
+SidebarWidget::SidebarWidget(QWidget *parent)
     : QTreeView(parent)
     , m_model(nullptr)
 {
@@ -11,7 +14,7 @@ SidebarWidget::SidebarWidget(QWidget *parent)
 
 void SidebarWidget::setupUI()
 {
-    m_model = new QStandardItemModel(this);
+    m_model = new ProjectTreeModel(this);
     setModel(m_model);
     setHeaderHidden(true);
     setMinimumWidth(200);
@@ -60,21 +63,34 @@ void SidebarWidget::setupUI()
 
 void SidebarWidget::setProject(const QString &projectName, const QString &projectPath)
 {
-    m_model->clear();
-    
-    auto *rootItem = new QStandardItem(projectName);
-    rootItem->setEditable(false);
-    rootItem->setData(projectPath, Qt::UserRole);
-    rootItem->setToolTip(projectPath);
-    
-    // Set icon for project root (using built-in icon)
-    rootItem->setIcon(style()->standardIcon(QStyle::SP_DirIcon));
-    
-    m_model->appendRow(rootItem);
+    m_currentProjectPath = projectPath;
+    m_model->setProject(projectName, projectPath);
     expandAll();
 }
 
 void SidebarWidget::clearProject()
 {
+    m_currentProjectPath.clear();
     m_model->clear();
+}
+
+void SidebarWidget::setSQLiteManager(SQLiteManager *manager)
+{
+    m_model->setSQLiteManager(manager);
+}
+
+void SidebarWidget::refreshFromDatabase()
+{
+    if (m_model) {
+        m_model->refreshScans();
+        expandAll();
+    }
+}
+
+void SidebarWidget::addScan(const ScanInfo &scan)
+{
+    if (m_model) {
+        m_model->addScan(scan);
+        expandAll();
+    }
 }
