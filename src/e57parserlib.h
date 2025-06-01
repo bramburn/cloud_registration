@@ -182,7 +182,7 @@ private:
     std::unique_ptr<e57::ImageFile> m_imageFile;
     QString m_currentFilePath;
     LoadingSettings m_currentSettings;
-    QString m_lastError;
+    mutable QString m_lastError;
 
     // Threading and cancellation
     std::atomic<bool> m_cancelRequested{false};
@@ -240,8 +240,8 @@ private:
     DataLimits m_dataLimits;
 
     // Helper methods
-    void clearError();
-    void setError(const std::string& error);
+    void clearError() const;
+    void setError(const std::string& error) const;
 
     // Sprint 2: Point data extraction helpers
     bool accessFirstScanData(e57::StructureNode& scanHeader);

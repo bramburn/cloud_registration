@@ -51,7 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
     , m_bottomViewAction(nullptr)
     , m_importGuidanceWidget(nullptr)
     , m_importGuidanceButton(nullptr)
-    , m_e57Parser(nullptr)
     , m_lasParser(nullptr)
     , m_parserThread(nullptr)
     , m_workerParser(nullptr)
@@ -343,10 +342,10 @@ void MainWindow::onOpenFileClicked()
 
         // Convert dialog settings to E57ParserLib::LoadingSettings
         E57ParserLib::LoadingSettings e57Settings;
-        e57Settings.loadIntensity = loadingSettings.loadIntensity;
-        e57Settings.loadColor = loadingSettings.loadColor;
-        e57Settings.maxPointsPerScan = loadingSettings.maxPoints;
-        e57Settings.subsamplingRatio = loadingSettings.subsamplingRatio;
+        e57Settings.loadIntensity = loadingSettings.parameters.value("loadIntensity", true).toBool();
+        e57Settings.loadColor = loadingSettings.parameters.value("loadColor", true).toBool();
+        e57Settings.maxPointsPerScan = loadingSettings.parameters.value("maxPoints", -1).toInt();
+        e57Settings.subsamplingRatio = loadingSettings.parameters.value("subsamplingRatio", 1.0).toDouble();
 
         // Connect signals
         connect(m_parserThread, &QThread::started, [=]() {

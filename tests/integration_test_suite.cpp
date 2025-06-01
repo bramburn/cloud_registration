@@ -1,5 +1,5 @@
 #include "integration_test_suite.h"
-#include "../src/e57parser.h"
+#include "../src/e57parserlib.h"
 #include "../src/lasparser.h"
 #include "../src/loadingsettings.h"
 #include <QStandardPaths>

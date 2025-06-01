@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "integration_test_suite.h"
 #include "test_reporter.h"
-#include "../src/e57parser.h"
+#include "../src/e57parserlib.h"
 #include "../src/lasparser.h"
 #include "../src/loadingsettingsdialog.h"
 #include "../src/loadingsettings.h"

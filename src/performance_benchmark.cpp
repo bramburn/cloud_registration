@@ -1,5 +1,5 @@
 #include "performance_benchmark.h"
-#include "e57parser.h"
+#include "e57parserlib.h"
 #include "lasparser.h"
 #include "performance_profiler.h"
 #include <QCoreApplication>

@@ -3,7 +3,7 @@
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QTimer>
-#include "src/e57parser.h"
+#include "src/e57parserlib.h"
 
 class Sprint21IntegrationTest : public QObject
 {
