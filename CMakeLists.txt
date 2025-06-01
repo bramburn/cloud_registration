@@ -78,7 +78,7 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
 endif()
 
 # Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network)
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql)
 
 # Find E57Format library for enhanced E57 parsing (Sprint 1.2)
 find_package(E57Format CONFIG REQUIRED)
@@ -115,6 +115,11 @@ set(SOURCES
     src/voxelgridfilter.cpp
     src/performance_profiler.cpp
     src/performance_benchmark.cpp
+    # Sprint 1.2: Scan Import & SQLite Database Setup
+    src/sqlitemanager.cpp
+    src/scanimportmanager.cpp
+    src/scanimportdialog.cpp
+    src/projecttreemodel.cpp
 )
 
 # Header files
@@ -135,6 +140,11 @@ set(HEADERS
     src/voxelgridfilter.h
     src/performance_profiler.h
     src/performance_benchmark.h
+    # Sprint 1.2: Scan Import & SQLite Database Setup
+    src/sqlitemanager.h
+    src/scanimportmanager.h
+    src/scanimportdialog.h
+    src/projecttreemodel.h
 )
 
 # Shader files
@@ -153,6 +163,7 @@ target_link_libraries(CloudRegistration
     Qt6::Gui
     Qt6::OpenGLWidgets
     Qt6::Xml
+    Qt6::Sql
     E57Format
 )
 

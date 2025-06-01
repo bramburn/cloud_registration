@@ -11,6 +11,10 @@
 #include "lasheadermetadata.h"
 #include "loadingsettings.h"
 #include "performance_profiler.h"
+// Sprint 1.2: Scan Import functionality
+#include "scanimportdialog.h"
+#include "scanimportmanager.h"
+#include "sqlitemanager.h"
 #include <QApplication>
 #include <QThread>
 #include <QTimer>
@@ -39,11 +43,15 @@ MainWindow::MainWindow(QWidget *parent)
     , m_newProjectAction(nullptr)
     , m_openProjectAction(nullptr)
     , m_closeProjectAction(nullptr)
+    , m_importScansAction(nullptr)
     , m_loadingSettingsAction(nullptr)
     , m_topViewAction(nullptr)
     , m_leftViewAction(nullptr)
     , m_rightViewAction(nullptr)
     , m_bottomViewAction(nullptr)
+    , m_importGuidanceWidget(nullptr)
+    , m_importGuidanceButton(nullptr)
+    , m_e57Parser(nullptr)
     , m_lasParser(nullptr)
     , m_parserThread(nullptr)
     , m_workerParser(nullptr)
@@ -72,6 +80,16 @@ MainWindow::MainWindow(QWidget *parent)
         qDebug() << "Initializing parsers...";
         m_lasParser = new LasParser(this);
         qDebug() << "Parsers initialized";
+
+        // Sprint 1.2: Connect project manager signals
+        connect(m_projectManager, &ProjectManager::scansImported,
+                this, &MainWindow::onScansImported);
+        connect(m_projectManager, &ProjectManager::projectScansChanged,
+                this, [this]() {
+                    if (m_sidebar) {
+                        m_sidebar->refreshFromDatabase();
+                    }
+                });
 
         // Set window properties
         qDebug() << "Setting window properties...";
@@ -163,6 +181,15 @@ void MainWindow::setupMenuBar()
     m_closeProjectAction->setEnabled(false);
     m_closeProjectAction->setStatusTip("Close the current project");
     connect(m_closeProjectAction, &QAction::triggered, this, &MainWindow::closeCurrentProject);
+
+    fileMenu->addSeparator();
+
+    // Sprint 1.2: Import Scans action
+    m_importScansAction = fileMenu->addAction("&Import Scans...");
+    m_importScansAction->setShortcut(QKeySequence("Ctrl+I"));
+    m_importScansAction->setEnabled(false);
+    m_importScansAction->setStatusTip("Import scan files into the current project");
+    connect(m_importScansAction, &QAction::triggered, this, &MainWindow::onImportScans);
 
     fileMenu->addSeparator();
 
@@ -500,43 +527,9 @@ void MainWindow::cleanupParsingThread()
 {
     if (m_parserThread) {
         m_parserThread->quit();
-        m_parserThread->wait(5000); // Wait up to 5 seconds
-
-        if (m_parserThread->isRunning()) {
-            qWarning() << "Parser thread did not quit gracefully, terminating...";
-            m_parserThread->terminate();
-            m_parserThread->wait(1000);
-        }
-
+        m_parserThread->wait();
         m_parserThread->deleteLater();
         m_parserThread = nullptr;
-    }
-
-    if (m_workerParser) {
-        m_workerParser->deleteLater();
-        m_workerParser = nullptr;
-    }
-}
-
-void MainWindow::cleanupParsingThread(QObject* parser)
-{
-    if (m_parserThread) {
-        m_parserThread->quit();
-        m_parserThread->wait(5000); // Wait up to 5 seconds
-
-        if (m_parserThread->isRunning()) {
-            qWarning() << "Parser thread did not quit gracefully, terminating...";
-            m_parserThread->terminate();
-            m_parserThread->wait(1000);
-        }
-
-        m_parserThread->deleteLater();
-        m_parserThread = nullptr;
-    }
-
-    if (parser) {
-        parser->deleteLater();
-        m_workerParser = nullptr;
     }
 }
 
@@ -739,6 +732,10 @@ void MainWindow::onProjectOpened(const QString &projectPath)
         delete m_currentProject;
         m_currentProject = new Project(projectInfo, this);
 
+        // Sprint 1.2: Check if project has scans and show/hide guidance accordingly
+        bool hasScans = m_projectManager->hasScans(projectPath);
+        showImportGuidance(!hasScans);
+
         transitionToProjectView(projectPath);
 
     } catch (const std::exception &e) {
@@ -750,7 +747,8 @@ void MainWindow::onProjectOpened(const QString &projectPath)
 void MainWindow::transitionToProjectView(const QString &projectPath)
 {
     if (m_currentProject) {
-        // Update sidebar with project root
+        // Sprint 1.2: Set up sidebar with SQLite manager and load scans
+        m_sidebar->setSQLiteManager(m_projectManager->getSQLiteManager());
         m_sidebar->setProject(m_currentProject->projectName(), projectPath);
 
         // Update window title
@@ -758,6 +756,7 @@ void MainWindow::transitionToProjectView(const QString &projectPath)
 
         // Enable project-specific menu items
         m_closeProjectAction->setEnabled(true);
+        m_importScansAction->setEnabled(true);
 
         // Switch to project view
         m_centralStack->setCurrentWidget(m_projectView);
@@ -826,10 +825,118 @@ void MainWindow::closeCurrentProject()
 
     // Disable project-specific menu items
     m_closeProjectAction->setEnabled(false);
+    m_importScansAction->setEnabled(false);
 
     // Switch back to Project Hub
     showProjectHub();
 
     // Update status bar
     statusBar()->showMessage("Project closed", 2000);
+}
+
+// Sprint 1.2: Scan Import functionality
+void MainWindow::onImportScans()
+{
+    if (!m_currentProject) {
+        return;
+    }
+
+    ScanImportDialog dialog(this);
+    dialog.setProjectPath(m_currentProject->projectPath());
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QStringList files = dialog.selectedFiles();
+        ImportMode mode = dialog.importMode();
+
+        if (!files.isEmpty()) {
+            auto result = m_projectManager->getScanImportManager()->importScans(
+                files, m_currentProject->projectPath(), m_currentProject->projectId(), mode, this);
+
+            if (result.success) {
+                // Hide guidance and refresh sidebar
+                showImportGuidance(false);
+                m_sidebar->refreshFromDatabase();
+
+                statusBar()->showMessage(
+                    QString("Successfully imported %1 scan(s)").arg(result.successfulFiles.size()), 3000);
+            } else {
+                QMessageBox::warning(this, "Import Failed", result.errorMessage);
+            }
+        }
+    }
+}
+
+void MainWindow::onScansImported(const QList<ScanInfo> &scans)
+{
+    // Update sidebar with new scans
+    for (const ScanInfo &scan : scans) {
+        m_sidebar->addScan(scan);
+    }
+
+    // Hide import guidance since we now have scans
+    showImportGuidance(false);
+
+    qDebug() << "Imported" << scans.size() << "scans";
+}
+
+void MainWindow::showImportGuidance(bool show)
+{
+    if (!m_importGuidanceWidget) {
+        createImportGuidanceWidget();
+    }
+
+    m_importGuidanceWidget->setVisible(show);
+}
+
+void MainWindow::createImportGuidanceWidget()
+{
+    m_importGuidanceWidget = new QWidget(m_mainContentArea);
+    auto *layout = new QVBoxLayout(m_importGuidanceWidget);
+    layout->setAlignment(Qt::AlignCenter);
+
+    auto *iconLabel = new QLabel(this);
+    iconLabel->setPixmap(style()->standardIcon(QStyle::SP_FileDialogDetailedView).pixmap(64, 64));
+    iconLabel->setAlignment(Qt::AlignCenter);
+
+    auto *titleLabel = new QLabel("Get Started with Your Project", this);
+    titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;");
+    titleLabel->setAlignment(Qt::AlignCenter);
+
+    auto *descLabel = new QLabel("Your project is ready! Start by importing scan files to populate your project.", this);
+    descLabel->setStyleSheet("color: #666; margin-bottom: 20px;");
+    descLabel->setAlignment(Qt::AlignCenter);
+    descLabel->setWordWrap(true);
+
+    m_importGuidanceButton = new QPushButton("Import Scan Files", this);
+    m_importGuidanceButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+        }
+        QPushButton:hover {
+            background-color: #106ebe;
+        }
+        QPushButton:pressed {
+            background-color: #005a9e;
+        }
+    )");
+
+    connect(m_importGuidanceButton, &QPushButton::clicked, this, &MainWindow::onImportScans);
+
+    layout->addWidget(iconLabel);
+    layout->addWidget(titleLabel);
+    layout->addWidget(descLabel);
+    layout->addWidget(m_importGuidanceButton);
+    layout->addStretch();
+
+    // Add to main content area
+    auto *mainLayout = qobject_cast<QVBoxLayout*>(m_mainContentArea->layout());
+    if (mainLayout) {
+        mainLayout->addWidget(m_importGuidanceWidget);
+    }
 }

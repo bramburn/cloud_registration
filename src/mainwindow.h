@@ -15,7 +15,10 @@ class ProjectManager;
 class Project;
 class E57ParserLib;
 class LasParser;
+class ScanImportDialog;
+class SQLiteManager;
 struct LasHeaderMetadata;
+struct ScanInfo;
 
 class MainWindow : public QMainWindow
 {
@@ -31,6 +34,10 @@ private slots:
     void onFileNewProject();
     void onFileOpenProject();
     void closeCurrentProject();
+
+    // Sprint 1.2: Scan Import functionality
+    void onImportScans();
+    void onScansImported(const QList<ScanInfo> &scans);
 
     // Legacy point cloud loading slots (for existing functionality)
     void onOpenFileClicked();
@@ -55,6 +62,10 @@ private:
     void setupStatusBar();
     void transitionToProjectView(const QString &projectPath);
     void updateWindowTitle(const QString &projectName = QString());
+
+    // Sprint 1.2: Import guidance methods
+    void showImportGuidance(bool show);
+    void createImportGuidanceWidget();
 
     // Legacy helper methods for point cloud loading
     void cleanupParsingThread();
@@ -90,11 +101,16 @@ private:
     QAction *m_newProjectAction;
     QAction *m_openProjectAction;
     QAction *m_closeProjectAction;
+    QAction *m_importScansAction;
     QAction *m_loadingSettingsAction;
     QAction *m_topViewAction;
     QAction *m_leftViewAction;
     QAction *m_rightViewAction;
     QAction *m_bottomViewAction;
+
+    // Sprint 1.2: Import guidance widgets
+    QWidget *m_importGuidanceWidget;
+    QPushButton *m_importGuidanceButton;
 
     // Legacy data processing
     LasParser *m_lasParser;
