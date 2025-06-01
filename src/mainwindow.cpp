@@ -500,9 +500,43 @@ void MainWindow::cleanupParsingThread()
 {
     if (m_parserThread) {
         m_parserThread->quit();
-        m_parserThread->wait();
+        m_parserThread->wait(5000); // Wait up to 5 seconds
+
+        if (m_parserThread->isRunning()) {
+            qWarning() << "Parser thread did not quit gracefully, terminating...";
+            m_parserThread->terminate();
+            m_parserThread->wait(1000);
+        }
+
         m_parserThread->deleteLater();
         m_parserThread = nullptr;
+    }
+
+    if (m_workerParser) {
+        m_workerParser->deleteLater();
+        m_workerParser = nullptr;
+    }
+}
+
+void MainWindow::cleanupParsingThread(QObject* parser)
+{
+    if (m_parserThread) {
+        m_parserThread->quit();
+        m_parserThread->wait(5000); // Wait up to 5 seconds
+
+        if (m_parserThread->isRunning()) {
+            qWarning() << "Parser thread did not quit gracefully, terminating...";
+            m_parserThread->terminate();
+            m_parserThread->wait(1000);
+        }
+
+        m_parserThread->deleteLater();
+        m_parserThread = nullptr;
+    }
+
+    if (parser) {
+        parser->deleteLater();
+        m_workerParser = nullptr;
     }
 }
 

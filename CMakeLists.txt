@@ -109,7 +109,6 @@ set(SOURCES
     src/sidebarwidget.cpp
     src/project.cpp
     src/pointcloudviewerwidget.cpp
-    src/e57parser.cpp
     src/e57parserlib.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
@@ -128,7 +127,6 @@ set(HEADERS
     src/sidebarwidget.h
     src/project.h
     src/pointcloudviewerwidget.h
-    src/e57parser.h
     src/e57parserlib.h
     src/lasparser.h
     src/loadingsettingsdialog.h
@@ -190,16 +188,16 @@ if(TARGET GTest::gtest_main)
 
     # Common test sources (excluding main.cpp)
     set(TEST_COMMON_SOURCES
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
         src/performance_profiler.cpp
     )
 
-    # E57 Parser Tests
+    # E57 Parser Tests (now using E57ParserLib)
     add_executable(E57ParserTests
         tests/test_e57parser.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
 
@@ -330,7 +328,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 2.1 Manual Test
     add_executable(Sprint21ManualTest
         test_sprint2_1_manual.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
 
@@ -345,7 +343,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 2.1 Integration Test
     add_executable(Sprint21IntegrationTest
         test_sprint2_1_integration.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
 
@@ -412,7 +410,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 1.2 CompressedVector Tests (without E57Format dependency)
     add_executable(Sprint12CompressedVectorTests
         tests/test_sprint1_2_compressedvector.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
 
@@ -429,7 +427,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 1.2 Integration Tests (without E57Format dependency)
     add_executable(Sprint12IntegrationTests
         tests/test_sprint1_2_integration.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
 
@@ -460,7 +458,7 @@ if(TARGET GTest::gtest_main)
     # Sprint 2.2 Profiling Demonstration
     add_executable(Sprint22ProfilingDemo
         test_sprint2_2_profiling_demo.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
         src/performance_profiler.cpp
@@ -483,7 +481,7 @@ if(TARGET GTest::gtest_main)
         tests/test_sprint1_4_integration.cpp
         tests/test_reporter.cpp
         tests/integration_test_suite.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/lasparser.cpp
         src/loadingsettingsdialog.cpp
         src/voxelgridfilter.cpp
@@ -511,7 +509,7 @@ if(TARGET GTest::gtest_main)
         tests/spectrum_based_tester.cpp
         tests/intelligent_bug_manager.cpp
         tests/test_data_manager.cpp
-        src/e57parser.cpp
+        src/e57parserlib.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
         src/performance_profiler.cpp

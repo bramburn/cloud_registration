@@ -111,11 +111,7 @@ public:
 
     ScanMetadata getScanMetadata(int scanIndex) const;
 
-    /**
-     * @brief Get the last error message
-     * @return Error message string, empty if no error
-     */
-    std::string getLastError() const;
+
 
     /**
      * @brief Check if a file is open

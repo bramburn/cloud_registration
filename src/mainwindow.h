@@ -58,6 +58,7 @@ private:
 
     // Legacy helper methods for point cloud loading
     void cleanupParsingThread();
+    void cleanupParsingThread(QObject* parser);
     void cleanupProgressDialog();
     void updateUIAfterParsing(bool success, const QString& message);
     void setStatusReady();
