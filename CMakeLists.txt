@@ -104,6 +104,7 @@ set(SOURCES
     src/mainwindow.cpp
     src/pointcloudviewerwidget.cpp
     src/e57parser.cpp
+    src/e57parserlib.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
@@ -116,6 +117,7 @@ set(HEADERS
     src/mainwindow.h
     src/pointcloudviewerwidget.h
     src/e57parser.h
+    src/e57parserlib.h
     src/lasparser.h
     src/loadingsettingsdialog.h
     src/loadingsettings.h
@@ -199,6 +201,59 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserTests PRIVATE src)
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
+
+    # E57ParserLib Tests (Sprint 1)
+    add_executable(E57ParserLibTests
+        tests/test_e57parserlib.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(E57ParserLibTests
+        GTest::gtest_main
+        E57Format
+        Qt6::Core
+        Qt6::Test
+    )
+
+    target_include_directories(E57ParserLibTests PRIVATE src)
+    add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
+
+    # Sprint 2 Simple Test
+    add_executable(Sprint2SimpleTest
+        test_sprint2_simple.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(Sprint2SimpleTest
+        E57Format
+        Qt6::Core
+    )
+
+    target_include_directories(Sprint2SimpleTest PRIVATE src)
+
+    # libE57Format Linkage Test (Sprint 1)
+    add_executable(LibE57LinkageTest
+        tests/test_libe57_linkage.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(LibE57LinkageTest
+        E57Format
+    )
+
+    target_include_directories(LibE57LinkageTest PRIVATE src)
+
+    # Sprint 1 Manual Verification Test
+    add_executable(Sprint1VerificationTest
+        test_sprint1_implementation.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(Sprint1VerificationTest
+        E57Format
+    )
+
+    target_include_directories(Sprint1VerificationTest PRIVATE src)
 
     # Sprint 2.1 Manual Test
     add_executable(Sprint21ManualTest
@@ -406,8 +461,15 @@ if(TARGET GTest::gtest_main)
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests
-        COMMENT "Running all unit tests including Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests
+        COMMENT "Running all unit tests including Sprint 1 E57ParserLib and Sprint 2.4 advanced testing framework"
+    )
+
+    # Sprint 1: E57ParserLib testing targets
+    add_custom_target(run_sprint1_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57ParserLib.*"
+        DEPENDS E57ParserLibTests
+        COMMENT "Running Sprint 1 E57ParserLib tests"
     )
 
     # Sprint 2.4: Advanced testing targets
