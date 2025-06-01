@@ -18,6 +18,7 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     : QTreeView(parent)
     , m_model(nullptr)
     , m_projectManager(nullptr)
+    , m_loadManager(nullptr)
     , m_contextMenu(nullptr)
     , m_contextItem(nullptr)
 {
@@ -98,6 +99,25 @@ void SidebarWidget::setProjectManager(ProjectManager *manager)
     m_projectManager = manager;
 }
 
+void SidebarWidget::setPointCloudLoadManager(PointCloudLoadManager *manager)
+{
+    m_loadManager = manager;
+
+    // Connect signals to load manager
+    if (m_loadManager) {
+        connect(this, &SidebarWidget::loadScanRequested,
+                m_loadManager, &PointCloudLoadManager::onLoadScanRequested);
+        connect(this, &SidebarWidget::unloadScanRequested,
+                m_loadManager, &PointCloudLoadManager::onUnloadScanRequested);
+        connect(this, &SidebarWidget::loadClusterRequested,
+                m_loadManager, &PointCloudLoadManager::onLoadClusterRequested);
+        connect(this, &SidebarWidget::unloadClusterRequested,
+                m_loadManager, &PointCloudLoadManager::onUnloadClusterRequested);
+        connect(this, &SidebarWidget::viewPointCloudRequested,
+                m_loadManager, &PointCloudLoadManager::onViewPointCloudRequested);
+    }
+}
+
 void SidebarWidget::refreshFromDatabase()
 {
     if (m_model) {
@@ -150,15 +170,31 @@ void SidebarWidget::createContextMenu()
 {
     m_contextMenu = new QMenu(this);
 
+    // Existing cluster actions
     m_createClusterAction = new QAction("New Cluster", this);
     m_createSubClusterAction = new QAction("New Sub-Cluster", this);
     m_renameClusterAction = new QAction("Rename", this);
     m_deleteClusterAction = new QAction("Delete", this);
 
+    // New Sprint 2.1 actions
+    m_loadScanAction = new QAction("Load Scan", this);
+    m_unloadScanAction = new QAction("Unload Scan", this);
+    m_loadClusterAction = new QAction("Load All Scans in Cluster", this);
+    m_unloadClusterAction = new QAction("Unload All Scans in Cluster", this);
+    m_viewPointCloudAction = new QAction("View Point Cloud", this);
+
+    // Connect existing actions
     connect(m_createClusterAction, &QAction::triggered, this, &SidebarWidget::onCreateCluster);
     connect(m_createSubClusterAction, &QAction::triggered, this, &SidebarWidget::onCreateSubCluster);
     connect(m_renameClusterAction, &QAction::triggered, this, &SidebarWidget::onRenameCluster);
     connect(m_deleteClusterAction, &QAction::triggered, this, &SidebarWidget::onDeleteCluster);
+
+    // Connect new Sprint 2.1 actions
+    connect(m_loadScanAction, &QAction::triggered, this, &SidebarWidget::onLoadScan);
+    connect(m_unloadScanAction, &QAction::triggered, this, &SidebarWidget::onUnloadScan);
+    connect(m_loadClusterAction, &QAction::triggered, this, &SidebarWidget::onLoadCluster);
+    connect(m_unloadClusterAction, &QAction::triggered, this, &SidebarWidget::onUnloadCluster);
+    connect(m_viewPointCloudAction, &QAction::triggered, this, &SidebarWidget::onViewPointCloud);
 }
 
 void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
@@ -175,19 +211,41 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
         m_contextMenu->addAction(m_createClusterAction);
     } else {
         QString itemType = m_model->getItemType(m_contextItem);
+        QString itemId = m_model->getItemId(m_contextItem);
 
-        if (itemType == "project_root" || itemType == "cluster") {
+        if (itemType == "scan") {
+            // Right-clicked on scan
+            if (m_loadManager) {
+                bool isLoaded = m_loadManager->isScanLoaded(itemId);
+                if (isLoaded) {
+                    m_contextMenu->addAction(m_unloadScanAction);
+                } else {
+                    m_contextMenu->addAction(m_loadScanAction);
+                }
+                m_contextMenu->addSeparator();
+                m_contextMenu->addAction(m_viewPointCloudAction);
+            }
+        } else if (itemType == "project_root" || itemType == "cluster") {
             // Right-clicked on project root or cluster
             m_contextMenu->addAction(m_createClusterAction);
 
             if (itemType == "cluster") {
                 m_contextMenu->addAction(m_createSubClusterAction);
                 m_contextMenu->addSeparator();
+
+                // Add load/unload actions for clusters
+                if (m_loadManager) {
+                    m_contextMenu->addAction(m_loadClusterAction);
+                    m_contextMenu->addAction(m_unloadClusterAction);
+                    m_contextMenu->addSeparator();
+                    m_contextMenu->addAction(m_viewPointCloudAction);
+                    m_contextMenu->addSeparator();
+                }
+
                 m_contextMenu->addAction(m_renameClusterAction);
                 m_contextMenu->addAction(m_deleteClusterAction);
             }
         }
-        // For scans, we don't show context menu for now
     }
 
     if (!m_contextMenu->isEmpty()) {
@@ -439,4 +497,79 @@ bool SidebarWidget::canDropOn(QStandardItem *item, const QString &draggedType)
 
     // For now, don't allow cluster drag-drop (could be implemented later)
     return false;
+}
+
+// New slot implementations for Sprint 2.1
+void SidebarWidget::onLoadScan()
+{
+    if (!m_contextItem || !m_loadManager) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit loadScanRequested(scanId);
+}
+
+void SidebarWidget::onUnloadScan()
+{
+    if (!m_contextItem || !m_loadManager) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit unloadScanRequested(scanId);
+}
+
+void SidebarWidget::onLoadCluster()
+{
+    if (!m_contextItem || !m_loadManager) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "cluster") {
+        return;
+    }
+
+    QString clusterId = m_model->getItemId(m_contextItem);
+    emit loadClusterRequested(clusterId);
+}
+
+void SidebarWidget::onUnloadCluster()
+{
+    if (!m_contextItem || !m_loadManager) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "cluster") {
+        return;
+    }
+
+    QString clusterId = m_model->getItemId(m_contextItem);
+    emit unloadClusterRequested(clusterId);
+}
+
+void SidebarWidget::onViewPointCloud()
+{
+    if (!m_contextItem || !m_loadManager) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    QString itemId = m_model->getItemId(m_contextItem);
+
+    if (itemType == "scan" || itemType == "cluster") {
+        emit viewPointCloudRequested(itemId, itemType);
+    }
 }

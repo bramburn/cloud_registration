@@ -13,6 +13,7 @@ ProjectTreeModel::ProjectTreeModel(QObject *parent)
     , m_scansFolder(nullptr)
 {
     setHorizontalHeaderLabels({"Project Structure"});
+    initializeIcons();
 }
 
 void ProjectTreeModel::setProject(const QString &projectName, const QString &projectPath)
@@ -26,6 +27,8 @@ void ProjectTreeModel::setProject(const QString &projectName, const QString &pro
     // Clear caches
     m_clusterItems.clear();
     m_scanItems.clear();
+    m_scanLoadedStates.clear();
+    m_clusterLoadedStates.clear();
 
     createProjectStructure();
     refreshHierarchy();
@@ -324,4 +327,211 @@ void ProjectTreeModel::moveScanToCluster(const QString &scanId, const QString &c
 
         qDebug() << "Moved scan in tree model:" << scanId << "to cluster:" << clusterId;
     }
+}
+
+// New methods for Sprint 2.1 - Loaded state management
+void ProjectTreeModel::initializeIcons()
+{
+    // Initialize icons for different loaded states
+    // Using standard Qt icons for now - can be replaced with custom icons later
+    m_loadedIcon = QApplication::style()->standardIcon(QStyle::SP_DialogApplyButton);
+    m_unloadedIcon = QApplication::style()->standardIcon(QStyle::SP_DialogCancelButton);
+    m_partialIcon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxWarning);
+    m_loadingIcon = QApplication::style()->standardIcon(QStyle::SP_BrowserReload);
+    m_errorIcon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxCritical);
+}
+
+void ProjectTreeModel::setScanLoadedState(const QString &scanId, LoadedState state)
+{
+    m_scanLoadedStates[scanId] = state;
+
+    // Update the visual representation of the scan item
+    QStandardItem *scanItem = findScanItem(scanId);
+    if (scanItem) {
+        setItemLoadedState(scanItem, state);
+    }
+
+    // Update cluster states that might be affected
+    updateClusterLoadedStates();
+
+    qDebug() << "Set scan loaded state:" << scanId << "to" << static_cast<int>(state);
+}
+
+LoadedState ProjectTreeModel::getScanLoadedState(const QString &scanId) const
+{
+    return m_scanLoadedStates.value(scanId, LoadedState::Unloaded);
+}
+
+void ProjectTreeModel::updateClusterLoadedStates()
+{
+    // Update all cluster states based on their child scans
+    for (auto it = m_clusterItems.begin(); it != m_clusterItems.end(); ++it) {
+        QString clusterId = it.key();
+        LoadedState clusterState = calculateClusterLoadedState(clusterId);
+        m_clusterLoadedStates[clusterId] = clusterState;
+
+        QStandardItem *clusterItem = it.value();
+        if (clusterItem) {
+            setItemLoadedState(clusterItem, clusterState);
+        }
+    }
+}
+
+LoadedState ProjectTreeModel::calculateClusterLoadedState(const QString &clusterId) const
+{
+    if (!m_sqliteManager) {
+        return LoadedState::Unloaded;
+    }
+
+    // Get all scans in this cluster (including sub-clusters)
+    QList<ScanInfo> scans = m_sqliteManager->getAllScans();
+    QList<QString> clusterScanIds;
+
+    // Find scans that belong to this cluster or its sub-clusters
+    for (const ScanInfo &scan : scans) {
+        if (scan.parentClusterId == clusterId) {
+            clusterScanIds.append(scan.scanId);
+        }
+    }
+
+    // Also check sub-clusters recursively
+    QList<ClusterInfo> clusters = m_sqliteManager->getAllClusters();
+    QList<QString> subClusterIds;
+    for (const ClusterInfo &cluster : clusters) {
+        if (cluster.parentClusterId == clusterId) {
+            subClusterIds.append(cluster.clusterId);
+            // Recursively get scans from sub-clusters
+            LoadedState subClusterState = calculateClusterLoadedState(cluster.clusterId);
+            // For now, we'll consider the cluster state based on direct child scans
+        }
+    }
+
+    if (clusterScanIds.isEmpty()) {
+        return LoadedState::Unloaded;
+    }
+
+    int loadedCount = 0;
+    int totalCount = clusterScanIds.size();
+    bool hasError = false;
+    bool hasLoading = false;
+
+    for (const QString &scanId : clusterScanIds) {
+        LoadedState scanState = getScanLoadedState(scanId);
+        switch (scanState) {
+            case LoadedState::Loaded:
+                loadedCount++;
+                break;
+            case LoadedState::Error:
+                hasError = true;
+                break;
+            case LoadedState::Loading:
+                hasLoading = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (hasError) {
+        return LoadedState::Error;
+    }
+    if (hasLoading) {
+        return LoadedState::Loading;
+    }
+    if (loadedCount == 0) {
+        return LoadedState::Unloaded;
+    }
+    if (loadedCount == totalCount) {
+        return LoadedState::Loaded;
+    }
+    return LoadedState::Partial;
+}
+
+void ProjectTreeModel::setItemLoadedState(QStandardItem *item, LoadedState state)
+{
+    if (!item) return;
+
+    QIcon icon;
+    QString tooltip;
+
+    switch (state) {
+        case LoadedState::Loaded:
+            icon = m_loadedIcon;
+            tooltip = "Loaded in memory";
+            break;
+        case LoadedState::Unloaded:
+            icon = m_unloadedIcon;
+            tooltip = "Not loaded";
+            break;
+        case LoadedState::Partial:
+            icon = m_partialIcon;
+            tooltip = "Partially loaded";
+            break;
+        case LoadedState::Loading:
+            icon = m_loadingIcon;
+            tooltip = "Loading...";
+            break;
+        case LoadedState::Error:
+            icon = m_errorIcon;
+            tooltip = "Error loading";
+            break;
+    }
+
+    // Store the loaded state in the item's data
+    item->setData(static_cast<int>(state), Qt::UserRole + 2);
+
+    // Update tooltip to include loaded state
+    QString existingTooltip = item->toolTip();
+    if (!existingTooltip.isEmpty()) {
+        item->setToolTip(existingTooltip + "\nState: " + tooltip);
+    } else {
+        item->setToolTip("State: " + tooltip);
+    }
+}
+
+QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid()) {
+        return QVariant();
+    }
+
+    QStandardItem *item = itemFromIndex(index);
+    if (!item) {
+        return QStandardItemModel::data(index, role);
+    }
+
+    if (role == Qt::DecorationRole) {
+        QString itemType = getItemType(item);
+        QString itemId = getItemId(item);
+
+        if (itemType == "scan") {
+            LoadedState state = getScanLoadedState(itemId);
+            switch (state) {
+                case LoadedState::Loaded:
+                    return m_loadedIcon;
+                case LoadedState::Loading:
+                    return m_loadingIcon;
+                case LoadedState::Error:
+                    return m_errorIcon;
+                default:
+                    return m_unloadedIcon;
+            }
+        } else if (itemType == "cluster") {
+            LoadedState state = m_clusterLoadedStates.value(itemId, LoadedState::Unloaded);
+            switch (state) {
+                case LoadedState::Loaded:
+                    return m_loadedIcon;
+                case LoadedState::Partial:
+                    return m_partialIcon;
+                case LoadedState::Loading:
+                    return m_loadingIcon;
+                case LoadedState::Error:
+                    return m_errorIcon;
+                default:
+                    return QApplication::style()->standardIcon(QStyle::SP_DirIcon);
+            }
+        }
+    }
+
+    return QStandardItemModel::data(index, role);
 }

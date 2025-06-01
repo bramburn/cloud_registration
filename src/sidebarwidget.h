@@ -9,6 +9,7 @@
 class ProjectTreeModel;
 class SQLiteManager;
 class ProjectManager;
+class PointCloudLoadManager;
 struct ScanInfo;
 struct ClusterInfo;
 
@@ -22,6 +23,7 @@ public:
     void clearProject();
     void setSQLiteManager(SQLiteManager *manager);
     void setProjectManager(ProjectManager *manager);
+    void setPointCloudLoadManager(PointCloudLoadManager *manager);
     void refreshFromDatabase();
     void addScan(const ScanInfo &scan);
 
@@ -36,6 +38,13 @@ signals:
     void clusterRenamed(const QString &clusterId, const QString &newName);
     void scanMovedToCluster(const QString &scanId, const QString &clusterId);
 
+    // New signals for Sprint 2.1
+    void loadScanRequested(const QString &scanId);
+    void unloadScanRequested(const QString &scanId);
+    void loadClusterRequested(const QString &clusterId);
+    void unloadClusterRequested(const QString &clusterId);
+    void viewPointCloudRequested(const QString &itemId, const QString &itemType);
+
 protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -49,6 +58,13 @@ private slots:
     void onRenameCluster();
     void onDeleteCluster();
 
+    // New slots for Sprint 2.1
+    void onLoadScan();
+    void onUnloadScan();
+    void onLoadCluster();
+    void onUnloadCluster();
+    void onViewPointCloud();
+
 private:
     void setupUI();
     void setupDragDrop();
@@ -59,6 +75,7 @@ private:
 
     ProjectTreeModel *m_model;
     ProjectManager *m_projectManager;
+    PointCloudLoadManager *m_loadManager;
     QString m_currentProjectPath;
 
     // Context menu and actions
@@ -67,6 +84,13 @@ private:
     QAction *m_createSubClusterAction;
     QAction *m_renameClusterAction;
     QAction *m_deleteClusterAction;
+
+    // New actions for Sprint 2.1
+    QAction *m_loadScanAction;
+    QAction *m_unloadScanAction;
+    QAction *m_loadClusterAction;
+    QAction *m_unloadClusterAction;
+    QAction *m_viewPointCloudAction;
 
     // Current context item for menu actions
     QStandardItem *m_contextItem;
