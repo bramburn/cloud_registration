@@ -87,7 +87,7 @@ void AutomatedTestOracle::learnInvariants(const QList<TestResult> &knownGoodResu
         countRule.confidence = 0.9;
         countRule.category = "count";
         countRule.validator = [minPoints, maxPoints](const std::vector<float>& points, const QJsonObject&) {
-            int count = points.size() / 3;
+            int count = static_cast<int>(points.size()) / 3;
             return count >= 0 && (count == 0 || (count >= minPoints * 0.1 && count <= maxPoints * 10));
         };
         
