@@ -10,6 +10,8 @@
 #include <QVector3D>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QTimer>
+#include <QFont>
 #include <vector>
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
@@ -17,12 +19,20 @@ class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
     Q_OBJECT
 
 public:
+    enum class ViewerState {
+        Idle,
+        Loading,
+        DisplayingData,
+        LoadFailed
+    };
+
     explicit PointCloudViewerWidget(QWidget *parent = nullptr);
     ~PointCloudViewerWidget();
 
     // Public interface
     void loadPointCloud(const std::vector<float>& points);
     void clearPointCloud();
+    void setState(ViewerState state, const QString &message = "");
 
     // Coordinate transformation access (User Story 3)
     QVector3D getGlobalOffset() const { return m_globalOffset; }
@@ -34,11 +44,18 @@ public slots:
     void setRightView();
     void setBottomView();
 
+    // Sprint 2.3: Loading feedback slots
+    void onLoadingStarted();
+    void onLoadingProgress(int percentage, const QString &stage);
+    void onLoadingFinished(bool success, const QString &message,
+                          const std::vector<float> &points);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
+    void paintOverlayGL();  // For text overlays
 
     // Mouse and keyboard events
     void mousePressEvent(QMouseEvent *event) override;
@@ -57,6 +74,18 @@ private:
     void setupUCSBuffers();
     void drawUCS();
 
+    // Sprint 1.3: Error state rendering for Task 1.3.3.2
+    void renderErrorState();
+
+    // Sprint 2.3: Visual state rendering methods
+    void drawLoadingState(QPainter &painter);
+    void drawLoadFailedState(QPainter &painter);
+    void drawIdleState(QPainter &painter);
+
+private slots:
+    void updateLoadingAnimation();
+
+private:
     // OpenGL objects
     QOpenGLBuffer m_vertexBuffer;
     QOpenGLVertexArrayObject m_vertexArrayObject;
@@ -113,6 +142,24 @@ private:
     // State
     bool m_hasData;
     bool m_shadersInitialized;
+
+    // Sprint 1.3: Error state management for Task 1.3.3.2
+    bool m_showErrorState;
+    QString m_errorMessage;
+
+    // Sprint 2.3: State management and visual feedback
+    ViewerState m_currentState;
+    QString m_stateMessage;
+    int m_loadingProgress;
+    QString m_loadingStage;
+
+    // Loading animation
+    QTimer *m_loadingTimer;
+    int m_loadingAngle;
+
+    // Fonts for overlay text
+    QFont m_overlayFont;
+    QFont m_detailFont;
 };
 
 #endif // POINTCLOUDVIEWERWIDGET_H

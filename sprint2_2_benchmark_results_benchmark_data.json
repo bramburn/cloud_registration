@@ -1,0 +1,71 @@
+{
+    "memoryMonitoringEnabled": true,
+    "results": [
+        {
+            "detailedTiming": {
+                "dataParse": 0,
+                "fileOpen": 0,
+                "gpuUpload": 0,
+                "headerParse": 0
+            },
+            "errorMessage": "Failed to parse E57 XML section: [E57_ERROR_XML_PARSE] Error in XML parsing: Failed at line 1, column 38: Encountered incorrectly encoded content.",
+            "filePath": "C:/dev/cloud_registration/sample/bunnyDouble.e57",
+            "fileSize": 743424,
+            "fileType": "E57",
+            "loadTimeMs": 5,
+            "mbPerSecond": 141.796875,
+            "memoryUsage": 110592,
+            "pointCount": 0,
+            "pointsPerSecond": 0,
+            "success": false,
+            "testName": "E57 - bunnyDouble.e57"
+        },
+        {
+            "detailedTiming": {
+                "dataParse": 0,
+                "fileOpen": 0,
+                "gpuUpload": 0,
+                "headerParse": 0
+            },
+            "errorMessage": "Failed to parse E57 XML section: [E57_ERROR_XML_PARSE] Error in XML parsing: Failed at line 1, column 38: Encountered incorrectly encoded content.",
+            "filePath": "C:/dev/cloud_registration/sample/bunnyInt32.e57",
+            "fileSize": 374784,
+            "fileType": "E57",
+            "loadTimeMs": 16,
+            "mbPerSecond": 22.3388671875,
+            "memoryUsage": 159744,
+            "pointCount": 0,
+            "pointsPerSecond": 0,
+            "success": false,
+            "testName": "E57 - bunnyInt32.e57"
+        },
+        {
+            "detailedTiming": {
+                "dataParse": 0,
+                "fileOpen": 0,
+                "gpuUpload": 0,
+                "headerParse": 0
+            },
+            "errorMessage": "",
+            "filePath": "C:/dev/cloud_registration/sample/S2max-Power line202503.las",
+            "fileSize": 588708719,
+            "fileType": "LAS",
+            "loadTimeMs": 5931,
+            "mbPerSecond": 94.66133622571643,
+            "memoryUsage": 336625664,
+            "pointCount": 14016863,
+            "pointsPerSecond": 2363322.0367560275,
+            "success": true,
+            "testName": "LAS - S2max-Power line202503.las"
+        }
+    ],
+    "summary": {
+        "averageLoadTime": 5931,
+        "averagePointsPerSecond": 2363322.0367560275,
+        "successfulTests": 1,
+        "totalPointsLoaded": 14016863,
+        "totalTests": 3
+    },
+    "timestamp": "2025-05-31T22:58:06",
+    "totalTests": 3
+}

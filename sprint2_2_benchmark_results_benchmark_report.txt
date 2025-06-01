@@ -1,0 +1,18 @@
+=== PERFORMANCE BENCHMARK REPORT ===
+Generated: 2025-05-31T22:58:06
+Total Tests: 3
+
+SUMMARY:
+  Successful Tests: 1/3
+  Average Load Time: 5931.0 ms
+  Total Points Loaded: 14016863
+  Average Points/Second: 2363322
+
+DETAILED RESULTS:
+%-30s %-8s %-10s %-8s %-10s %-12s %-8s
+------------------------------------------------------------------------------------------
+%-30s %-8s %-10s %-8s %-10lld %-12s %-8s
+%-30s %-8s %-10s %-8s %-10lld %-12s %-8s
+    Error: Failed to parse E57 XML section: [E57_ERROR_XML_PARSE] Error in XML parsing: Failed at line 1, column 38: Encountered incorrectly encoded content.
+%-30s %-8s %-10s %-8s %-10lld %-12s %-8s
+    Error: Failed to parse E57 XML section: [E57_ERROR_XML_PARSE] Error in XML parsing: Failed at line 1, column 38: Encountered incorrectly encoded content.

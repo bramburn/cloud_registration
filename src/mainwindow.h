@@ -32,7 +32,7 @@ public:
 private slots:
     void onOpenFileClicked();
     void onLoadingFinished(bool success, const QString& message);
-    void onParsingProgressUpdated(int percentage);
+    void onParsingProgressUpdated(int percentage, const QString &stage);
     void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
 
     // Settings dialog slot
@@ -56,6 +56,16 @@ private:
     void cleanupParsingThread();
     void cleanupProgressDialog();
     void updateUIAfterParsing(bool success, const QString& message);
+
+    // Sprint 2.3: Standardized status bar messages
+    void setStatusReady();
+    void setStatusLoading(const QString &filename);
+    void setStatusLoadSuccess(const QString &filename, int pointCount);
+    void setStatusLoadFailed(const QString &filename, const QString &error);
+    void setStatusFileInfo(const QString &filename, int pointCount,
+                          double minX, double minY, double minZ,
+                          double maxX, double maxY, double maxZ);
+    void setStatusViewChanged(const QString &viewName);
 
     // UI Components
     QWidget *m_centralWidget;
@@ -86,6 +96,14 @@ private:
     // State
     QString m_currentFilePath;
     bool m_isLoading;
+
+    // Sprint 2.3: Status bar widgets
+    QLabel *m_statusLabel;
+    QLabel *m_permanentStatusLabel;
+
+    // Current file info for status display
+    QString m_currentFileName;
+    int m_currentPointCount;
 };
 
 #endif // MAINWINDOW_H

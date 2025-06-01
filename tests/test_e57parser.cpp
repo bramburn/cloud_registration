@@ -2,6 +2,9 @@
 #include <QCoreApplication>
 #include <QTemporaryFile>
 #include <QDataStream>
+#include <QSignalSpy>
+#include <QDomDocument>
+#include <QDebug>
 #include "e57parser.h"
 
 class E57ParserTest : public ::testing::Test
@@ -115,64 +118,369 @@ TEST_F(E57ParserTest, NonExistentFileHandling)
     EXPECT_FALSE(isValid);
 }
 
-TEST_F(E57ParserTest, MockDataGeneration)
+TEST_F(E57ParserTest, InvalidFileNoMockData)
 {
-    // Test parsing with an invalid file (should generate mock data)
+    // Test parsing with an invalid file (should NOT generate mock data in Sprint 1.1)
     QString invalidFile = createInvalidFile();
     ASSERT_FALSE(invalidFile.isEmpty());
 
-    try {
-        std::vector<float> points = parser->parse(invalidFile);
+    // Set up signal spy to capture parsing results
+    QSignalSpy spy(parser, &E57Parser::parsingFinished);
 
-        // Should have generated mock data
-        EXPECT_FALSE(points.empty());
-        EXPECT_EQ(points.size() % 3, 0); // Should be divisible by 3 (X, Y, Z)
+    std::vector<float> points = parser->parse(invalidFile);
 
-        // Check that we have a reasonable number of points
-        size_t numPoints = points.size() / 3;
-        EXPECT_GT(numPoints, 1000); // Should have generated at least 1000 points
-        EXPECT_LT(numPoints, 100000); // But not too many
+    // Should NOT have generated mock data - should return empty vector
+    EXPECT_TRUE(points.empty());
 
-    } catch (const std::exception& e) {
-        FAIL() << "Unexpected exception: " << e.what();
-    }
+    // Should have error message
+    EXPECT_FALSE(parser->getLastError().isEmpty());
+
+    // Should have emitted parsingFinished with failure
+    EXPECT_EQ(spy.count(), 1);
+    QList<QVariant> arguments = spy.takeFirst();
+    EXPECT_FALSE(arguments.at(0).toBool()); // success should be false
 
     // Clean up
     QFile::remove(invalidFile);
 }
 
-TEST_F(E57ParserTest, ValidE57FileParsing)
+TEST_F(E57ParserTest, ValidE57FileHeaderParsing)
 {
     QString mockFile = createMockE57File();
     ASSERT_FALSE(mockFile.isEmpty());
 
-    try {
-        std::vector<float> points = parser->parse(mockFile);
+    // Test that the file is recognized as valid E57
+    bool isValid = parser->isValidE57File(mockFile);
+    EXPECT_TRUE(isValid);
 
-        // Should have generated mock data (since full parsing is not implemented yet)
-        EXPECT_FALSE(points.empty());
-        EXPECT_EQ(points.size() % 3, 0);
+    // Test parsing - this will fail at XML stage since our mock file doesn't have proper XML
+    // but it should NOT generate mock data
+    QSignalSpy spy(parser, &E57Parser::parsingFinished);
+    std::vector<float> points = parser->parse(mockFile);
 
-    } catch (const std::exception& e) {
-        FAIL() << "Unexpected exception: " << e.what();
-    }
+    // Should NOT have generated mock data - should return empty vector due to missing XML
+    EXPECT_TRUE(points.empty());
+
+    // Should have error message about XML parsing
+    EXPECT_FALSE(parser->getLastError().isEmpty());
 
     // Clean up
     QFile::remove(mockFile);
 }
 
+TEST_F(E57ParserTest, RealE57FileTest)
+{
+    // Test with the real E57 test file if it exists
+    QString testFile = "test_data/test_real_points.e57";
+
+    if (QFile::exists(testFile)) {
+        QSignalSpy spy(parser, &E57Parser::parsingFinished);
+        std::vector<float> points = parser->parse(testFile);
+
+        // Should have successfully parsed real E57 data
+        EXPECT_FALSE(points.empty());
+        EXPECT_EQ(points.size() % 3, 0); // Should be divisible by 3 (X, Y, Z)
+
+        // Should have exactly 3 points (9 floats)
+        EXPECT_EQ(points.size(), 9);
+
+        // Should have emitted parsingFinished with success
+        EXPECT_EQ(spy.count(), 1);
+        QList<QVariant> arguments = spy.takeFirst();
+        EXPECT_TRUE(arguments.at(0).toBool()); // success should be true
+
+        // Verify the actual coordinates (1,2,3), (4,5,6), (7,8,9)
+        if (points.size() >= 9) {
+            EXPECT_FLOAT_EQ(points[0], 1.0f);
+            EXPECT_FLOAT_EQ(points[1], 2.0f);
+            EXPECT_FLOAT_EQ(points[2], 3.0f);
+            EXPECT_FLOAT_EQ(points[3], 4.0f);
+            EXPECT_FLOAT_EQ(points[4], 5.0f);
+            EXPECT_FLOAT_EQ(points[5], 6.0f);
+            EXPECT_FLOAT_EQ(points[6], 7.0f);
+            EXPECT_FLOAT_EQ(points[7], 8.0f);
+            EXPECT_FLOAT_EQ(points[8], 9.0f);
+        }
+    } else {
+        // Skip test if file doesn't exist
+        GTEST_SKIP() << "Test file " << testFile.toStdString() << " not found";
+    }
+}
+
 TEST_F(E57ParserTest, ErrorHandling)
 {
-    // Test with a non-existent file
-    try {
-        std::vector<float> points = parser->parse("/non/existent/file.e57");
-        FAIL() << "Expected exception was not thrown";
-    } catch (const E57ParseException&) {
-        // Expected behavior
-        EXPECT_FALSE(parser->getLastError().isEmpty());
-    } catch (const std::exception& e) {
-        FAIL() << "Wrong exception type: " << e.what();
+    // Test with a non-existent file - should return empty vector, not throw exception
+    std::vector<float> points = parser->parse("/non/existent/file.e57");
+
+    // Should return empty vector
+    EXPECT_TRUE(points.empty());
+
+    // Should have error message
+    EXPECT_FALSE(parser->getLastError().isEmpty());
+}
+
+// Sprint 1.2: CompressedVector parsing tests
+TEST_F(E57ParserTest, CompressedVectorParsing)
+{
+    QString testXml = R"(
+        <points type="CompressedVector">
+            <codecs>
+                <CompressedVectorNode recordCount="1000" fileOffset="2048">
+                    <prototype>
+                        <cartesianX type="Float" precision="single"/>
+                        <cartesianY type="Float" precision="single"/>
+                        <cartesianZ type="Float" precision="single"/>
+                    </prototype>
+                </CompressedVectorNode>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_TRUE(result);
+    if (!result) {
+        qDebug() << "CompressedVector parsing failed:" << parser->getLastError();
     }
+}
+
+TEST_F(E57ParserTest, CompressedVectorMissingRecordCount)
+{
+    QString testXml = R"(
+        <points type="CompressedVector">
+            <codecs>
+                <CompressedVectorNode fileOffset="2048">
+                    <prototype>
+                        <cartesianX type="Float" precision="single"/>
+                        <cartesianY type="Float" precision="single"/>
+                        <cartesianZ type="Float" precision="single"/>
+                    </prototype>
+                </CompressedVectorNode>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(parser->getLastError().contains("recordCount"));
+    EXPECT_TRUE(parser->getLastError().contains("E57_ERROR_MISSING_RECORDCOUNT"));
+}
+
+TEST_F(E57ParserTest, CompressedVectorMissingCodecs)
+{
+    QString testXml = R"(
+        <points type="CompressedVector">
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(parser->getLastError().contains("codecs"));
+    EXPECT_TRUE(parser->getLastError().contains("E57_ERROR_BAD_CODECS"));
+}
+
+// Sprint 1.2: Enhanced error reporting tests
+TEST_F(E57ParserTest, DetailedErrorReporting)
+{
+    QString testXml = R"(
+        <points type="Vector">
+            <prototype>
+                <cartesianX type="Float" precision="single"/>
+                <cartesianY type="Float" precision="single"/>
+                <!-- Missing cartesianZ -->
+            </prototype>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    QString error = parser->getLastError();
+    EXPECT_TRUE(error.contains("cartesianZ"));
+    EXPECT_TRUE(error.contains("E57_ERROR_MISSING_COORDINATES"));
+    EXPECT_TRUE(error.contains("prototype"));
+}
+
+TEST_F(E57ParserTest, DetailedErrorWithElementContext)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="invalid">
+            <codecs>
+                <CompressedVectorNode recordCount="not_a_number">
+                </CompressedVectorNode>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    QString error = parser->getLastError();
+    EXPECT_TRUE(error.contains("CompressedVectorNode"));
+    EXPECT_TRUE(error.contains("not_a_number"));
+}
+
+// Sprint 2.1: Codec handling tests
+TEST_F(E57ParserTest, BitPackCodecIdentificationExplicit)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="100">
+            <prototype>
+                <cartesianX type="Float" precision="single"/>
+                <cartesianY type="Float" precision="single"/>
+                <cartesianZ type="Float" precision="single"/>
+            </prototype>
+            <codecs>
+                <vector>
+                    <bitPackCodec/>
+                </vector>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_TRUE(result);
+    if (!result) {
+        qDebug() << "BitPack codec identification failed:" << parser->getLastError();
+    }
+}
+
+TEST_F(E57ParserTest, BitPackCodecIdentificationDefault)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="100">
+            <prototype>
+                <cartesianX type="Float" precision="single"/>
+                <cartesianY type="Float" precision="single"/>
+                <cartesianZ type="Float" precision="single"/>
+            </prototype>
+            <codecs>
+                <vector>
+                    <!-- Empty vector = default bitPackCodec -->
+                </vector>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_TRUE(result);
+    if (!result) {
+        qDebug() << "Default BitPack codec identification failed:" << parser->getLastError();
+    }
+}
+
+TEST_F(E57ParserTest, UnsupportedCodecRejection)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="100">
+            <prototype>
+                <cartesianX type="Float" precision="single"/>
+                <cartesianY type="Float" precision="single"/>
+                <cartesianZ type="Float" precision="single"/>
+            </prototype>
+            <codecs>
+                <vector>
+                    <zLibCodec/>
+                </vector>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    QString error = parser->getLastError();
+    EXPECT_TRUE(error.contains("Unsupported E57 compression codec") ||
+                error.contains("zLibCodec"));
+}
+
+TEST_F(E57ParserTest, FieldDescriptorParsing)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="50">
+            <prototype>
+                <cartesianX type="Float" precision="single" minimum="-10.0" maximum="10.0"/>
+                <cartesianY type="Float" precision="double" minimum="-5.0" maximum="5.0"/>
+                <cartesianZ type="ScaledInteger" precision="16" scale="0.001" offset="100.0"/>
+            </prototype>
+            <codecs>
+                <vector>
+                    <bitPackCodec/>
+                </vector>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_TRUE(result);
+    if (!result) {
+        qDebug() << "Field descriptor parsing failed:" << parser->getLastError();
+    }
+}
+
+TEST_F(E57ParserTest, MissingPrototypeInCompressedVector)
+{
+    QString testXml = R"(
+        <points type="CompressedVector" recordCount="100">
+            <!-- Missing prototype -->
+            <codecs>
+                <vector>
+                    <bitPackCodec/>
+                </vector>
+            </codecs>
+        </points>
+    )";
+
+    QDomDocument doc;
+    ASSERT_TRUE(doc.setContent(testXml));
+
+    QDomElement pointsElement = doc.documentElement();
+    bool result = parser->parseData3D(pointsElement);
+
+    EXPECT_FALSE(result);
+    QString error = parser->getLastError();
+    EXPECT_TRUE(error.contains("prototype") || error.contains("E57_ERROR_MISSING_PROTOTYPE"));
 }
 
 // Main function for running tests

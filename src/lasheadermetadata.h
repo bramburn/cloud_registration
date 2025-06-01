@@ -14,7 +14,13 @@ struct LasHeaderMetadata {
     Vector3D minBounds;                // Minimum X, Y, Z coordinates of the bounding box
     Vector3D maxBounds;                // Maximum X, Y, Z coordinates of the bounding box
     QString filePath;                  // The path of the file this metadata belongs to (for display)
-    // Additional relevant header information can be added here in future sprints
+
+    // Sprint 1.3: Enhanced metadata for better error reporting and display
+    uint8_t versionMajor = 0;          // LAS version major (should be 1)
+    uint8_t versionMinor = 0;          // LAS version minor (2, 3, or 4)
+    uint8_t pointDataFormat = 0;       // Point Data Record Format (0-3 supported)
+    QString systemIdentifier;         // System that created the file
+    QString generatingSoftware;       // Software that created the file
 };
 
 #endif // LASHEADERMETADATA_H

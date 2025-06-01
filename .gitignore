@@ -10,6 +10,7 @@ cmake_install.cmake
 compile_commands.json
 .cmake/
 _deps/
+.doc-pdf/
 
 # C++ compiled files
 *.o

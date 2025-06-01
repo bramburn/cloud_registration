@@ -11,6 +11,7 @@
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QGroupBox>
+#include <QCheckBox>
 #include "loadingsettings.h"
 
 class LoadingSettingsDialog : public QDialog
@@ -23,6 +24,10 @@ public:
 
     // Public method to retrieve the currently configured loading settings
     LoadingSettings getSettings() const;
+    void setSettings(const LoadingSettings& settings);
+
+    // Task 1.4.3.4: E57/LAS compatibility handling
+    void configureForFileType(const QString& fileExtension);
 
 private slots:
     // Slots for button clicks and combo box changes
@@ -30,6 +35,7 @@ private slots:
     void onOkClicked();
     void onCancelClicked();
     void onMethodChanged(int index);
+    void onVoxelSettingsChanged();
 
 private:
     // Private helper methods for managing settings persistence
@@ -54,6 +60,15 @@ private:
     QDoubleSpinBox *m_leafSizeSpinBox;
     QLabel *m_minPointsLabel;
     QSpinBox *m_minPointsSpinBox;
+
+    // File type specific controls (Sprint 1.4)
+    QGroupBox *m_e57Group;
+    QGroupBox *m_lasGroup;
+    QCheckBox *m_e57TransformCheck;
+    QCheckBox *m_e57LoadColorsCheck;
+    QCheckBox *m_lasValidateCheck;
+    QCheckBox *m_lasLoadIntensityCheck;
+    QCheckBox *m_lasLoadColorsCheck;
 
     // Internal state
     LoadingSettings m_currentSettings;

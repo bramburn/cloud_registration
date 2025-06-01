@@ -1,7 +1,9 @@
 #include "pointcloudviewerwidget.h"
+#include "performance_profiler.h"
 #include <QDebug>
 #include <QDir>
 #include <QCoreApplication>
+#include <QPainter>
 #include <cmath>
 
 PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
@@ -32,6 +34,11 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_pointSize(2.0f)
     , m_hasData(false)
     , m_shadersInitialized(false)
+    , m_showErrorState(true)  // Sprint 1.3: Start in error state
+    , m_errorMessage("No point cloud data loaded")
+    , m_currentState(ViewerState::Idle)  // Sprint 2.3: Initialize state
+    , m_loadingProgress(0)
+    , m_loadingAngle(0)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -40,6 +47,23 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     m_modelMatrix.setToIdentity();
     m_viewMatrix.setToIdentity();
     m_projectionMatrix.setToIdentity();
+
+    // Sprint 2.3: Setup loading animation timer
+    m_loadingTimer = new QTimer(this);
+    m_loadingTimer->setInterval(50); // 20 FPS animation
+    connect(m_loadingTimer, &QTimer::timeout,
+            this, &PointCloudViewerWidget::updateLoadingAnimation);
+
+    // Setup fonts for overlay text
+    m_overlayFont.setFamily("Arial");
+    m_overlayFont.setPointSize(16);
+    m_overlayFont.setBold(true);
+
+    m_detailFont.setFamily("Arial");
+    m_detailFont.setPointSize(12);
+
+    // Initialize in idle state
+    setState(ViewerState::Idle, "Ready to load point cloud files");
 
     qDebug() << "PointCloudViewerWidget constructor completed";
 }
@@ -146,71 +170,72 @@ void PointCloudViewerWidget::paintGL()
         qCritical() << "OpenGL Error after glClear:" << QString("0x%1").arg(error, 0, 16);
     }
 
-    // Debug logging for rendering state (User Story 2)
-    if (!m_hasData) {
-        qDebug() << "paintGL: No data to render (m_hasData = false)";
-        return;
+    // Sprint 2.3: Handle state-based rendering
+    if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
+        // Render point cloud data
+        qDebug() << "paintGL: Rendering" << m_pointCount << "points";
+
+        // Use shader program with error checking
+        if (!m_shaderProgram->bind()) {
+            qWarning() << "Failed to bind shader program";
+            paintOverlayGL(); // Still show overlay even if shader fails
+            return;
+        }
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        // Calculate MVP matrix
+        QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+
+        // Set uniforms with error checking
+        m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        qDebug() << "paintGL: Point size set to:" << m_pointSize;
+
+        // Bind VAO and draw points with error checking
+        m_vertexArrayObject.bind();
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        qDebug() << "paintGL: Drawing" << m_pointCount << "points with glDrawArrays(GL_POINTS, 0," << m_pointCount << ")";
+        glDrawArrays(GL_POINTS, 0, m_pointCount);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
+        }
+
+        m_vertexArrayObject.release();
+        m_shaderProgram->release();
+
+        // Draw UCS indicator
+        drawUCS();
+    } else if (m_showErrorState || !m_hasData) {
+        // Sprint 1.3: Handle legacy error state rendering (Task 1.3.3.2)
+        renderErrorState();
     }
-    if (!m_shadersInitialized) {
-        qDebug() << "paintGL: Shaders not initialized (m_shadersInitialized = false)";
-        return;
-    }
 
-    qDebug() << "paintGL: Rendering" << m_pointCount << "points";
-
-    // Use shader program with error checking
-    if (!m_shaderProgram->bind()) {
-        qWarning() << "Failed to bind shader program";
-        return;
-    }
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    // Calculate MVP matrix
-    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
-
-    // Set uniforms with error checking
-    m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    qDebug() << "paintGL: Point size set to:" << m_pointSize;
-
-    // Bind VAO and draw points with error checking
-    m_vertexArrayObject.bind();
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    qDebug() << "paintGL: Drawing" << m_pointCount << "points with glDrawArrays(GL_POINTS, 0," << m_pointCount << ")";
-    glDrawArrays(GL_POINTS, 0, m_pointCount);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
-    }
-
-    m_vertexArrayObject.release();
-    m_shaderProgram->release();
-
-    // Draw UCS indicator
-    drawUCS();
+    // Sprint 2.3: Always draw overlay for state feedback
+    paintOverlayGL();
 }
 
 void PointCloudViewerWidget::setupShaders()
@@ -312,6 +337,8 @@ void PointCloudViewerWidget::setupBuffers()
 
 void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 {
+    PROFILE_FUNCTION();
+
     // Debug logging for data reception (User Story 1)
     qDebug() << "=== PointCloudViewerWidget::loadPointCloud ===";
     qDebug() << "Received points vector size:" << points.size();
@@ -392,42 +419,49 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
     qDebug() << "  Target:" << m_cameraTarget;
 
     // Upload data to GPU with OpenGL error checking (User Story 2)
-    m_vertexArrayObject.bind();
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
-    }
+    {
+        PROFILE_SECTION("GPU::DataUpload");
+        m_vertexArrayObject.bind();
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-    m_vertexBuffer.bind();
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after VBO bind:" << QString("0x%1").arg(error, 0, 16);
-    }
+        m_vertexBuffer.bind();
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after VBO bind:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-    m_vertexBuffer.allocate(m_pointData.data(), static_cast<int>(m_pointData.size() * sizeof(float)));
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after VBO allocate:" << QString("0x%1").arg(error, 0, 16);
-    }
+        m_vertexBuffer.allocate(m_pointData.data(), static_cast<int>(m_pointData.size() * sizeof(float)));
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after VBO allocate:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-    // Set vertex attribute
-    glEnableVertexAttribArray(0);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after glEnableVertexAttribArray:" << QString("0x%1").arg(error, 0, 16);
-    }
+        // Set vertex attribute
+        glEnableVertexAttribArray(0);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glEnableVertexAttribArray:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-    error = glGetError();
-    if (error != GL_NO_ERROR) {
-        qCritical() << "OpenGL Error after glVertexAttribPointer:" << QString("0x%1").arg(error, 0, 16);
-    }
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after glVertexAttribPointer:" << QString("0x%1").arg(error, 0, 16);
+        }
 
-    m_vertexBuffer.release();
-    m_vertexArrayObject.release();
+        m_vertexBuffer.release();
+        m_vertexArrayObject.release();
+    }
 
     m_hasData = true;
     qDebug() << "m_hasData set to true";
+
+    // Sprint 1.3: Clear error state when data is successfully loaded
+    m_showErrorState = false;
+    m_errorMessage.clear();
 
     doneCurrent();
     update(); // Trigger repaint
@@ -437,14 +471,33 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 
 void PointCloudViewerWidget::clearPointCloud()
 {
+    // Task 1.3.3.2: Enhanced data clearing for Sprint 1.3
+    qDebug() << "PointCloudViewerWidget::clearPointCloud() - Clearing all point cloud data";
+
     makeCurrent();
 
+    // Clear all point data
     m_pointData.clear();
     m_pointCount = 0;
     m_hasData = false;
 
+    // Reset bounding box
+    m_boundingBoxMin = QVector3D(0.0f, 0.0f, 0.0f);
+    m_boundingBoxMax = QVector3D(0.0f, 0.0f, 0.0f);
+    m_boundingBoxCenter = QVector3D(0.0f, 0.0f, 0.0f);
+    m_boundingBoxSize = 1.0f;
+
+    // Reset global offset
+    m_globalOffset = QVector3D(0.0f, 0.0f, 0.0f);
+
+    // Set error state display
+    m_showErrorState = true;
+    m_errorMessage = "No point cloud data loaded";
+
     doneCurrent();
-    update();
+    update(); // Trigger repaint to show cleared state
+
+    qDebug() << "PointCloudViewerWidget::clearPointCloud() - Data cleared, error state set";
 }
 
 void PointCloudViewerWidget::calculateBoundingBox()
@@ -599,6 +652,26 @@ void PointCloudViewerWidget::setTopView()
     m_cameraPitch = static_cast<float>(M_PI) / 2.0f - 0.1f; // Almost 90 degrees, avoid singularity
     m_cameraUp = QVector3D(0.0f, 0.0f, -1.0f); // Z-axis points forward in top view
     updateCamera();
+}
+
+// Sprint 1.3: Error state rendering implementation for Task 1.3.3.2
+void PointCloudViewerWidget::renderErrorState()
+{
+    // Render centered text indicating no data loaded or error state
+    // Since we're in an OpenGL context, we need to use QPainter overlay
+
+    // Create a simple text rendering using OpenGL-compatible method
+    // For now, just clear the screen with a different color to indicate error state
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f); // Darker background for error state
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Note: For proper text rendering in OpenGL context, we would need to:
+    // 1. Use texture-based text rendering, or
+    // 2. Use QPainter with paintEvent override, or
+    // 3. Use a text rendering library like FreeType
+    // For now, the darker background serves as a visual indicator
+
+    qDebug() << "renderErrorState: Displaying error state -" << m_errorMessage;
 }
 
 void PointCloudViewerWidget::setLeftView()
@@ -801,4 +874,230 @@ void PointCloudViewerWidget::drawUCS()
         glEnable(GL_DEPTH_TEST);
     }
     glLineWidth(lineWidth);
+}
+
+// Sprint 2.3: State management and visual feedback methods
+void PointCloudViewerWidget::setState(ViewerState state, const QString &message)
+{
+    if (m_currentState != state) {
+        m_currentState = state;
+        m_stateMessage = message;
+
+        switch (state) {
+            case ViewerState::Loading:
+                m_loadingProgress = 0;
+                m_loadingStage = "Initializing...";
+                m_loadingTimer->start();
+                break;
+
+            case ViewerState::DisplayingData:
+                m_loadingTimer->stop();
+                break;
+
+            case ViewerState::LoadFailed:
+                m_loadingTimer->stop();
+                break;
+
+            case ViewerState::Idle:
+                m_loadingTimer->stop();
+                break;
+        }
+
+        update(); // Trigger repaint
+    }
+}
+
+void PointCloudViewerWidget::onLoadingStarted()
+{
+    setState(ViewerState::Loading, "Loading point cloud...");
+}
+
+void PointCloudViewerWidget::onLoadingProgress(int percentage, const QString &stage)
+{
+    m_loadingProgress = percentage;
+    m_loadingStage = stage;
+    update(); // Trigger repaint to update progress display
+}
+
+void PointCloudViewerWidget::onLoadingFinished(bool success, const QString &message,
+                                              const std::vector<float> &points)
+{
+    if (success && !points.empty()) {
+        setState(ViewerState::DisplayingData, message);
+        loadPointCloud(points);
+    } else {
+        setState(ViewerState::LoadFailed, message);
+    }
+}
+
+void PointCloudViewerWidget::updateLoadingAnimation()
+{
+    m_loadingAngle = (m_loadingAngle + 10) % 360;
+    update(); // Trigger repaint for animation
+}
+
+void PointCloudViewerWidget::paintOverlayGL()
+{
+    // Use QPainter for text overlays on top of OpenGL content
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    switch (m_currentState) {
+        case ViewerState::Loading:
+            drawLoadingState(painter);
+            break;
+
+        case ViewerState::LoadFailed:
+            drawLoadFailedState(painter);
+            break;
+
+        case ViewerState::Idle:
+            drawIdleState(painter);
+            break;
+
+        case ViewerState::DisplayingData:
+            // No overlay needed when displaying data
+            break;
+    }
+}
+
+void PointCloudViewerWidget::drawLoadingState(QPainter &painter)
+{
+    QRect rect = this->rect();
+    QPoint center = rect.center();
+
+    // Semi-transparent background
+    painter.fillRect(rect, QColor(0, 0, 0, 100));
+
+    // Draw loading spinner
+    painter.setPen(QPen(QColor(100, 150, 255), 3));
+    painter.setFont(m_overlayFont);
+
+    const int spinnerRadius = 30;
+
+    // Draw spinning arc
+    QRect spinnerRect(center.x() - spinnerRadius, center.y() - spinnerRadius - 40,
+                      spinnerRadius * 2, spinnerRadius * 2);
+
+    painter.drawArc(spinnerRect, m_loadingAngle * 16, 120 * 16); // 120 degree arc
+
+    // Draw main loading text
+    painter.setPen(QColor(255, 255, 255));
+    QRect textRect = rect;
+    textRect.setTop(center.y() + 10);
+    textRect.setHeight(30);
+
+    painter.drawText(textRect, Qt::AlignCenter, "Loading Point Cloud...");
+
+    // Draw progress information
+    painter.setFont(m_detailFont);
+    QRect progressRect = rect;
+    progressRect.setTop(center.y() + 50);
+    progressRect.setHeight(20);
+
+    QString progressText = QString("%1% - %2").arg(m_loadingProgress).arg(m_loadingStage);
+    painter.drawText(progressRect, Qt::AlignCenter, progressText);
+
+    // Draw progress bar
+    const int progressBarWidth = 300;
+    const int progressBarHeight = 6;
+    QRect progressBarRect(center.x() - progressBarWidth/2, center.y() + 80,
+                         progressBarWidth, progressBarHeight);
+
+    // Background
+    painter.fillRect(progressBarRect, QColor(70, 70, 70));
+
+    // Progress fill
+    QRect fillRect = progressBarRect;
+    fillRect.setWidth((progressBarWidth * m_loadingProgress) / 100);
+    painter.fillRect(fillRect, QColor(100, 150, 255));
+
+    // Progress bar border
+    painter.setPen(QColor(150, 150, 150));
+    painter.drawRect(progressBarRect);
+}
+
+void PointCloudViewerWidget::drawLoadFailedState(QPainter &painter)
+{
+    QRect rect = this->rect();
+    QPoint center = rect.center();
+
+    // Semi-transparent red background
+    painter.fillRect(rect, QColor(100, 0, 0, 80));
+
+    // Draw error icon (simple X)
+    painter.setPen(QPen(QColor(255, 100, 100), 4));
+    const int iconSize = 40;
+    QRect iconRect(center.x() - iconSize/2, center.y() - iconSize/2 - 40,
+                   iconSize, iconSize);
+
+    painter.drawLine(iconRect.topLeft(), iconRect.bottomRight());
+    painter.drawLine(iconRect.topRight(), iconRect.bottomLeft());
+
+    // Draw main error text
+    painter.setPen(QColor(255, 255, 255));
+    painter.setFont(m_overlayFont);
+
+    QRect textRect = rect;
+    textRect.setTop(center.y() + 10);
+    textRect.setHeight(30);
+
+    painter.drawText(textRect, Qt::AlignCenter, "Failed to Load File");
+
+    // Draw error details
+    painter.setFont(m_detailFont);
+    QRect detailRect = rect;
+    detailRect.setTop(center.y() + 50);
+    detailRect.setHeight(60);
+    detailRect.adjust(20, 0, -20, 0); // Add margins
+
+    painter.drawText(detailRect, Qt::AlignCenter | Qt::TextWordWrap, m_stateMessage);
+}
+
+void PointCloudViewerWidget::drawIdleState(QPainter &painter)
+{
+    QRect rect = this->rect();
+    QPoint center = rect.center();
+
+    // Light background
+    painter.fillRect(rect, QColor(50, 50, 50, 50));
+
+    // Draw file icon (simple representation)
+    painter.setPen(QPen(QColor(150, 150, 150), 2));
+    painter.setBrush(QBrush(QColor(200, 200, 200, 100)));
+
+    const int iconWidth = 60;
+    const int iconHeight = 80;
+    QRect iconRect(center.x() - iconWidth/2, center.y() - iconHeight/2 - 20,
+                   iconWidth, iconHeight);
+
+    painter.drawRoundedRect(iconRect, 5, 5);
+
+    // Draw some lines to represent file content
+    painter.setPen(QColor(150, 150, 150));
+    for (int i = 0; i < 4; ++i) {
+        int lineY = iconRect.top() + 20 + i * 12;
+        int lineWidth = (i == 3) ? iconWidth / 2 : iconWidth - 20;
+        painter.drawLine(iconRect.left() + 10, lineY,
+                        iconRect.left() + 10 + lineWidth, lineY);
+    }
+
+    // Draw main text
+    painter.setPen(QColor(200, 200, 200));
+    painter.setFont(m_overlayFont);
+
+    QRect textRect = rect;
+    textRect.setTop(center.y() + 50);
+    textRect.setHeight(30);
+
+    painter.drawText(textRect, Qt::AlignCenter, "Ready to Load Point Cloud");
+
+    // Draw instruction text
+    painter.setFont(m_detailFont);
+    QRect instructionRect = rect;
+    instructionRect.setTop(center.y() + 90);
+    instructionRect.setHeight(40);
+
+    painter.drawText(instructionRect, Qt::AlignCenter,
+                    "Click 'Open File' to load E57 or LAS files");
 }

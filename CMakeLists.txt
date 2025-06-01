@@ -80,6 +80,9 @@ endif()
 # Find Qt6 components - require minimum version 6.9.0
 find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml)
 
+# Find E57Format library for enhanced E57 parsing (Sprint 1.2)
+find_package(E57Format CONFIG REQUIRED)
+
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
 
@@ -104,6 +107,8 @@ set(SOURCES
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
+    src/performance_profiler.cpp
+    src/performance_benchmark.cpp
 )
 
 # Header files
@@ -116,6 +121,8 @@ set(HEADERS
     src/loadingsettings.h
     src/lasheadermetadata.h
     src/voxelgridfilter.h
+    src/performance_profiler.h
+    src/performance_benchmark.h
 )
 
 # Shader files
@@ -127,13 +134,14 @@ set(SHADERS
 # Create the executable
 add_executable(CloudRegistration ${SOURCES} ${HEADERS})
 
-# Link Qt6 libraries
+# Link Qt6 libraries and E57Format
 target_link_libraries(CloudRegistration
     Qt6::Core
     Qt6::Widgets
     Qt6::Gui
     Qt6::OpenGLWidgets
     Qt6::Xml
+    E57Format
 )
 
 
@@ -171,28 +179,65 @@ if(TARGET GTest::gtest_main)
         src/e57parser.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
     )
 
     # E57 Parser Tests
     add_executable(E57ParserTests
         tests/test_e57parser.cpp
         src/e57parser.cpp
+        src/performance_profiler.cpp
     )
 
     target_link_libraries(E57ParserTests
         GTest::gtest_main
         Qt6::Core
         Qt6::Xml
+        Qt6::Test
+        E57Format
     )
 
     target_include_directories(E57ParserTests PRIVATE src)
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
+
+    # Sprint 2.1 Manual Test
+    add_executable(Sprint21ManualTest
+        test_sprint2_1_manual.cpp
+        src/e57parser.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint21ManualTest
+        Qt6::Core
+        Qt6::Xml
+        E57Format
+    )
+
+    target_include_directories(Sprint21ManualTest PRIVATE src)
+
+    # Sprint 2.1 Integration Test
+    add_executable(Sprint21IntegrationTest
+        test_sprint2_1_integration.cpp
+        src/e57parser.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint21IntegrationTest
+        Qt6::Core
+        Qt6::Xml
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(Sprint21IntegrationTest PRIVATE src)
+    add_test(NAME Sprint21IntegrationTest COMMAND Sprint21IntegrationTest)
 
     # LAS Parser Tests
     add_executable(LasParserTests
         tests/test_lasparser.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
     )
 
     target_link_libraries(LasParserTests
@@ -207,6 +252,7 @@ if(TARGET GTest::gtest_main)
     add_executable(VoxelGridFilterTests
         tests/test_voxelgridfilter.cpp
         src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
     )
 
     target_link_libraries(VoxelGridFilterTests
@@ -228,20 +274,159 @@ if(TARGET GTest::gtest_main)
         GTest::gtest_main
         Qt6::Core
         Qt6::Widgets
+        Qt6::Xml
         Qt6::Test
+        E57Format
     )
 
     target_include_directories(Sprint1FunctionalityTests PRIVATE src)
     add_test(NAME Sprint1FunctionalityTests COMMAND Sprint1FunctionalityTests)
 
+    # Sprint 1.2 CompressedVector Tests (without E57Format dependency)
+    add_executable(Sprint12CompressedVectorTests
+        tests/test_sprint1_2_compressedvector.cpp
+        src/e57parser.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint12CompressedVectorTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Xml
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint12CompressedVectorTests PRIVATE src)
+    add_test(NAME Sprint12CompressedVectorTests COMMAND Sprint12CompressedVectorTests)
+
+    # Sprint 1.2 Integration Tests (without E57Format dependency)
+    add_executable(Sprint12IntegrationTests
+        tests/test_sprint1_2_integration.cpp
+        src/e57parser.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint12IntegrationTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Xml
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint12IntegrationTests PRIVATE src)
+    add_test(NAME Sprint12IntegrationTests COMMAND Sprint12IntegrationTests)
+
+    # Simple LAS real file test (no GTest dependency)
+    add_executable(TestLasRealFile
+        test_las_real_file.cpp
+        src/lasparser.cpp
+        src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(TestLasRealFile
+        Qt6::Core
+    )
+
+    target_include_directories(TestLasRealFile PRIVATE src)
+
+    # Sprint 2.2 Profiling Demonstration
+    add_executable(Sprint22ProfilingDemo
+        test_sprint2_2_profiling_demo.cpp
+        src/e57parser.cpp
+        src/lasparser.cpp
+        src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
+        src/performance_benchmark.cpp
+    )
+
+    target_link_libraries(Sprint22ProfilingDemo
+        Qt6::Core
+        Qt6::Xml
+        E57Format
+    )
+
+    target_include_directories(Sprint22ProfilingDemo PRIVATE src)
+
     # Note: AllTests target removed due to multiple main() conflicts
     # Individual test executables work fine
+
+    # Sprint 1.4: Comprehensive Integration Testing Framework
+    add_executable(Sprint14IntegrationTests
+        tests/test_sprint1_4_integration.cpp
+        tests/test_reporter.cpp
+        tests/integration_test_suite.cpp
+        src/e57parser.cpp
+        src/lasparser.cpp
+        src/loadingsettingsdialog.cpp
+        src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint14IntegrationTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Xml
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(Sprint14IntegrationTests PRIVATE src)
+    add_test(NAME Sprint14IntegrationTests COMMAND Sprint14IntegrationTests)
+
+    # Sprint 2.4: Advanced Testing Framework
+    add_executable(Sprint24AdvancedTests
+        tests/test_sprint2_4_advanced.cpp
+        tests/advanced_test_executor.cpp
+        tests/advanced_test_file_generator.cpp
+        tests/automated_test_oracle.cpp
+        tests/spectrum_based_tester.cpp
+        tests/intelligent_bug_manager.cpp
+        tests/test_data_manager.cpp
+        src/e57parser.cpp
+        src/lasparser.cpp
+        src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(Sprint24AdvancedTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Xml
+        Qt6::Test
+        Qt6::Network
+        E57Format
+    )
+
+    target_include_directories(Sprint24AdvancedTests PRIVATE src tests)
+    add_test(NAME Sprint24AdvancedTests COMMAND Sprint24AdvancedTests)
 
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests
-        COMMENT "Running all unit tests"
+        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests
+        COMMENT "Running all unit tests including Sprint 2.4 advanced testing framework"
+    )
+
+    # Sprint 2.4: Advanced testing targets
+    add_custom_target(run_advanced_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint24.*"
+        DEPENDS Sprint24AdvancedTests
+        COMMENT "Running Sprint 2.4 advanced testing suite"
+    )
+
+    add_custom_target(generate_complex_test_files
+        COMMAND Sprint24AdvancedTests --generate-test-files
+        DEPENDS Sprint24AdvancedTests
+        COMMENT "Generating complex test files for advanced testing"
+    )
+
+    add_custom_target(run_stress_tests
+        COMMAND Sprint24AdvancedTests --stress-test
+        DEPENDS Sprint24AdvancedTests
+        COMMENT "Running stress tests with large files"
     )
 
     # Code coverage target (if enabled)

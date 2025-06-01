@@ -17,6 +17,13 @@ LoadingSettingsDialog::LoadingSettingsDialog(QWidget *parent)
     , m_leafSizeSpinBox(nullptr)
     , m_minPointsLabel(nullptr)
     , m_minPointsSpinBox(nullptr)
+    , m_e57Group(nullptr)
+    , m_lasGroup(nullptr)
+    , m_e57TransformCheck(nullptr)
+    , m_e57LoadColorsCheck(nullptr)
+    , m_lasValidateCheck(nullptr)
+    , m_lasLoadIntensityCheck(nullptr)
+    , m_lasLoadColorsCheck(nullptr)
     , m_qSettings("CloudRegistration", "PointCloudViewer")
 {
     setWindowTitle("Point Cloud Loading Settings");
@@ -121,6 +128,90 @@ LoadingSettings LoadingSettingsDialog::getSettings() const
     return m_currentSettings;
 }
 
+void LoadingSettingsDialog::setSettings(const LoadingSettings& settings)
+{
+    m_currentSettings = settings;
+
+    // Update UI to reflect new settings
+    for (int i = 0; i < m_methodComboBox->count(); ++i) {
+        if (m_methodComboBox->itemData(i).toInt() == static_cast<int>(settings.method)) {
+            m_methodComboBox->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // Update voxel parameters if present
+    if (settings.parameters.contains("leafSize")) {
+        m_leafSizeSpinBox->setValue(settings.parameters["leafSize"].toDouble());
+    }
+    if (settings.parameters.contains("minPointsPerVoxel")) {
+        m_minPointsSpinBox->setValue(settings.parameters["minPointsPerVoxel"].toInt());
+    }
+
+    updateUIForMethod(settings.method);
+}
+
+void LoadingSettingsDialog::configureForFileType(const QString& fileExtension)
+{
+    // Task 1.4.3.4: E57 files don't support HeaderOnly/VoxelGrid modes
+    if (fileExtension.toLower() == "e57") {
+        // Disable HeaderOnly and VoxelGrid for E57 files
+        for (int i = 0; i < m_methodComboBox->count(); ++i) {
+            LoadingMethod method = static_cast<LoadingMethod>(m_methodComboBox->itemData(i).toInt());
+            if (method == LoadingMethod::HeaderOnly || method == LoadingMethod::VoxelGrid) {
+                m_methodComboBox->setItemData(i, false, Qt::UserRole - 1); // Disable item
+            }
+        }
+
+        // Force FullLoad mode for E57
+        for (int i = 0; i < m_methodComboBox->count(); ++i) {
+            if (m_methodComboBox->itemData(i).toInt() == static_cast<int>(LoadingMethod::FullLoad)) {
+                m_methodComboBox->setCurrentIndex(i);
+                break;
+            }
+        }
+
+        // Show E57-specific options if they exist
+        if (m_e57Group) {
+            m_e57Group->setVisible(true);
+        }
+        if (m_lasGroup) {
+            m_lasGroup->setVisible(false);
+        }
+
+        // Add explanatory tooltips
+        m_methodComboBox->setToolTip("E57 format requires full parsing - header-only mode not supported.\n"
+                                   "Voxel grid filtering will be applied post-load if needed.");
+
+    } else if (fileExtension.toLower() == "las") {
+        // Enable all modes for LAS files
+        for (int i = 0; i < m_methodComboBox->count(); ++i) {
+            m_methodComboBox->setItemData(i, true, Qt::UserRole - 1); // Enable item
+        }
+
+        // Show LAS-specific options if they exist
+        if (m_e57Group) {
+            m_e57Group->setVisible(false);
+        }
+        if (m_lasGroup) {
+            m_lasGroup->setVisible(true);
+        }
+
+        m_methodComboBox->setToolTip("LAS files support all loading modes:\n"
+                                   "- Full Load: Complete point data\n"
+                                   "- Header-Only: Metadata inspection\n"
+                                   "- Voxel Grid: Subsampled data");
+    } else {
+        // Unknown file type - enable all modes
+        for (int i = 0; i < m_methodComboBox->count(); ++i) {
+            m_methodComboBox->setItemData(i, true, Qt::UserRole - 1);
+        }
+
+        if (m_e57Group) m_e57Group->setVisible(false);
+        if (m_lasGroup) m_lasGroup->setVisible(false);
+    }
+}
+
 void LoadingSettingsDialog::onApplyClicked()
 {
     saveSettings();
@@ -152,6 +243,15 @@ void LoadingSettingsDialog::onMethodChanged(int index)
         }
 
         updateUIForMethod(method);
+    }
+}
+
+void LoadingSettingsDialog::onVoxelSettingsChanged()
+{
+    // Update current settings when voxel parameters change
+    if (m_currentSettings.method == LoadingMethod::VoxelGrid) {
+        m_currentSettings.parameters["leafSize"] = m_leafSizeSpinBox->value();
+        m_currentSettings.parameters["minPointsPerVoxel"] = m_minPointsSpinBox->value();
     }
 }
 

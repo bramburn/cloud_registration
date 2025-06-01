@@ -1,0 +1,12 @@
+=== PERFORMANCE PROFILING REPORT ===
+Generated: 2025-05-31T22:57:53
+
+Total Profiling Time: 0 ms
+Number of Sections: 4
+
+Section Name                                Calls Total(ms)  Avg(ms)  Min(ms)  Max(ms)  % Total
+------------------------------------------------------------------------------------------
+E57::FileOpen                                   1        0     0.00        0        0     0.0%
+E57::HeaderParse                                1        0     0.00        0        0     0.0%
+E57::XMLParse                                   0        0     0.00        0        0     0.0%
+E57Parser::parse                                0        0     0.00        0        0     0.0%

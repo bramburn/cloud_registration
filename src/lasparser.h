@@ -31,17 +31,24 @@ public:
     bool isValidLasFile(const QString& filePath);
     QString getLastError() const;
 
+    // Sprint 1.3: Accessor methods for header information
+    uint8_t getVersionMajor() const { return m_versionMajor; }
+    uint8_t getVersionMinor() const { return m_versionMinor; }
+    uint8_t getPointDataFormat() const { return m_pointFormat; }
+    uint16_t getPointDataRecordLength() const { return m_pointDataRecordLength; }
+    uint16_t getHeaderSize() const { return m_headerSize; }
+
 public slots:
     void startParsing(const QString& filePath);
     void startParsing(const QString& filePath, const LoadingSettings& settings);
 
 signals:
-    void progressUpdated(int percentage);
+    void progressUpdated(int percentage, const QString &stage);
     void parsingFinished(bool success, const QString& message, const std::vector<float>& points);
     void headerParsed(const LasHeaderMetadata& metadata);
 
 private:
-    // LAS file header structure
+    // Enhanced LAS file header structure for LAS 1.2-1.4 support (Sprint 1.3)
     struct LasHeader {
         char signature[4];              // "LASF"
         uint16_t fileSourceId;
@@ -50,8 +57,8 @@ private:
         uint16_t guidData2;
         uint16_t guidData3;
         uint8_t guidData4[8];
-        uint8_t versionMajor;
-        uint8_t versionMinor;
+        uint8_t versionMajor;           // Must be 1
+        uint8_t versionMinor;           // 2, 3, or 4 supported (Sprint 1.3)
         char systemIdentifier[32];
         char generatingSoftware[32];
         uint16_t creationDayOfYear;
@@ -59,7 +66,7 @@ private:
         uint16_t headerSize;
         uint32_t pointDataOffset;
         uint32_t numberOfVLRs;
-        uint8_t pointDataFormat;
+        uint8_t pointDataFormat;        // 0-3 supported (Sprint 1.3)
         uint16_t pointDataRecordLength;
         uint32_t numberOfPointRecords;
         uint32_t numberOfPointsByReturn[5];
@@ -75,6 +82,15 @@ private:
         double minY;
         double maxZ;
         double minZ;
+
+        // LAS 1.3+ extensions (Sprint 1.3)
+        uint64_t startOfWaveformData;   // LAS 1.3+
+
+        // LAS 1.4+ extensions (Sprint 1.3)
+        uint64_t startOfFirstEVLR;      // LAS 1.4+
+        uint32_t numEVLRRecords;        // LAS 1.4+
+        uint64_t numPointRecords64;     // LAS 1.4+
+        uint64_t numPointsByReturn64[15]; // LAS 1.4+
     };
 
     // Point data format structures
@@ -127,6 +143,13 @@ private:
     // Error handling
     void setError(const QString& error);
 
+    // Sprint 1.3: Enhanced validation helpers
+    bool isVersionSupported(uint8_t major, uint8_t minor) const;
+    uint16_t getExpectedRecordLength(uint8_t pointDataFormat) const;
+    uint16_t getExpectedHeaderSize(uint8_t versionMinor) const;
+    bool validateRecordLength(const LasHeader& header) const;
+    bool validateScaleFactors(const LasHeader& header) const;
+
     // Member variables
     QString m_lastError;
     bool m_hasError;
@@ -148,6 +171,12 @@ private:
     uint8_t m_pointFormat;
     double m_xScale, m_yScale, m_zScale;
     double m_xOffset, m_yOffset, m_zOffset;
+
+    // Sprint 1.3: Enhanced header information storage
+    uint8_t m_versionMajor;
+    uint8_t m_versionMinor;
+    uint16_t m_pointDataRecordLength;
+    uint16_t m_headerSize;
 
     // Header metadata for signals (simplified for testing)
     // Use Vector3D from lasheadermetadata.h to avoid conflicts
