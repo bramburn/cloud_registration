@@ -20,10 +20,24 @@ struct ScanInfo {
     QString filePathRelative;
     QString importType;  // "COPIED" or "MOVED"
     QString dateAdded;
+    QString parentClusterId; // New: ID of parent cluster (NULL if at project root)
     QString absolutePath; // Computed field
 
     bool isValid() const {
         return !scanId.isEmpty() && !scanName.isEmpty() && !filePathRelative.isEmpty();
+    }
+};
+
+// Cluster metadata structure for database storage
+struct ClusterInfo {
+    QString clusterId;
+    QString projectId;
+    QString clusterName;
+    QString parentClusterId; // NULL if top-level cluster
+    QString creationDate;
+
+    bool isValid() const {
+        return !clusterId.isEmpty() && !clusterName.isEmpty() && !projectId.isEmpty();
     }
 };
 
@@ -59,6 +73,15 @@ public:
     SQLiteManager* getSQLiteManager() const { return m_sqliteManager; }
     ScanImportManager* getScanImportManager() const { return m_scanImportManager; }
 
+    // New for Sprint 1.3 - Cluster Management
+    QString createCluster(const QString &clusterName, const QString &parentClusterId = QString());
+    bool deleteCluster(const QString &clusterId);
+    bool renameCluster(const QString &clusterId, const QString &newName);
+    QList<ClusterInfo> getProjectClusters();
+    QList<ClusterInfo> getChildClusters(const QString &parentClusterId);
+    bool moveScanToCluster(const QString &scanId, const QString &clusterId);
+    bool moveScansToCluster(const QStringList &scanIds, const QString &clusterId);
+
     static QString getMetadataFilePath(const QString &projectPath);
     static bool isProjectDirectory(const QString &path);
     static QString getScansSubfolder(const QString &projectPath);
@@ -67,6 +90,10 @@ public:
 signals:
     void scansImported(const QList<ScanInfo> &scans);
     void projectScansChanged();
+    void clusterCreated(const ClusterInfo &cluster);
+    void clusterDeleted(const QString &clusterId);
+    void clusterRenamed(const QString &clusterId, const QString &newName);
+    void scanMovedToCluster(const QString &scanId, const QString &clusterId);
 
 private:
     bool createProjectMetadata(const QString &projectPath, const QString &projectName);

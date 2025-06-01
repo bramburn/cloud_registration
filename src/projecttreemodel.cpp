@@ -19,12 +19,16 @@ void ProjectTreeModel::setProject(const QString &projectName, const QString &pro
 {
     m_projectName = projectName;
     m_projectPath = projectPath;
-    
+
     clear();
     setHorizontalHeaderLabels({"Project Structure"});
-    
+
+    // Clear caches
+    m_clusterItems.clear();
+    m_scanItems.clear();
+
     createProjectStructure();
-    loadScansFromDatabase();
+    refreshHierarchy();
 }
 
 void ProjectTreeModel::createProjectStructure()
@@ -32,9 +36,8 @@ void ProjectTreeModel::createProjectStructure()
     m_rootItem = new QStandardItem(m_projectName);
     m_rootItem->setIcon(QApplication::style()->standardIcon(QStyle::SP_DirIcon));
     m_rootItem->setEditable(false);
-    m_rootItem->setData(m_projectPath, Qt::UserRole);
-    m_rootItem->setData("project_root", Qt::UserRole + 1);
-    
+    setItemData(m_rootItem, QString(), "project_root");
+
     appendRow(m_rootItem);
 }
 
@@ -61,21 +64,15 @@ void ProjectTreeModel::loadScansFromDatabase()
         qDebug() << "No SQLite manager available for loading scans";
         return;
     }
-    
+
     QList<ScanInfo> scans = m_sqliteManager->getAllScans();
-    
-    if (!scans.isEmpty()) {
-        QStandardItem *scansFolder = getOrCreateScansFolder();
-        
-        for (const ScanInfo &scan : scans) {
-            QStandardItem *scanItem = createScanItem(scan);
-            scansFolder->appendRow(scanItem);
-        }
-        
-        qDebug() << "Loaded" << scans.size() << "scans from database";
-    } else {
-        qDebug() << "No scans found in database";
+
+    for (const ScanInfo &scan : scans) {
+        QStandardItem *scanItem = createScanItem(scan);
+        m_scanItems[scan.scanId] = scanItem;
     }
+
+    qDebug() << "Loaded" << scans.size() << "scans from database";
 }
 
 QStandardItem* ProjectTreeModel::createScanItem(const ScanInfo &scan)
@@ -94,8 +91,7 @@ QStandardItem* ProjectTreeModel::createScanItem(const ScanInfo &scan)
     
     item->setIcon(QApplication::style()->standardIcon(iconType));
     item->setEditable(false);
-    item->setData(scan.scanId, Qt::UserRole);
-    item->setData("scan_item", Qt::UserRole + 1);
+    setItemData(item, scan.scanId, "scan");
     
     // Set tooltip with scan information
     QString tooltip = QString("Scan: %1\nFile: %2\nImported: %3\nMethod: %4")
@@ -110,23 +106,222 @@ QStandardItem* ProjectTreeModel::createScanItem(const ScanInfo &scan)
 
 void ProjectTreeModel::addScan(const ScanInfo &scan)
 {
-    QStandardItem *scansFolder = getOrCreateScansFolder();
     QStandardItem *scanItem = createScanItem(scan);
-    scansFolder->appendRow(scanItem);
-    
+    m_scanItems[scan.scanId] = scanItem;
+
+    QStandardItem *parentItem = getParentItem(scan.parentClusterId);
+    if (parentItem) {
+        parentItem->appendRow(scanItem);
+    }
+
     qDebug() << "Added scan to tree model:" << scan.scanName;
 }
 
 void ProjectTreeModel::refreshScans()
 {
-    if (m_scansFolder) {
-        m_scansFolder->removeRows(0, m_scansFolder->rowCount());
-    }
-    
-    loadScansFromDatabase();
+    refreshHierarchy();
 }
 
 void ProjectTreeModel::setSQLiteManager(SQLiteManager *manager)
 {
     m_sqliteManager = manager;
+}
+
+// New methods for Sprint 1.3 - Cluster support
+void ProjectTreeModel::refreshHierarchy()
+{
+    if (!m_sqliteManager) {
+        qDebug() << "No SQLite manager available for loading hierarchy";
+        return;
+    }
+
+    // Clear existing structure except root
+    if (m_rootItem) {
+        m_rootItem->removeRows(0, m_rootItem->rowCount());
+    }
+
+    // Clear caches
+    m_clusterItems.clear();
+    m_scanItems.clear();
+    m_scansFolder = nullptr;
+
+    // Load clusters and scans from database
+    loadClustersFromDatabase();
+    loadScansFromDatabase();
+    buildHierarchicalStructure();
+}
+
+void ProjectTreeModel::loadClustersFromDatabase()
+{
+    if (!m_sqliteManager) {
+        return;
+    }
+
+    QList<ClusterInfo> clusters = m_sqliteManager->getAllClusters();
+
+    for (const ClusterInfo &cluster : clusters) {
+        QStandardItem *clusterItem = createClusterItem(cluster);
+        m_clusterItems[cluster.clusterId] = clusterItem;
+    }
+
+    qDebug() << "Loaded" << clusters.size() << "clusters from database";
+}
+
+void ProjectTreeModel::buildHierarchicalStructure()
+{
+    // First, add all top-level clusters to root
+    for (auto it = m_clusterItems.begin(); it != m_clusterItems.end(); ++it) {
+        QString clusterId = it.key();
+        QStandardItem *clusterItem = it.value();
+
+        ClusterInfo cluster = m_sqliteManager->getClusterById(clusterId);
+        if (cluster.parentClusterId.isEmpty()) {
+            // Top-level cluster
+            m_rootItem->appendRow(clusterItem);
+        }
+    }
+
+    // Then, build parent-child relationships for clusters
+    for (auto it = m_clusterItems.begin(); it != m_clusterItems.end(); ++it) {
+        QString clusterId = it.key();
+        QStandardItem *clusterItem = it.value();
+
+        ClusterInfo cluster = m_sqliteManager->getClusterById(clusterId);
+        if (!cluster.parentClusterId.isEmpty()) {
+            // Child cluster
+            QStandardItem *parentItem = m_clusterItems.value(cluster.parentClusterId);
+            if (parentItem) {
+                parentItem->appendRow(clusterItem);
+            }
+        }
+    }
+
+    // Finally, add scans to their appropriate parents
+    for (auto it = m_scanItems.begin(); it != m_scanItems.end(); ++it) {
+        QString scanId = it.key();
+        QStandardItem *scanItem = it.value();
+
+        ScanInfo scan = m_sqliteManager->getScanById(scanId);
+        QStandardItem *parentItem = getParentItem(scan.parentClusterId);
+        if (parentItem) {
+            parentItem->appendRow(scanItem);
+        }
+    }
+}
+
+QStandardItem* ProjectTreeModel::createClusterItem(const ClusterInfo &cluster)
+{
+    auto *item = new QStandardItem(cluster.clusterName);
+    item->setIcon(QApplication::style()->standardIcon(QStyle::SP_DirIcon));
+    item->setEditable(false);
+    setItemData(item, cluster.clusterId, "cluster");
+
+    // Set tooltip with cluster information
+    QString tooltip = QString("Cluster: %1\nCreated: %2")
+                     .arg(cluster.clusterName)
+                     .arg(cluster.creationDate);
+    item->setToolTip(tooltip);
+
+    return item;
+}
+
+QStandardItem* ProjectTreeModel::getParentItem(const QString &parentClusterId)
+{
+    if (parentClusterId.isEmpty()) {
+        // Return project root for scans/clusters at top level
+        return m_rootItem;
+    }
+
+    // Return the cluster item
+    return m_clusterItems.value(parentClusterId, m_rootItem);
+}
+
+void ProjectTreeModel::setItemData(QStandardItem *item, const QString &id, const QString &type)
+{
+    item->setData(id, Qt::UserRole);        // ID
+    item->setData(type, Qt::UserRole + 1);  // Type
+}
+
+QString ProjectTreeModel::getItemId(QStandardItem *item) const
+{
+    if (!item) return QString();
+    return item->data(Qt::UserRole).toString();
+}
+
+QString ProjectTreeModel::getItemType(QStandardItem *item) const
+{
+    if (!item) return QString();
+    return item->data(Qt::UserRole + 1).toString();
+}
+
+QStandardItem* ProjectTreeModel::findClusterItem(const QString &clusterId)
+{
+    return m_clusterItems.value(clusterId, nullptr);
+}
+
+QStandardItem* ProjectTreeModel::findScanItem(const QString &scanId)
+{
+    return m_scanItems.value(scanId, nullptr);
+}
+
+void ProjectTreeModel::addCluster(const ClusterInfo &cluster)
+{
+    QStandardItem *clusterItem = createClusterItem(cluster);
+    m_clusterItems[cluster.clusterId] = clusterItem;
+
+    QStandardItem *parentItem = getParentItem(cluster.parentClusterId);
+    if (parentItem) {
+        parentItem->appendRow(clusterItem);
+    }
+
+    qDebug() << "Added cluster to tree model:" << cluster.clusterName;
+}
+
+void ProjectTreeModel::removeCluster(const QString &clusterId)
+{
+    QStandardItem *clusterItem = m_clusterItems.value(clusterId);
+    if (clusterItem) {
+        QStandardItem *parentItem = clusterItem->parent();
+        if (parentItem) {
+            parentItem->removeRow(clusterItem->row());
+        }
+        m_clusterItems.remove(clusterId);
+        qDebug() << "Removed cluster from tree model:" << clusterId;
+    }
+}
+
+void ProjectTreeModel::updateCluster(const ClusterInfo &cluster)
+{
+    QStandardItem *clusterItem = m_clusterItems.value(cluster.clusterId);
+    if (clusterItem) {
+        clusterItem->setText(cluster.clusterName);
+
+        // Update tooltip
+        QString tooltip = QString("Cluster: %1\nCreated: %2")
+                         .arg(cluster.clusterName)
+                         .arg(cluster.creationDate);
+        clusterItem->setToolTip(tooltip);
+
+        qDebug() << "Updated cluster in tree model:" << cluster.clusterName;
+    }
+}
+
+void ProjectTreeModel::moveScanToCluster(const QString &scanId, const QString &clusterId)
+{
+    QStandardItem *scanItem = m_scanItems.value(scanId);
+    if (scanItem) {
+        // Remove from current parent
+        QStandardItem *currentParent = scanItem->parent();
+        if (currentParent) {
+            currentParent->removeRow(scanItem->row());
+        }
+
+        // Add to new parent
+        QStandardItem *newParent = getParentItem(clusterId);
+        if (newParent) {
+            newParent->appendRow(scanItem);
+        }
+
+        qDebug() << "Moved scan in tree model:" << scanId << "to cluster:" << clusterId;
+    }
 }
