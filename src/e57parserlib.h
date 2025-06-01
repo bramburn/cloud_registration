@@ -58,6 +58,25 @@ public:
      */
     int getScanCount() const;
 
+    // Sprint 4: Multi-scan support enhancement
+
+    /**
+     * @brief Get metadata for a specific scan
+     * @param scanIndex Index of the scan (0-based)
+     * @return Scan metadata structure
+     */
+    struct ScanMetadata {
+        int index = -1;
+        std::string name;
+        std::string guid;
+        int64_t pointCount = 0;
+        bool isLoaded = false;
+        bool hasIntensity = false;
+        bool hasColor = false;
+    };
+
+    ScanMetadata getScanMetadata(int scanIndex) const;
+
     /**
      * @brief Get the last error message
      * @return Error message string, empty if no error

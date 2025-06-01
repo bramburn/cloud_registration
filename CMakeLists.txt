@@ -218,6 +218,38 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57ParserLibTests PRIVATE src)
     add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
 
+    # Sprint 4: Comprehensive E57 Test Suite
+    add_executable(E57Sprint4ComprehensiveTests
+        tests/test_e57parser_sprint4_comprehensive.cpp
+        tests/E57TestFramework.cpp
+        tests/PerformanceProfiler.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(E57Sprint4ComprehensiveTests
+        GTest::gtest_main
+        E57Format
+        Qt6::Core
+        Qt6::Test
+    )
+
+    target_include_directories(E57Sprint4ComprehensiveTests PRIVATE src tests)
+    add_test(NAME E57Sprint4ComprehensiveTests COMMAND E57Sprint4ComprehensiveTests)
+
+    # Sprint 4: Performance Benchmarking Target
+    add_custom_target(benchmark_e57_sprint4
+        COMMAND E57Sprint4ComprehensiveTests --gtest_filter="*Performance*"
+        DEPENDS E57Sprint4ComprehensiveTests
+        COMMENT "Running E57 Sprint 4 performance benchmarks"
+    )
+
+    # Sprint 4: Comprehensive Testing Target
+    add_custom_target(test_e57_comprehensive
+        COMMAND E57Sprint4ComprehensiveTests
+        DEPENDS E57Sprint4ComprehensiveTests
+        COMMENT "Running E57 Sprint 4 comprehensive test suite"
+    )
+
     # E57ParserLib Sprint 3 Tests (Intensity, Color, and CompressedVector Handling)
     add_executable(E57ParserLibSprint3Tests
         tests/test_e57parserlib_sprint3.cpp
@@ -232,6 +264,19 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserLibSprint3Tests PRIVATE src)
     add_test(NAME E57ParserLibSprint3Tests COMMAND E57ParserLibSprint3Tests)
+
+    # Sprint 3 Demo Program
+    add_executable(Sprint3Demo
+        test_sprint3_demo.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(Sprint3Demo
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(Sprint3Demo PRIVATE src)
 
     # Sprint 2 Simple Test
     add_executable(Sprint2SimpleTest

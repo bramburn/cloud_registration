@@ -106,6 +106,78 @@ int E57ParserLib::getScanCount() const {
     return 0;
 }
 
+// Sprint 4: Multi-scan support enhancement
+E57ParserLib::ScanMetadata E57ParserLib::getScanMetadata(int scanIndex) const {
+    ScanMetadata metadata;
+
+    if (!m_imageFile || !m_imageFile->isOpen()) {
+        setError("No E57 file is open");
+        return metadata;
+    }
+
+    try {
+        e57::StructureNode root = m_imageFile->root();
+
+        if (!root.isDefined("data3D")) {
+            return metadata;
+        }
+
+        e57::VectorNode data3DVector(root.get("data3D"));
+        int64_t scanCount = data3DVector.childCount();
+
+        if (scanIndex < 0 || scanIndex >= scanCount) {
+            return metadata;
+        }
+
+        e57::StructureNode scanHeader(data3DVector.get(scanIndex));
+
+        // Fill metadata
+        metadata.index = scanIndex;
+
+        // Get scan name if available
+        if (scanHeader.isDefined("name")) {
+            e57::StringNode nameNode(scanHeader.get("name"));
+            metadata.name = nameNode.value();
+        } else {
+            metadata.name = QString("Scan %1").arg(scanIndex).toStdString();
+        }
+
+        // Get scan GUID if available
+        if (scanHeader.isDefined("guid")) {
+            e57::StringNode guidNode(scanHeader.get("guid"));
+            metadata.guid = guidNode.value();
+        }
+
+        // Get point count
+        if (scanHeader.isDefined("points")) {
+            e57::CompressedVectorNode points(scanHeader.get("points"));
+            metadata.pointCount = points.childCount();
+        }
+
+        // Check for intensity and color data
+        if (scanHeader.isDefined("points")) {
+            e57::CompressedVectorNode points(scanHeader.get("points"));
+            e57::StructureNode prototype = points.prototype();
+
+            metadata.hasIntensity = prototype.isDefined("intensity");
+            metadata.hasColor = prototype.isDefined("colorRed") &&
+                               prototype.isDefined("colorGreen") &&
+                               prototype.isDefined("colorBlue");
+        }
+
+        metadata.isLoaded = false; // Not tracking loaded state in this implementation
+
+        return metadata;
+
+    } catch (const e57::E57Exception& ex) {
+        setError(std::string("E57 Exception during scan metadata retrieval: ") + ex.what());
+        return metadata;
+    } catch (const std::exception& ex) {
+        setError(std::string("Standard exception during scan metadata retrieval: ") + ex.what());
+        return metadata;
+    }
+}
+
 std::string E57ParserLib::getLastError() const {
     return m_lastError;
 }
