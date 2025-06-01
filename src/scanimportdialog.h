@@ -40,6 +40,7 @@ private:
     QListWidget *m_fileList;
     QRadioButton *m_copyModeRadio;
     QRadioButton *m_moveModeRadio;
+    QRadioButton *m_linkModeRadio;  // New for Sprint 2.2
     QPushButton *m_browseButton;
     QPushButton *m_removeButton;
     QPushButton *m_okButton;
