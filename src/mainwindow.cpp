@@ -5,7 +5,7 @@
 #include "projectmanager.h"
 #include "project.h"
 #include "pointcloudviewerwidget.h"
-#include "e57parser.h"
+#include "e57parserlib.h"
 #include "lasparser.h"
 #include "loadingsettingsdialog.h"
 #include "lasheadermetadata.h"
@@ -44,10 +44,11 @@ MainWindow::MainWindow(QWidget *parent)
     , m_leftViewAction(nullptr)
     , m_rightViewAction(nullptr)
     , m_bottomViewAction(nullptr)
-    , m_e57Parser(nullptr)
     , m_lasParser(nullptr)
     , m_parserThread(nullptr)
+    , m_workerParser(nullptr)
     , m_isLoading(false)
+    , m_currentScanCount(0)
     , m_statusLabel(nullptr)
     , m_permanentStatusLabel(nullptr)
     , m_currentPointCount(0)
@@ -69,7 +70,6 @@ MainWindow::MainWindow(QWidget *parent)
 
         // Initialize legacy parsers for point cloud loading
         qDebug() << "Initializing parsers...";
-        m_e57Parser = new E57Parser(this);
         m_lasParser = new LasParser(this);
         qDebug() << "Parsers initialized";
 
@@ -309,27 +309,52 @@ void MainWindow::onOpenFileClicked()
     m_parserThread = new QThread(this);
 
     // Create parser instance for the worker thread
-    QObject* workerParser = nullptr;
     if (extension == "e57") {
-        E57Parser* e57Worker = new E57Parser();
+        E57ParserLib* e57Worker = new E57ParserLib();
         e57Worker->moveToThread(m_parserThread);
-        workerParser = e57Worker;
+        m_workerParser = e57Worker;
+
+        // Convert dialog settings to E57ParserLib::LoadingSettings
+        E57ParserLib::LoadingSettings e57Settings;
+        e57Settings.loadIntensity = loadingSettings.loadIntensity;
+        e57Settings.loadColor = loadingSettings.loadColor;
+        e57Settings.maxPointsPerScan = loadingSettings.maxPoints;
+        e57Settings.subsamplingRatio = loadingSettings.subsamplingRatio;
 
         // Connect signals
-        connect(m_parserThread, &QThread::started, e57Worker, [=]() {
-            e57Worker->startParsing(m_currentFilePath);
+        connect(m_parserThread, &QThread::started, [=]() {
+            e57Worker->startParsing(m_currentFilePath, e57Settings);
         });
-        connect(e57Worker, &E57Parser::progressUpdated, this, &MainWindow::onParsingProgressUpdated, Qt::QueuedConnection);
-        connect(e57Worker, &E57Parser::parsingFinished, this, &MainWindow::onParsingFinished, Qt::QueuedConnection);
+
+        // Connect progress updates
+        connect(e57Worker, &E57ParserLib::progressUpdated, this, &MainWindow::onParsingProgressUpdated, Qt::QueuedConnection);
+
+        // Connect parsing finished
+        connect(e57Worker, &E57ParserLib::parsingFinished, this, &MainWindow::onParsingFinished, Qt::QueuedConnection);
+
+        // Connect additional E57-specific signals
+        connect(e57Worker, &E57ParserLib::scanMetadataAvailable, this, &MainWindow::onScanMetadataReceived, Qt::QueuedConnection);
+        connect(e57Worker, &E57ParserLib::intensityDataExtracted, this, &MainWindow::onIntensityDataReceived, Qt::QueuedConnection);
+        connect(e57Worker, &E57ParserLib::colorDataExtracted, this, &MainWindow::onColorDataReceived, Qt::QueuedConnection);
 
         // Sprint 2.3: Connect to viewer for visual feedback
-        connect(e57Worker, &E57Parser::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
-        connect(e57Worker, &E57Parser::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
+        connect(e57Worker, &E57ParserLib::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
+        connect(e57Worker, &E57ParserLib::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
+
+        // Connect thread cleanup
+        connect(e57Worker, &E57ParserLib::parsingFinished, [this, e57Worker]() {
+            cleanupParsingThread(e57Worker);
+        });
+
+        // Connect cancel button
+        connect(m_progressDialog, &QProgressDialog::canceled, [this, e57Worker]() {
+            e57Worker->cancelParsing();
+        });
 
     } else if (extension == "las") {
         LasParser* lasWorker = new LasParser();
         lasWorker->moveToThread(m_parserThread);
-        workerParser = lasWorker;
+        m_workerParser = lasWorker;
 
         // Connect signals
         connect(m_parserThread, &QThread::started, lasWorker, [=]() {
@@ -346,7 +371,6 @@ void MainWindow::onOpenFileClicked()
     } else {
         // Cleanup and show error
         m_isLoading = false;
-        m_openFileButton->setEnabled(true);
         if (m_progressDialog) {
             m_progressDialog->close();
             m_progressDialog->deleteLater();
@@ -357,7 +381,7 @@ void MainWindow::onOpenFileClicked()
     }
 
     // Setup cleanup when thread finishes
-    connect(m_parserThread, &QThread::finished, workerParser, &QObject::deleteLater);
+    connect(m_parserThread, &QThread::finished, m_workerParser, &QObject::deleteLater);
 
     // Start the worker thread
     m_parserThread->start();
@@ -548,6 +572,43 @@ void MainWindow::onLasHeaderParsed(const LasHeaderMetadata& metadata)
     qDebug() << "Software:" << metadata.generatingSoftware;
     qDebug() << "BBox: Min(" << metadata.minBounds.x << "," << metadata.minBounds.y << "," << metadata.minBounds.z
              << ") Max(" << metadata.maxBounds.x << "," << metadata.maxBounds.y << "," << metadata.maxBounds.z << ")";
+}
+
+// E57-specific slot implementations
+void MainWindow::onScanMetadataReceived(int scanCount, const QStringList& scanNames)
+{
+    m_currentScanCount = scanCount;
+    m_currentScanNames = scanNames;
+
+    qDebug() << "E57 scan metadata received:" << scanCount << "scans";
+    for (int i = 0; i < scanNames.size(); ++i) {
+        qDebug() << "  Scan" << i << ":" << scanNames[i];
+    }
+
+    if (scanCount > 1) {
+        QString statusMsg = QString("Multi-scan E57 file detected (%1 scans), loading first scan...").arg(scanCount);
+        if (m_progressDialog) {
+            m_progressDialog->setLabelText(statusMsg);
+        }
+    }
+}
+
+void MainWindow::onIntensityDataReceived(const std::vector<float>& intensityValues)
+{
+    m_currentIntensityData = intensityValues;
+    qDebug() << "E57 intensity data received:" << intensityValues.size() << "values";
+
+    // Future enhancement: Pass intensity data to viewer
+    // m_viewer->setIntensityData(intensityValues);
+}
+
+void MainWindow::onColorDataReceived(const std::vector<uint8_t>& colorValues)
+{
+    m_currentColorData = colorValues;
+    qDebug() << "E57 color data received:" << colorValues.size() << "values (RGB interleaved)";
+
+    // Future enhancement: Pass color data to viewer
+    // m_viewer->setColorData(colorValues);
 }
 
 // Sprint 2.3: Standardized status bar message methods

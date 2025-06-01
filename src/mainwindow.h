@@ -13,7 +13,7 @@ class SidebarWidget;
 class PointCloudViewerWidget;
 class ProjectManager;
 class Project;
-class E57Parser;
+class E57ParserLib;
 class LasParser;
 struct LasHeaderMetadata;
 
@@ -39,6 +39,11 @@ private slots:
     void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
     void onLoadingSettingsTriggered();
     void onLasHeaderParsed(const LasHeaderMetadata& metadata);
+
+    // E57-specific slots
+    void onScanMetadataReceived(int scanCount, const QStringList& scanNames);
+    void onIntensityDataReceived(const std::vector<float>& intensityValues);
+    void onColorDataReceived(const std::vector<uint8_t>& colorValues);
     void onTopViewClicked();
     void onLeftViewClicked();
     void onRightViewClicked();
@@ -91,11 +96,17 @@ private:
     QAction *m_bottomViewAction;
 
     // Legacy data processing
-    E57Parser *m_e57Parser;
     LasParser *m_lasParser;
     QThread *m_parserThread;
+    QObject *m_workerParser = nullptr;  // Generic pointer for any parser type
     QString m_currentFilePath;
     bool m_isLoading;
+
+    // E57-specific data storage
+    int m_currentScanCount = 0;
+    QStringList m_currentScanNames;
+    std::vector<float> m_currentIntensityData;
+    std::vector<uint8_t> m_currentColorData;
 
     // Status bar widgets
     QLabel *m_statusLabel;

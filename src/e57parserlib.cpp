@@ -3,14 +3,104 @@
 #include <sstream>
 #include <QString>
 #include <QDebug>
+#include <QTimer>
+#include <QThread>
+#include <QFileInfo>
+#include <random>
 
 E57ParserLib::E57ParserLib(QObject *parent)
-    : QObject(parent), m_imageFile(nullptr)
+    : QObject(parent), m_imageFile(nullptr), m_totalScans(0)
 {
+    setupForThreading();
 }
 
 E57ParserLib::~E57ParserLib() {
-    closeFile();
+    closeE57File();
+}
+
+// MainWindow-compatible interface methods
+void E57ParserLib::startParsing(const QString& filePath, const LoadingSettings& settings) {
+    m_currentFilePath = filePath;
+    m_currentSettings = settings;
+    m_cancelRequested = false;
+
+    qDebug() << "E57ParserLib::startParsing called with file:" << filePath;
+
+    // Validate file path
+    if (filePath.isEmpty()) {
+        QString errorMsg = "Empty file path provided";
+        emit parsingFinished(false, errorMsg, std::vector<float>());
+        return;
+    }
+
+    if (!isValidE57File(filePath)) {
+        QString errorMsg = "Invalid E57 file format: " + filePath;
+        emit parsingFinished(false, errorMsg, std::vector<float>());
+        return;
+    }
+
+    // Start parsing in current thread or defer to thread if already in worker thread
+    if (QThread::currentThread() != thread()) {
+        // We're being called from a worker thread, execute directly
+        performParsing();
+    } else {
+        // We're in the main thread, defer to next event loop iteration
+        QTimer::singleShot(0, this, &E57ParserLib::performParsing);
+    }
+}
+
+void E57ParserLib::cancelParsing() {
+    m_cancelRequested = true;
+    qDebug() << "E57ParserLib: Parsing cancellation requested";
+}
+
+QString E57ParserLib::getLastError() const {
+    QMutexLocker locker(&m_errorMutex);
+    return m_lastError;
+}
+
+bool E57ParserLib::isValidE57File(const QString& filePath) {
+    QFileInfo fileInfo(filePath);
+    if (!fileInfo.exists() || !fileInfo.isReadable()) {
+        return false;
+    }
+
+    // Try to open the file with libE57Format to validate
+    try {
+        e57::ImageFile testFile(filePath.toStdString(), "r");
+        bool isValid = testFile.isOpen();
+        testFile.close();
+        return isValid;
+    } catch (const e57::E57Exception&) {
+        return false;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+int E57ParserLib::getScanCount(const QString& filePath) {
+    try {
+        e57::ImageFile testFile(filePath.toStdString(), "r");
+        if (!testFile.isOpen()) {
+            return 0;
+        }
+
+        e57::StructureNode root = testFile.root();
+        if (root.isDefined("/data3D")) {
+            e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("/data3D"));
+            int count = static_cast<int>(data3D.childCount());
+            testFile.close();
+            return count;
+        }
+
+        testFile.close();
+        return 0;
+
+    } catch (const e57::E57Exception&) {
+        return 0;
+    } catch (const std::exception&) {
+        return 0;
+    }
 }
 
 bool E57ParserLib::openFile(const std::string& filePath) {
@@ -874,4 +964,363 @@ bool E57ParserLib::extractEnhancedPointData(const e57::StructureNode& scanHeader
         setError(std::string("E57 Exception during enhanced point data extraction: ") + ex.what());
         return false;
     }
+}
+
+// MainWindow-compatible implementation methods
+void E57ParserLib::performParsing() {
+    emit progressUpdated(0, "Initializing E57 parser...");
+
+    try {
+        // Step 1: Open E57 file
+        if (!openE57File(m_currentFilePath)) {
+            emit parsingFinished(false, m_lastError, std::vector<float>());
+            return;
+        }
+
+        if (m_cancelRequested) {
+            closeE57File();
+            emit parsingFinished(false, "Parsing cancelled by user", std::vector<float>());
+            return;
+        }
+
+        emit progressUpdated(10, "Analyzing E57 file structure...");
+
+        // Step 2: Get scan information
+        m_totalScans = getScanCount();
+
+        if (m_totalScans == 0) {
+            closeE57File();
+            emit parsingFinished(false, "No scans found in E57 file", std::vector<float>());
+            return;
+        }
+
+        // Extract scan names for metadata
+        e57::StructureNode root = m_imageFile->root();
+        if (root.isDefined("/data3D")) {
+            e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("/data3D"));
+
+            for (int64_t i = 0; i < data3D.childCount(); ++i) {
+                e57::StructureNode scan = static_cast<e57::StructureNode>(data3D.get(i));
+                QString scanName = QString("Scan %1").arg(i);
+
+                if (scan.isDefined("name")) {
+                    scanName = QString::fromStdString(
+                        static_cast<e57::StringNode>(scan.get("name")).value());
+                }
+                m_scanNames.append(scanName);
+            }
+        }
+
+        emit scanMetadataAvailable(m_totalScans, m_scanNames);
+        emit progressUpdated(20, QString("Found %1 scans, processing...").arg(m_totalScans));
+
+        if (m_cancelRequested) {
+            closeE57File();
+            emit parsingFinished(false, "Parsing cancelled by user", std::vector<float>());
+            return;
+        }
+
+        // Step 3: Extract point data (currently from first scan only, as per PRD requirements)
+        emit progressUpdated(30, "Extracting point data...");
+
+        m_extractedPoints = extractPointDataFromScan(0, m_currentSettings);
+
+        if (m_extractedPoints.empty()) {
+            closeE57File();
+            emit parsingFinished(false, "No valid points extracted from E57 file", std::vector<float>());
+            return;
+        }
+
+        if (m_cancelRequested) {
+            closeE57File();
+            emit parsingFinished(false, "Parsing cancelled by user", std::vector<float>());
+            return;
+        }
+
+        emit progressUpdated(80, "Converting point data...");
+
+        // Step 4: Convert to XYZ vector for MainWindow compatibility
+        std::vector<float> xyzPoints = convertToXYZVector(m_extractedPoints);
+
+        // Step 5: Emit additional data if available
+        std::vector<float> intensityData;
+        std::vector<uint8_t> colorData;
+
+        bool hasIntensity = std::any_of(m_extractedPoints.begin(), m_extractedPoints.end(),
+            [](const PointData& p) { return p.hasIntensity; });
+        bool hasColor = std::any_of(m_extractedPoints.begin(), m_extractedPoints.end(),
+            [](const PointData& p) { return p.hasColor; });
+
+        if (hasIntensity) {
+            intensityData.reserve(m_extractedPoints.size());
+            for (const auto& point : m_extractedPoints) {
+                intensityData.push_back(point.hasIntensity ? point.intensity : 0.0f);
+            }
+            emit intensityDataExtracted(intensityData);
+        }
+
+        if (hasColor) {
+            colorData.reserve(m_extractedPoints.size() * 3);
+            for (const auto& point : m_extractedPoints) {
+                if (point.hasColor) {
+                    colorData.push_back(point.r);
+                    colorData.push_back(point.g);
+                    colorData.push_back(point.b);
+                } else {
+                    colorData.push_back(255);
+                    colorData.push_back(255);
+                    colorData.push_back(255);
+                }
+            }
+            emit colorDataExtracted(colorData);
+        }
+
+        closeE57File();
+
+        emit progressUpdated(100, "Parsing complete");
+
+        QString successMessage = QString("Successfully loaded %1 points from %2 scans")
+                                .arg(m_extractedPoints.size()).arg(m_totalScans);
+
+        if (hasIntensity) successMessage += " (with intensity data)";
+        if (hasColor) successMessage += " (with color data)";
+
+        emit parsingFinished(true, successMessage, xyzPoints);
+
+        qDebug() << "E57ParserLib::performParsing completed successfully with" << xyzPoints.size()/3 << "points";
+
+    } catch (const e57::E57Exception& ex) {
+        closeE57File();
+        handleE57Exception(ex, "E57 parsing");
+        emit parsingFinished(false, m_lastError, std::vector<float>());
+
+    } catch (const std::exception& ex) {
+        closeE57File();
+        m_lastError = QString("Unexpected error during E57 parsing: %1").arg(ex.what());
+        emit parsingFinished(false, m_lastError, std::vector<float>());
+    }
+}
+
+bool E57ParserLib::openE57File(const QString& filePath) {
+    try {
+        closeE57File();
+
+        // Create new ImageFile instance
+        m_imageFile = std::make_unique<e57::ImageFile>(filePath.toStdString(), "r");
+
+        if (!m_imageFile->isOpen()) {
+            m_lastError = "Failed to open file handle";
+            return false;
+        }
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        m_lastError = QString("E57 Exception: %1").arg(ex.what());
+        return false;
+    } catch (const std::exception& ex) {
+        m_lastError = QString("Standard exception: %1").arg(ex.what());
+        return false;
+    }
+}
+
+void E57ParserLib::closeE57File() {
+    if (m_imageFile) {
+        try {
+            if (m_imageFile->isOpen()) {
+                m_imageFile->close();
+            }
+        } catch (const e57::E57Exception& ex) {
+            // Log error but don't throw in destructor path
+            qWarning() << "E57 Exception during close:" << ex.what();
+        }
+        m_imageFile.reset();
+    }
+}
+
+std::vector<E57ParserLib::PointData> E57ParserLib::extractPointDataFromScan(int scanIndex, const LoadingSettings& settings) {
+    std::vector<PointData> points;
+
+    try {
+        e57::StructureNode root = m_imageFile->root();
+        e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("/data3D"));
+
+        if (scanIndex >= data3D.childCount()) {
+            m_lastError = QString("Scan index %1 out of range").arg(scanIndex);
+            return points;
+        }
+
+        e57::StructureNode scan = static_cast<e57::StructureNode>(data3D.get(scanIndex));
+
+        if (!scan.isDefined("points")) {
+            m_lastError = "Scan does not contain point data";
+            return points;
+        }
+
+        e57::CompressedVectorNode pointsNode =
+            static_cast<e57::CompressedVectorNode>(scan.get("points"));
+        e57::StructureNode prototype = pointsNode.prototype();
+
+        // Check available fields
+        bool hasX = prototype.isDefined("cartesianX");
+        bool hasY = prototype.isDefined("cartesianY");
+        bool hasZ = prototype.isDefined("cartesianZ");
+        bool hasIntensity = prototype.isDefined("intensity") && settings.loadIntensity;
+        bool hasColorR = prototype.isDefined("colorRed") && settings.loadColor;
+        bool hasColorG = prototype.isDefined("colorGreen") && settings.loadColor;
+        bool hasColorB = prototype.isDefined("colorBlue") && settings.loadColor;
+
+        if (!hasX || !hasY || !hasZ) {
+            m_lastError = "Scan missing required cartesian coordinates";
+            return points;
+        }
+
+        // Setup buffers for reading
+        const int64_t BUFFER_SIZE = 65536;
+        int64_t totalPoints = pointsNode.childCount();
+
+        if (settings.maxPointsPerScan > 0) {
+            totalPoints = std::min(totalPoints, static_cast<int64_t>(settings.maxPointsPerScan));
+        }
+
+        std::vector<double> xBuffer(BUFFER_SIZE);
+        std::vector<double> yBuffer(BUFFER_SIZE);
+        std::vector<double> zBuffer(BUFFER_SIZE);
+        std::vector<float> intensityBuffer(BUFFER_SIZE);
+        std::vector<uint8_t> rBuffer(BUFFER_SIZE);
+        std::vector<uint8_t> gBuffer(BUFFER_SIZE);
+        std::vector<uint8_t> bBuffer(BUFFER_SIZE);
+
+        // Setup SourceDestBuffers
+        std::vector<e57::SourceDestBuffer> buffers;
+        buffers.emplace_back(*m_imageFile, "cartesianX", xBuffer.data(), BUFFER_SIZE, true);
+        buffers.emplace_back(*m_imageFile, "cartesianY", yBuffer.data(), BUFFER_SIZE, true);
+        buffers.emplace_back(*m_imageFile, "cartesianZ", zBuffer.data(), BUFFER_SIZE, true);
+
+        if (hasIntensity) {
+            buffers.emplace_back(*m_imageFile, "intensity", intensityBuffer.data(), BUFFER_SIZE, true, true);
+        }
+        if (hasColorR) {
+            buffers.emplace_back(*m_imageFile, "colorRed", rBuffer.data(), BUFFER_SIZE, true, true);
+        }
+        if (hasColorG) {
+            buffers.emplace_back(*m_imageFile, "colorGreen", gBuffer.data(), BUFFER_SIZE, true, true);
+        }
+        if (hasColorB) {
+            buffers.emplace_back(*m_imageFile, "colorBlue", bBuffer.data(), BUFFER_SIZE, true, true);
+        }
+
+        // Read points in chunks
+        e57::CompressedVectorReader reader = pointsNode.reader(buffers);
+        points.reserve(std::min(totalPoints, static_cast<int64_t>(1000000))); // Reserve reasonable amount
+
+        unsigned long pointsRead = 0;
+        int64_t totalProcessed = 0;
+        int lastProgressPercent = 30;
+
+        while ((pointsRead = reader.read()) > 0 && totalProcessed < totalPoints) {
+            for (unsigned long i = 0; i < pointsRead && totalProcessed < totalPoints; ++i) {
+                PointData point;
+                point.x = xBuffer[i];
+                point.y = yBuffer[i];
+                point.z = zBuffer[i];
+
+                if (hasIntensity) {
+                    point.intensity = intensityBuffer[i];
+                    point.hasIntensity = true;
+                }
+
+                if (hasColorR || hasColorG || hasColorB) {
+                    point.r = hasColorR ? rBuffer[i] : 255;
+                    point.g = hasColorG ? gBuffer[i] : 255;
+                    point.b = hasColorB ? bBuffer[i] : 255;
+                    point.hasColor = true;
+                }
+
+                // Apply subsampling if requested
+                if (settings.subsamplingRatio < 1.0) {
+                    static std::random_device rd;
+                    static std::mt19937 gen(rd());
+                    static std::uniform_real_distribution<> dis(0.0, 1.0);
+
+                    if (dis(gen) > settings.subsamplingRatio) {
+                        totalProcessed++;
+                        continue;
+                    }
+                }
+
+                points.push_back(point);
+                totalProcessed++;
+            }
+
+            // Update progress
+            int progressPercent = 30 + (totalProcessed * 50) / totalPoints;
+            if (progressPercent > lastProgressPercent + 5) {
+                emit progressUpdated(progressPercent,
+                    QString("Processed %1 of %2 points...").arg(totalProcessed).arg(totalPoints));
+                lastProgressPercent = progressPercent;
+            }
+        }
+
+        reader.close();
+
+        qDebug() << "E57ParserLib: Extracted" << points.size() << "points from scan" << scanIndex;
+        return points;
+
+    } catch (const e57::E57Exception& ex) {
+        m_lastError = QString("E57 Exception during point extraction: %1").arg(ex.what());
+        return points;
+    }
+}
+
+std::vector<float> E57ParserLib::convertToXYZVector(const std::vector<PointData>& pointData) {
+    std::vector<float> xyzVector;
+    xyzVector.reserve(pointData.size() * 3);
+
+    for (const auto& point : pointData) {
+        if (point.isValid) {
+            xyzVector.push_back(static_cast<float>(point.x));
+            xyzVector.push_back(static_cast<float>(point.y));
+            xyzVector.push_back(static_cast<float>(point.z));
+        }
+    }
+
+    return xyzVector;
+}
+
+void E57ParserLib::handleE57Exception(const std::exception& ex, const QString& context) {
+    QString technicalError = QString::fromStdString(ex.what());
+    m_lastError = translateE57Error(technicalError);
+    qWarning() << "E57ParserLib error in" << context << ":" << technicalError;
+}
+
+QString E57ParserLib::translateE57Error(const QString& technicalError) {
+    // Translate technical E57 errors to user-friendly messages
+    if (technicalError.contains("E57_ERROR_BAD_CHECKSUM") || technicalError.contains("checksum")) {
+        return "File integrity check failed: The E57 file may be corrupted.";
+    }
+    if (technicalError.contains("E57_ERROR_OPEN_FAILED") || technicalError.contains("open")) {
+        return "Unable to open the E57 file. Please check file permissions and ensure the file is not in use.";
+    }
+    if (technicalError.contains("E57_ERROR_FILE_NOT_OPEN")) {
+        return "E57 file is not properly opened.";
+    }
+    if (technicalError.contains("E57_ERROR_BAD_API_ARGUMENT")) {
+        return "Invalid file format or unsupported E57 structure.";
+    }
+    if (technicalError.contains("E57_ERROR_INTERNAL")) {
+        return "Internal E57 library error occurred.";
+    }
+
+    // Default fallback for unknown errors
+    return QString("E57 parsing error: %1").arg(technicalError);
+}
+
+void E57ParserLib::setupForThreading() {
+    // Setup for potential threading
+    m_progressTimer = new QTimer(this);
+    m_progressTimer->setSingleShot(true);
+
+    // Ensure proper signal/slot connections work across threads
+    connect(this, &E57ParserLib::progressUpdated, this, &E57ParserLib::progressUpdated, Qt::QueuedConnection);
 }
