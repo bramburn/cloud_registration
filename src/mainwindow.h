@@ -2,21 +2,17 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QStatusBar>
-#include <QProgressDialog>
-#include <QFileDialog>
-#include <QMessageBox>
+#include <QStackedWidget>
+#include <QSplitter>
 #include <QLabel>
-#include <QMenuBar>
-#include <QMenu>
 #include <QAction>
-#include <QThread>
 #include <vector>
 
+class ProjectHubWidget;
+class SidebarWidget;
 class PointCloudViewerWidget;
+class ProjectManager;
+class Project;
 class E57Parser;
 class LasParser;
 struct LasHeaderMetadata;
@@ -26,22 +22,23 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 private slots:
+    void onProjectOpened(const QString &projectPath);
+    void showProjectHub();
+    void onFileNewProject();
+    void onFileOpenProject();
+    void closeCurrentProject();
+
+    // Legacy point cloud loading slots (for existing functionality)
     void onOpenFileClicked();
     void onLoadingFinished(bool success, const QString& message);
     void onParsingProgressUpdated(int percentage, const QString &stage);
     void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
-
-    // Settings dialog slot
     void onLoadingSettingsTriggered();
-
-    // Header metadata slot
     void onLasHeaderParsed(const LasHeaderMetadata& metadata);
-
-    // View control slots
     void onTopViewClicked();
     void onLeftViewClicked();
     void onRightViewClicked();
@@ -51,13 +48,13 @@ private:
     void setupUI();
     void setupMenuBar();
     void setupStatusBar();
+    void transitionToProjectView(const QString &projectPath);
+    void updateWindowTitle(const QString &projectName = QString());
 
-    // Helper methods for cleanup and UI updates
+    // Legacy helper methods for point cloud loading
     void cleanupParsingThread();
     void cleanupProgressDialog();
     void updateUIAfterParsing(bool success, const QString& message);
-
-    // Sprint 2.3: Standardized status bar messages
     void setStatusReady();
     void setStatusLoading(const QString &filename);
     void setStatusLoadSuccess(const QString &filename, int pointCount);
@@ -67,41 +64,42 @@ private:
                           double maxX, double maxY, double maxZ);
     void setStatusViewChanged(const QString &viewName);
 
-    // UI Components
-    QWidget *m_centralWidget;
-    QVBoxLayout *m_mainLayout;
-    QHBoxLayout *m_buttonLayout;
-    QPushButton *m_openFileButton;
-    QPushButton *m_topViewButton;
-    QPushButton *m_leftViewButton;
-    QPushButton *m_rightViewButton;
-    QPushButton *m_bottomViewButton;
+    // Main UI Components
+    QStackedWidget *m_centralStack;
+    ProjectHubWidget *m_projectHub;
+    QWidget *m_projectView;
+    QSplitter *m_projectSplitter;
+    SidebarWidget *m_sidebar;
+    QWidget *m_mainContentArea;
+
+    // Legacy point cloud viewer
     PointCloudViewerWidget *m_viewer;
     QProgressDialog *m_progressDialog;
 
+    // Project management
+    ProjectManager *m_projectManager;
+    Project *m_currentProject;
+
     // Menu actions
+    QAction *m_newProjectAction;
+    QAction *m_openProjectAction;
+    QAction *m_closeProjectAction;
     QAction *m_loadingSettingsAction;
     QAction *m_topViewAction;
     QAction *m_leftViewAction;
     QAction *m_rightViewAction;
     QAction *m_bottomViewAction;
 
-    // Data processing
+    // Legacy data processing
     E57Parser *m_e57Parser;
     LasParser *m_lasParser;
-
-    // Threading
     QThread *m_parserThread;
-
-    // State
     QString m_currentFilePath;
     bool m_isLoading;
 
-    // Sprint 2.3: Status bar widgets
+    // Status bar widgets
     QLabel *m_statusLabel;
     QLabel *m_permanentStatusLabel;
-
-    // Current file info for status display
     QString m_currentFileName;
     int m_currentPointCount;
 };
