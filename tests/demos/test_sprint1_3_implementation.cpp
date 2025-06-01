@@ -8,10 +8,10 @@
 #include <QDateTime>
 
 // Include our Sprint 1.3 implementation
-#include "src/projectmanager.h"
-#include "src/sqlitemanager.h"
-#include "src/projecttreemodel.h"
-#include "src/sidebarwidget.h"
+#include "../../src/projectmanager.h"
+#include "../../src/sqlitemanager.h"
+#include "../../src/projecttreemodel.h"
+#include "../../src/sidebarwidget.h"
 
 class TestWindow : public QMainWindow
 {

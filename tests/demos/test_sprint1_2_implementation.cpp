@@ -8,10 +8,10 @@
 #include <QSqlError>
 
 // Include our Sprint 1.2 classes
-#include "src/projectmanager.h"
-#include "src/sqlitemanager.h"
-#include "src/scanimportmanager.h"
-#include "src/projecttreemodel.h"
+#include "../../src/projectmanager.h"
+#include "../../src/sqlitemanager.h"
+#include "../../src/scanimportmanager.h"
+#include "../../src/projecttreemodel.h"
 
 void testSQLiteManager()
 {

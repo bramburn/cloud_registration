@@ -6,8 +6,10 @@
 Write-Host "=== Sprint 1.1 E57 Parser Implementation Test ===" -ForegroundColor Green
 Write-Host "Testing enhanced E57 parser with real E57 files..." -ForegroundColor Yellow
 
-# Set working directory
-Set-Location "C:\dev\cloud_registration"
+# Set working directory to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+Set-Location $projectRoot
 
 # Check if test files exist
 $testFiles = @(

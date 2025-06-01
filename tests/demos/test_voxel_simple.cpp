@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
-#include "src/voxelgridfilter.h"
-#include "src/loadingsettings.h"
+#include "../../src/voxelgridfilter.h"
+#include "../../src/loadingsettings.h"
 #include <QCoreApplication>
 
 int main(int argc, char* argv[])

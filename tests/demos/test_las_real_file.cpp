@@ -3,7 +3,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <iostream>
-#include "src/lasparser.h"
+#include "../../src/lasparser.h"
 
 int main(int argc, char *argv[])
 {

@@ -3,7 +3,7 @@
 #include <QFile>
 #include <QDataStream>
 #include <QByteArray>
-#include "src/e57parser.h"
+#include "../../src/e57parser.h"
 
 // Create a minimal valid E57 file for testing
 bool createTestE57File(const QString& filePath) {

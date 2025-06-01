@@ -3,6 +3,11 @@
 # Test Sprint 1 Functionality
 # This script tests the implemented Sprint 1 features
 
+# Set working directory to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+Set-Location $projectRoot
+
 Write-Host "=== Testing Sprint 1 Functionality ===" -ForegroundColor Cyan
 Write-Host ""
 

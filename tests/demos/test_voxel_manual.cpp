@@ -1,5 +1,5 @@
-#include "src/voxelgridfilter.h"
-#include "src/loadingsettings.h"
+#include "../../src/voxelgridfilter.h"
+#include "../../src/loadingsettings.h"
 #include <iostream>
 #include <vector>
 

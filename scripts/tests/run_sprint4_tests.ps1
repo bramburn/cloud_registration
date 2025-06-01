@@ -16,7 +16,10 @@ Write-Host "=== Sprint 4 E57 Library Integration Test Suite ===" -ForegroundColo
 Write-Host "Testing: Comprehensive functionality, Performance profiling, Multi-scan support" -ForegroundColor Yellow
 
 # Set working directory
-Set-Location "C:\dev\cloud_registration"
+# Set working directory to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+Set-Location $projectRoot
 
 # Check if build directory exists
 if (-not (Test-Path $BuildDir)) {

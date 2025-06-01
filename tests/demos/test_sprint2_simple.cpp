@@ -1,6 +1,6 @@
 #include <iostream>
 #include <QCoreApplication>
-#include "src/e57parserlib.h"
+#include "../../src/e57parserlib.h"
 
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);

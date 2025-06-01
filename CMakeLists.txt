@@ -288,7 +288,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 3 Demo Program
     add_executable(Sprint3Demo
-        test_sprint3_demo.cpp
+        tests/demos/test_sprint3_demo.cpp
         src/e57parserlib.cpp
     )
 
@@ -301,7 +301,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 2 Simple Test
     add_executable(Sprint2SimpleTest
-        test_sprint2_simple.cpp
+        tests/demos/test_sprint2_simple.cpp
         src/e57parserlib.cpp
     )
 
@@ -326,7 +326,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 1 Manual Verification Test
     add_executable(Sprint1VerificationTest
-        test_sprint1_implementation.cpp
+        tests/demos/test_sprint1_implementation.cpp
         src/e57parserlib.cpp
     )
 
@@ -338,7 +338,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 2.1 Manual Test
     add_executable(Sprint21ManualTest
-        test_sprint2_1_manual.cpp
+        tests/demos/test_sprint2_1_manual.cpp
         src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
@@ -353,7 +353,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 2.1 Integration Test
     add_executable(Sprint21IntegrationTest
-        test_sprint2_1_integration.cpp
+        tests/demos/test_sprint2_1_integration.cpp
         src/e57parserlib.cpp
         src/performance_profiler.cpp
     )
@@ -454,7 +454,7 @@ if(TARGET GTest::gtest_main)
 
     # Simple LAS real file test (no GTest dependency)
     add_executable(TestLasRealFile
-        test_las_real_file.cpp
+        tests/demos/test_las_real_file.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp
         src/performance_profiler.cpp
@@ -468,7 +468,7 @@ if(TARGET GTest::gtest_main)
 
     # Sprint 2.2 Profiling Demonstration
     add_executable(Sprint22ProfilingDemo
-        test_sprint2_2_profiling_demo.cpp
+        tests/demos/test_sprint2_2_profiling_demo.cpp
         src/e57parserlib.cpp
         src/lasparser.cpp
         src/voxelgridfilter.cpp

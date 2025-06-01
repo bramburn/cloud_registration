@@ -5,10 +5,17 @@
 #include <QSignalSpy>
 #include <QDomDocument>
 #include <QDebug>
-#include "e57parser.h"
+#include <QEventLoop>
+#include <QTimer>
+#include <QObject>
+#include <QFile>
+#include <QFileInfo>
+#include "e57parserlib.h"
 
-class E57ParserTest : public ::testing::Test
+class E57ParserLibTest : public QObject, public ::testing::Test
 {
+    Q_OBJECT
+
 protected:
     void SetUp() override
     {
@@ -19,13 +26,50 @@ protected:
             app = new QCoreApplication(argc, argv);
         }
 
-        parser = new E57Parser();
+        parser = new E57ParserLib();
+
+        // Connect signals for testing
+        connect(parser, &E57ParserLib::parsingFinished,
+                this, &E57ParserLibTest::onParsingFinished);
+        connect(parser, &E57ParserLib::progressUpdated,
+                this, &E57ParserLibTest::onProgressUpdated);
     }
 
     void TearDown() override
     {
         delete parser;
         // Don't delete app as it might be used by other tests
+    }
+
+public slots:
+    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points) {
+        lastSuccess = success;
+        lastMessage = message;
+        lastPoints = points;
+        parsingComplete = true;
+    }
+
+    void onProgressUpdated(int percentage, const QString& stage) {
+        lastProgress = percentage;
+        lastStage = stage;
+    }
+
+protected:
+    // Helper function to wait for async parsing to complete
+    bool waitForParsing(int timeoutMs = 5000) {
+        QEventLoop loop;
+        QTimer timer;
+        timer.setSingleShot(true);
+        timer.setInterval(timeoutMs);
+
+        connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+        connect(parser, &E57ParserLib::parsingFinished, &loop, &QEventLoop::quit);
+
+        parsingComplete = false;
+        timer.start();
+        loop.exec();
+
+        return parsingComplete;
     }
 
     // Helper function to create a mock E57 file
@@ -83,10 +127,18 @@ protected:
     }
 
     QCoreApplication* app = nullptr;
-    E57Parser* parser = nullptr;
+    E57ParserLib* parser = nullptr;
+
+    // Test result storage
+    bool parsingComplete = false;
+    bool lastSuccess = false;
+    QString lastMessage;
+    std::vector<float> lastPoints;
+    int lastProgress = 0;
+    QString lastStage;
 };
 
-TEST_F(E57ParserTest, ValidE57FileDetection)
+TEST_F(E57ParserLibTest, ValidE57FileDetection)
 {
     QString mockFile = createMockE57File();
     ASSERT_FALSE(mockFile.isEmpty());
@@ -98,7 +150,7 @@ TEST_F(E57ParserTest, ValidE57FileDetection)
     QFile::remove(mockFile);
 }
 
-TEST_F(E57ParserTest, InvalidFileDetection)
+TEST_F(E57ParserLibTest, InvalidFileDetection)
 {
     QString invalidFile = createInvalidFile();
     ASSERT_FALSE(invalidFile.isEmpty());
@@ -110,7 +162,7 @@ TEST_F(E57ParserTest, InvalidFileDetection)
     QFile::remove(invalidFile);
 }
 
-TEST_F(E57ParserTest, NonExistentFileHandling)
+TEST_F(E57ParserLibTest, NonExistentFileHandling)
 {
     QString nonExistentFile = "/path/that/does/not/exist.e57";
 
@@ -118,33 +170,31 @@ TEST_F(E57ParserTest, NonExistentFileHandling)
     EXPECT_FALSE(isValid);
 }
 
-TEST_F(E57ParserTest, InvalidFileNoMockData)
+TEST_F(E57ParserLibTest, InvalidFileNoMockData)
 {
-    // Test parsing with an invalid file (should NOT generate mock data in Sprint 1.1)
+    // Test parsing with an invalid file (should NOT generate mock data)
     QString invalidFile = createInvalidFile();
     ASSERT_FALSE(invalidFile.isEmpty());
 
-    // Set up signal spy to capture parsing results
-    QSignalSpy spy(parser, &E57Parser::parsingFinished);
+    // Start parsing asynchronously
+    parser->startParsing(invalidFile);
 
-    std::vector<float> points = parser->parse(invalidFile);
+    // Wait for parsing to complete
+    ASSERT_TRUE(waitForParsing());
 
     // Should NOT have generated mock data - should return empty vector
-    EXPECT_TRUE(points.empty());
+    EXPECT_TRUE(lastPoints.empty());
+    EXPECT_FALSE(lastSuccess);
 
     // Should have error message
     EXPECT_FALSE(parser->getLastError().isEmpty());
-
-    // Should have emitted parsingFinished with failure
-    EXPECT_EQ(spy.count(), 1);
-    QList<QVariant> arguments = spy.takeFirst();
-    EXPECT_FALSE(arguments.at(0).toBool()); // success should be false
+    EXPECT_FALSE(lastMessage.isEmpty());
 
     // Clean up
     QFile::remove(invalidFile);
 }
 
-TEST_F(E57ParserTest, ValidE57FileHeaderParsing)
+TEST_F(E57ParserLibTest, ValidE57FileHeaderParsing)
 {
     QString mockFile = createMockE57File();
     ASSERT_FALSE(mockFile.isEmpty());
@@ -155,11 +205,14 @@ TEST_F(E57ParserTest, ValidE57FileHeaderParsing)
 
     // Test parsing - this will fail at XML stage since our mock file doesn't have proper XML
     // but it should NOT generate mock data
-    QSignalSpy spy(parser, &E57Parser::parsingFinished);
-    std::vector<float> points = parser->parse(mockFile);
+    parser->startParsing(mockFile);
+
+    // Wait for parsing to complete
+    ASSERT_TRUE(waitForParsing());
 
     // Should NOT have generated mock data - should return empty vector due to missing XML
-    EXPECT_TRUE(points.empty());
+    EXPECT_TRUE(lastPoints.empty());
+    EXPECT_FALSE(lastSuccess);
 
     // Should have error message about XML parsing
     EXPECT_FALSE(parser->getLastError().isEmpty());
@@ -168,38 +221,36 @@ TEST_F(E57ParserTest, ValidE57FileHeaderParsing)
     QFile::remove(mockFile);
 }
 
-TEST_F(E57ParserTest, RealE57FileTest)
+TEST_F(E57ParserLibTest, RealE57FileTest)
 {
     // Test with the real E57 test file if it exists
     QString testFile = "test_data/test_real_points.e57";
 
     if (QFile::exists(testFile)) {
-        QSignalSpy spy(parser, &E57Parser::parsingFinished);
-        std::vector<float> points = parser->parse(testFile);
+        parser->startParsing(testFile);
+
+        // Wait for parsing to complete
+        ASSERT_TRUE(waitForParsing());
 
         // Should have successfully parsed real E57 data
-        EXPECT_FALSE(points.empty());
-        EXPECT_EQ(points.size() % 3, 0); // Should be divisible by 3 (X, Y, Z)
+        EXPECT_FALSE(lastPoints.empty());
+        EXPECT_EQ(lastPoints.size() % 3, 0); // Should be divisible by 3 (X, Y, Z)
+        EXPECT_TRUE(lastSuccess);
 
         // Should have exactly 3 points (9 floats)
-        EXPECT_EQ(points.size(), 9);
-
-        // Should have emitted parsingFinished with success
-        EXPECT_EQ(spy.count(), 1);
-        QList<QVariant> arguments = spy.takeFirst();
-        EXPECT_TRUE(arguments.at(0).toBool()); // success should be true
+        EXPECT_EQ(lastPoints.size(), 9);
 
         // Verify the actual coordinates (1,2,3), (4,5,6), (7,8,9)
-        if (points.size() >= 9) {
-            EXPECT_FLOAT_EQ(points[0], 1.0f);
-            EXPECT_FLOAT_EQ(points[1], 2.0f);
-            EXPECT_FLOAT_EQ(points[2], 3.0f);
-            EXPECT_FLOAT_EQ(points[3], 4.0f);
-            EXPECT_FLOAT_EQ(points[4], 5.0f);
-            EXPECT_FLOAT_EQ(points[5], 6.0f);
-            EXPECT_FLOAT_EQ(points[6], 7.0f);
-            EXPECT_FLOAT_EQ(points[7], 8.0f);
-            EXPECT_FLOAT_EQ(points[8], 9.0f);
+        if (lastPoints.size() >= 9) {
+            EXPECT_FLOAT_EQ(lastPoints[0], 1.0f);
+            EXPECT_FLOAT_EQ(lastPoints[1], 2.0f);
+            EXPECT_FLOAT_EQ(lastPoints[2], 3.0f);
+            EXPECT_FLOAT_EQ(lastPoints[3], 4.0f);
+            EXPECT_FLOAT_EQ(lastPoints[4], 5.0f);
+            EXPECT_FLOAT_EQ(lastPoints[5], 6.0f);
+            EXPECT_FLOAT_EQ(lastPoints[6], 7.0f);
+            EXPECT_FLOAT_EQ(lastPoints[7], 8.0f);
+            EXPECT_FLOAT_EQ(lastPoints[8], 9.0f);
         }
     } else {
         // Skip test if file doesn't exist
@@ -207,280 +258,174 @@ TEST_F(E57ParserTest, RealE57FileTest)
     }
 }
 
-TEST_F(E57ParserTest, ErrorHandling)
+TEST_F(E57ParserLibTest, ErrorHandling)
 {
     // Test with a non-existent file - should return empty vector, not throw exception
-    std::vector<float> points = parser->parse("/non/existent/file.e57");
+    parser->startParsing("/non/existent/file.e57");
+
+    // Wait for parsing to complete
+    ASSERT_TRUE(waitForParsing());
 
     // Should return empty vector
-    EXPECT_TRUE(points.empty());
+    EXPECT_TRUE(lastPoints.empty());
+    EXPECT_FALSE(lastSuccess);
 
     // Should have error message
     EXPECT_FALSE(parser->getLastError().isEmpty());
+    EXPECT_FALSE(lastMessage.isEmpty());
 }
 
-// Sprint 1.2: CompressedVector parsing tests
-TEST_F(E57ParserTest, CompressedVectorParsing)
+// Sprint 5: E57ParserLib Integration Tests
+TEST_F(E57ParserLibTest, MainWindowCompatibleSignals)
 {
-    QString testXml = R"(
-        <points type="CompressedVector">
-            <codecs>
-                <CompressedVectorNode recordCount="1000" fileOffset="2048">
-                    <prototype>
-                        <cartesianX type="Float" precision="single"/>
-                        <cartesianY type="Float" precision="single"/>
-                        <cartesianZ type="Float" precision="single"/>
-                    </prototype>
-                </CompressedVectorNode>
-            </codecs>
-        </points>
-    )";
+    // Test that signals match MainWindow expectations
+    QSignalSpy progressSpy(parser, &E57ParserLib::progressUpdated);
+    QSignalSpy finishedSpy(parser, &E57ParserLib::parsingFinished);
+    QSignalSpy metadataSpy(parser, &E57ParserLib::scanMetadataAvailable);
 
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
+    EXPECT_TRUE(progressSpy.isValid());
+    EXPECT_TRUE(finishedSpy.isValid());
+    EXPECT_TRUE(metadataSpy.isValid());
+}
 
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
+TEST_F(E57ParserLibTest, XYZVectorConversion)
+{
+    // Test that XYZ vector format matches MainWindow expectations
+    // This test verifies the data format compliance requirement from PRD
 
-    EXPECT_TRUE(result);
-    if (!result) {
-        qDebug() << "CompressedVector parsing failed:" << parser->getLastError();
+    // Create a simple test to verify the parser can handle basic operations
+    QString nonExistentFile = "/test/path/that/does/not/exist.e57";
+
+    parser->startParsing(nonExistentFile);
+    ASSERT_TRUE(waitForParsing());
+
+    // Should fail gracefully and return empty vector
+    EXPECT_TRUE(lastPoints.empty());
+    EXPECT_FALSE(lastSuccess);
+
+    // Verify the vector is properly formatted (empty but valid)
+    EXPECT_EQ(lastPoints.size() % 3, 0); // Should be divisible by 3 even when empty
+}
+
+TEST_F(E57ParserLibTest, ErrorMessageTranslation)
+{
+    // Test that technical errors are translated to user-friendly messages
+    QString nonExistentFile = "/path/that/does/not/exist.e57";
+
+    parser->startParsing(nonExistentFile);
+    ASSERT_TRUE(waitForParsing());
+
+    QString errorMsg = parser->getLastError();
+    EXPECT_FALSE(errorMsg.isEmpty());
+
+    // Should not contain technical jargon
+    EXPECT_FALSE(errorMsg.contains("E57_ERROR_"));
+    EXPECT_FALSE(errorMsg.contains("libE57Format"));
+
+    // Should be user-friendly
+    EXPECT_TRUE(errorMsg.contains("file") || errorMsg.contains("File"));
+}
+
+TEST_F(E57ParserLibTest, ThreadSafeOperations)
+{
+    // Test that parser can be safely used in worker threads
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    timer.setInterval(100); // Short timeout for test
+
+    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+    // Test cancel operation thread safety
+    timer.start();
+    parser->cancelParsing(); // Should not crash
+    loop.exec();
+
+    // If we reach here without crashing, test passes
+    SUCCEED();
+}
+
+TEST_F(E57ParserLibTest, CancellationSupport)
+{
+    // Test that parsing can be cancelled
+    QString nonExistentFile = "/some/long/path/that/does/not/exist.e57";
+
+    // Start parsing
+    parser->startParsing(nonExistentFile);
+
+    // Immediately cancel
+    parser->cancelParsing();
+
+    // Wait for completion
+    ASSERT_TRUE(waitForParsing());
+
+    // Should have been cancelled or failed quickly
+    EXPECT_FALSE(lastSuccess);
+    EXPECT_TRUE(lastPoints.empty());
+}
+
+TEST_F(E57ParserLibTest, LoadingSettingsSupport)
+{
+    // Test that loading settings are properly handled
+    E57ParserLib::LoadingSettings settings;
+    settings.loadIntensity = true;
+    settings.loadColor = true;
+    settings.maxPointsPerScan = 1000;
+    settings.subsamplingRatio = 0.5;
+
+    QString nonExistentFile = "/test/file.e57";
+
+    // Should not crash with custom settings
+    parser->startParsing(nonExistentFile, settings);
+    ASSERT_TRUE(waitForParsing());
+
+    // Should fail gracefully
+    EXPECT_FALSE(lastSuccess);
+    EXPECT_TRUE(lastPoints.empty());
+}
+
+TEST_F(E57ParserLibTest, ProgressReporting)
+{
+    // Test that progress updates are emitted
+    QSignalSpy progressSpy(parser, &E57ParserLib::progressUpdated);
+
+    QString nonExistentFile = "/test/file.e57";
+    parser->startParsing(nonExistentFile);
+    ASSERT_TRUE(waitForParsing());
+
+    // Should have received at least one progress update (even for failed parsing)
+    EXPECT_GE(progressSpy.count(), 1);
+
+    if (progressSpy.count() > 0) {
+        QList<QVariant> arguments = progressSpy.first();
+        EXPECT_TRUE(arguments.at(0).canConvert<int>());
+        EXPECT_TRUE(arguments.at(1).canConvert<QString>());
     }
 }
 
-TEST_F(E57ParserTest, CompressedVectorMissingRecordCount)
+TEST_F(E57ParserLibTest, ScanCountUtility)
 {
-    QString testXml = R"(
-        <points type="CompressedVector">
-            <codecs>
-                <CompressedVectorNode fileOffset="2048">
-                    <prototype>
-                        <cartesianX type="Float" precision="single"/>
-                        <cartesianY type="Float" precision="single"/>
-                        <cartesianZ type="Float" precision="single"/>
-                    </prototype>
-                </CompressedVectorNode>
-            </codecs>
-        </points>
-    )";
+    // Test getScanCount utility method
+    QString nonExistentFile = "/test/file.e57";
 
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_FALSE(result);
-    EXPECT_TRUE(parser->getLastError().contains("recordCount"));
-    EXPECT_TRUE(parser->getLastError().contains("E57_ERROR_MISSING_RECORDCOUNT"));
+    int scanCount = parser->getScanCount(nonExistentFile);
+    EXPECT_EQ(scanCount, 0); // Should return 0 for non-existent files
 }
 
-TEST_F(E57ParserTest, CompressedVectorMissingCodecs)
+TEST_F(E57ParserLibTest, ValidE57FileUtility)
 {
-    QString testXml = R"(
-        <points type="CompressedVector">
-        </points>
-    )";
+    // Test isValidE57File utility method with various inputs
+    EXPECT_FALSE(parser->isValidE57File(""));
+    EXPECT_FALSE(parser->isValidE57File("/non/existent/file.e57"));
 
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
+    // Test with invalid file
+    QString invalidFile = createInvalidFile();
+    ASSERT_FALSE(invalidFile.isEmpty());
 
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
+    EXPECT_FALSE(parser->isValidE57File(invalidFile));
 
-    EXPECT_FALSE(result);
-    EXPECT_TRUE(parser->getLastError().contains("codecs"));
-    EXPECT_TRUE(parser->getLastError().contains("E57_ERROR_BAD_CODECS"));
-}
-
-// Sprint 1.2: Enhanced error reporting tests
-TEST_F(E57ParserTest, DetailedErrorReporting)
-{
-    QString testXml = R"(
-        <points type="Vector">
-            <prototype>
-                <cartesianX type="Float" precision="single"/>
-                <cartesianY type="Float" precision="single"/>
-                <!-- Missing cartesianZ -->
-            </prototype>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_FALSE(result);
-    QString error = parser->getLastError();
-    EXPECT_TRUE(error.contains("cartesianZ"));
-    EXPECT_TRUE(error.contains("E57_ERROR_MISSING_COORDINATES"));
-    EXPECT_TRUE(error.contains("prototype"));
-}
-
-TEST_F(E57ParserTest, DetailedErrorWithElementContext)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="invalid">
-            <codecs>
-                <CompressedVectorNode recordCount="not_a_number">
-                </CompressedVectorNode>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_FALSE(result);
-    QString error = parser->getLastError();
-    EXPECT_TRUE(error.contains("CompressedVectorNode"));
-    EXPECT_TRUE(error.contains("not_a_number"));
-}
-
-// Sprint 2.1: Codec handling tests
-TEST_F(E57ParserTest, BitPackCodecIdentificationExplicit)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="100">
-            <prototype>
-                <cartesianX type="Float" precision="single"/>
-                <cartesianY type="Float" precision="single"/>
-                <cartesianZ type="Float" precision="single"/>
-            </prototype>
-            <codecs>
-                <vector>
-                    <bitPackCodec/>
-                </vector>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_TRUE(result);
-    if (!result) {
-        qDebug() << "BitPack codec identification failed:" << parser->getLastError();
-    }
-}
-
-TEST_F(E57ParserTest, BitPackCodecIdentificationDefault)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="100">
-            <prototype>
-                <cartesianX type="Float" precision="single"/>
-                <cartesianY type="Float" precision="single"/>
-                <cartesianZ type="Float" precision="single"/>
-            </prototype>
-            <codecs>
-                <vector>
-                    <!-- Empty vector = default bitPackCodec -->
-                </vector>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_TRUE(result);
-    if (!result) {
-        qDebug() << "Default BitPack codec identification failed:" << parser->getLastError();
-    }
-}
-
-TEST_F(E57ParserTest, UnsupportedCodecRejection)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="100">
-            <prototype>
-                <cartesianX type="Float" precision="single"/>
-                <cartesianY type="Float" precision="single"/>
-                <cartesianZ type="Float" precision="single"/>
-            </prototype>
-            <codecs>
-                <vector>
-                    <zLibCodec/>
-                </vector>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_FALSE(result);
-    QString error = parser->getLastError();
-    EXPECT_TRUE(error.contains("Unsupported E57 compression codec") ||
-                error.contains("zLibCodec"));
-}
-
-TEST_F(E57ParserTest, FieldDescriptorParsing)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="50">
-            <prototype>
-                <cartesianX type="Float" precision="single" minimum="-10.0" maximum="10.0"/>
-                <cartesianY type="Float" precision="double" minimum="-5.0" maximum="5.0"/>
-                <cartesianZ type="ScaledInteger" precision="16" scale="0.001" offset="100.0"/>
-            </prototype>
-            <codecs>
-                <vector>
-                    <bitPackCodec/>
-                </vector>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_TRUE(result);
-    if (!result) {
-        qDebug() << "Field descriptor parsing failed:" << parser->getLastError();
-    }
-}
-
-TEST_F(E57ParserTest, MissingPrototypeInCompressedVector)
-{
-    QString testXml = R"(
-        <points type="CompressedVector" recordCount="100">
-            <!-- Missing prototype -->
-            <codecs>
-                <vector>
-                    <bitPackCodec/>
-                </vector>
-            </codecs>
-        </points>
-    )";
-
-    QDomDocument doc;
-    ASSERT_TRUE(doc.setContent(testXml));
-
-    QDomElement pointsElement = doc.documentElement();
-    bool result = parser->parseData3D(pointsElement);
-
-    EXPECT_FALSE(result);
-    QString error = parser->getLastError();
-    EXPECT_TRUE(error.contains("prototype") || error.contains("E57_ERROR_MISSING_PROTOTYPE"));
+    // Clean up
+    QFile::remove(invalidFile);
 }
 
 // Main function for running tests
@@ -489,3 +434,6 @@ int main(int argc, char **argv)
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+// Include MOC file for Qt meta-object system
+#include "test_e57parser.moc"

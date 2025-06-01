@@ -3,10 +3,10 @@
 #include <QStringList>
 #include <QFileInfo>
 #include <QDir>
-#include "src/performance_profiler.h"
-#include "src/performance_benchmark.h"
-#include "src/e57parser.h"
-#include "src/lasparser.h"
+#include "../../src/performance_profiler.h"
+#include "../../src/performance_benchmark.h"
+#include "../../src/e57parser.h"
+#include "../../src/lasparser.h"
 
 /**
  * @brief Sprint 2.2 Profiling and Benchmarking Test Application

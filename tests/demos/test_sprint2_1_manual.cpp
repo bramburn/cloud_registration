@@ -2,7 +2,7 @@
 #include <QDebug>
 #include <QDomDocument>
 #include <QDomElement>
-#include "src/e57parserlib.h"
+#include "../../src/e57parserlib.h"
 
 int main(int argc, char *argv[])
 {

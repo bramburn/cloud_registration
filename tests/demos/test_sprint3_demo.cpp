@@ -5,7 +5,7 @@
 #include <QDebug>
 #include <iostream>
 #include <iomanip>
-#include "src/e57parserlib.h"
+#include "../../src/e57parserlib.h"
 
 void printPointSample(const std::vector<E57ParserLib::PointData>& points, int maxSamples = 10) {
     std::cout << "\n=== Point Data Sample ===\n";

@@ -3,7 +3,7 @@
 #include <QTemporaryFile>
 #include <QDataStream>
 #include <QtEndian>
-#include "src/lasparser.h"
+#include "../../src/lasparser.h"
 
 // Helper function to create a simple test LAS file
 QString createTestLasFile()

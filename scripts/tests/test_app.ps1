@@ -1,6 +1,11 @@
 # Test script for CloudRegistration application
 Write-Host "Testing CloudRegistration Application..."
 
+# Set working directory to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+Set-Location $projectRoot
+
 # Set Qt path
 $env:PATH = "C:\Qt\6.5.3\msvc2019_64\bin;$env:PATH"
 

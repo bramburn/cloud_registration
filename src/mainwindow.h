@@ -17,6 +17,8 @@ class E57ParserLib;
 class LasParser;
 class ScanImportDialog;
 class SQLiteManager;
+class QProgressDialog;
+class QPushButton;
 struct LasHeaderMetadata;
 struct ScanInfo;
 
