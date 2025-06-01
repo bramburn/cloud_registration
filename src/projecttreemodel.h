@@ -5,10 +5,21 @@
 #include <QStandardItem>
 #include <QString>
 #include <QList>
+#include <QIcon>
+#include <QHash>
 
 class SQLiteManager;
 struct ScanInfo;
 struct ClusterInfo;
+
+// Enum for tracking loaded state of scans and clusters
+enum class LoadedState {
+    Unloaded,       // Not loaded in memory
+    Loaded,         // Fully loaded in memory
+    Partial,        // Partially loaded (for clusters with some loaded scans)
+    Loading,        // Currently being loaded
+    Error           // Error occurred during loading
+};
 
 class ProjectTreeModel : public QStandardItemModel
 {
@@ -35,6 +46,13 @@ public:
     QString getItemId(QStandardItem *item) const;
     QString getItemType(QStandardItem *item) const;
 
+    // New methods for Sprint 2.1 - Loaded state management
+    void setScanLoadedState(const QString &scanId, LoadedState state);
+    LoadedState getScanLoadedState(const QString &scanId) const;
+    void updateClusterLoadedStates();
+    LoadedState calculateClusterLoadedState(const QString &clusterId) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+
 private:
     void createProjectStructure();
     void loadScansFromDatabase();
@@ -57,6 +75,20 @@ private:
     // Cache for quick lookups
     QHash<QString, QStandardItem*> m_clusterItems;
     QHash<QString, QStandardItem*> m_scanItems;
+
+    // New for Sprint 2.1 - Loaded state tracking
+    QHash<QString, LoadedState> m_scanLoadedStates;
+    QHash<QString, LoadedState> m_clusterLoadedStates;
+
+    // Icons for different loaded states
+    QIcon m_loadedIcon;
+    QIcon m_unloadedIcon;
+    QIcon m_partialIcon;
+    QIcon m_loadingIcon;
+    QIcon m_errorIcon;
+
+    void initializeIcons();
+    void setItemLoadedState(QStandardItem *item, LoadedState state);
 };
 
 #endif // PROJECTTREEMODEL_H

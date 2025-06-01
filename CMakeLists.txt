@@ -120,6 +120,8 @@ set(SOURCES
     src/scanimportmanager.cpp
     src/scanimportdialog.cpp
     src/projecttreemodel.cpp
+    # Sprint 2.1: Point Cloud Load Management
+    src/pointcloudloadmanager.cpp
 )
 
 # Header files
@@ -145,6 +147,8 @@ set(HEADERS
     src/scanimportmanager.h
     src/scanimportdialog.h
     src/projecttreemodel.h
+    # Sprint 2.1: Point Cloud Load Management
+    src/pointcloudloadmanager.h
 )
 
 # Shader files
