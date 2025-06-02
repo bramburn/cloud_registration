@@ -21,6 +21,14 @@ if(MSVC)
 
     # Enable debug information in all builds
     add_compile_options(/Zi)
+
+    # User Story 3: Fix encoding issues - enforce UTF-8 for source and execution
+    add_compile_options(/utf-8)
+endif()
+
+# User Story 3: Fix encoding issues for GCC/Clang compilers
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
 endif()
 
 # Set C++ standard
@@ -326,6 +334,59 @@ if(TARGET GTest::gtest_main)
     )
 
     target_include_directories(E57WriterDebugTest PRIVATE src)
+
+    # E57 Writer Simple Test (for debugging hanging issues)
+    add_executable(E57WriterSimpleTest
+        test_e57_simple.cpp
+        src/e57writer_lib.cpp
+    )
+
+    target_link_libraries(E57WriterSimpleTest
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(E57WriterSimpleTest PRIVATE src)
+
+    # E57 Minimal Test (for debugging libE57Format issues)
+    add_executable(E57MinimalTest
+        test_e57_minimal.cpp
+    )
+
+    target_link_libraries(E57MinimalTest
+        E57Format
+    )
+
+    # E57 No Signals Test (for debugging Qt signals issues)
+    add_executable(E57NoSignalsTest
+        test_e57_nosignals.cpp
+    )
+
+    target_link_libraries(E57NoSignalsTest
+        Qt6::Core
+        E57Format
+    )
+
+    # E57 Pure C++ Test (no Qt dependencies)
+    add_executable(E57PureTest
+        test_e57_pure.cpp
+    )
+
+    target_link_libraries(E57PureTest
+        E57Format
+    )
+
+    # E57WriterLib No-Qt Test (fixes hanging issues)
+    add_executable(E57WriterNoQtTest
+        test_e57writer_noqt.cpp
+        src/e57writer_lib_noqt.cpp
+    )
+
+    target_link_libraries(E57WriterNoQtTest
+        E57Format
+    )
+
+    target_include_directories(E57WriterNoQtTest PRIVATE src)
 
     # Sprint 3 Demo Program
     add_executable(Sprint3Demo

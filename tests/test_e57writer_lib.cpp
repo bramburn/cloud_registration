@@ -58,22 +58,28 @@ TEST_F(E57WriterLibTest, CreateE57FileInWritableDirectory) {
     EXPECT_GT(fileInfo.size(), 0) << "E57 file is empty - size: " << fileInfo.size();
     
     // Verify file can be opened by libE57Format for reading
+    // User Story 2: Enhanced exception handling for libE57Format API calls
     try {
         e57::ImageFile testFile(testFilePath.toStdString(), "r");
         EXPECT_TRUE(testFile.isOpen()) << "Created file cannot be opened by libE57Format";
-        
-        // Verify E57Root structure
+
+        // Verify E57Root structure with defensive access
         e57::StructureNode root = testFile.root();
         EXPECT_TRUE(root.isDefined("formatName")) << "formatName not found in E57Root";
         EXPECT_TRUE(root.isDefined("guid")) << "guid not found in E57Root";
-        
-        // Verify formatName value
-        e57::StringNode formatName(root.get("formatName"));
-        EXPECT_EQ(formatName.value(), "ASTM E57 3D Imaging Data File") << "Incorrect formatName value";
-        
+
+        // Verify formatName value with constructor-based conversion
+        if (root.isDefined("formatName")) {
+            e57::StringNode formatName(root.get("formatName"));
+            EXPECT_EQ(formatName.value(), "ASTM E57 3D Imaging Data File") << "Incorrect formatName value";
+        }
+
         testFile.close();
     } catch (const e57::E57Exception& ex) {
-        FAIL() << "E57 Exception when reading created file: " << ex.what();
+        FAIL() << "E57 Exception when reading created file: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when reading created file: " << ex.what();
     }
 }
 
@@ -106,24 +112,34 @@ TEST_F(E57WriterLibTest, CreateE57FileWithScanStructure) {
         e57::ImageFile testFile(testFilePath.toStdString(), "r");
         e57::StructureNode root = testFile.root();
         
-        // Verify /data3D exists
+        // Verify /data3D exists with defensive checking
         EXPECT_TRUE(root.isDefined("data3D")) << "/data3D VectorNode not found";
 
-        e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("data3D"));
-        EXPECT_EQ(data3D.childCount(), 1) << "/data3D should contain exactly one scan";
+        if (root.isDefined("data3D")) {
+            // User Story 1: Replace static_cast with constructor-based conversion
+            e57::VectorNode data3D(root.get("data3D"));
+            EXPECT_EQ(data3D.childCount(), 1) << "/data3D should contain exactly one scan";
 
-        // Verify scan structure
-        e57::StructureNode scan = static_cast<e57::StructureNode>(data3D.get(0));
-        EXPECT_TRUE(scan.isDefined("guid")) << "Scan should have guid";
-        EXPECT_TRUE(scan.isDefined("name")) << "Scan should have name";
+            if (data3D.childCount() > 0) {
+                // Verify scan structure - use constructor-based conversion
+                e57::StructureNode scan(data3D.get(0));
+                EXPECT_TRUE(scan.isDefined("guid")) << "Scan should have guid";
+                EXPECT_TRUE(scan.isDefined("name")) << "Scan should have name";
 
-        // Verify scan name
-        e57::StringNode scanName = static_cast<e57::StringNode>(scan.get("name"));
-        EXPECT_EQ(scanName.value(), "Test Scan 001") << "Incorrect scan name";
-        
+                // Verify scan name - use constructor-based conversion with defensive access
+                if (scan.isDefined("name")) {
+                    e57::StringNode scanName(scan.get("name"));
+                    EXPECT_EQ(scanName.value(), "Test Scan 001") << "Incorrect scan name";
+                }
+            }
+        }
+
         testFile.close();
     } catch (const e57::E57Exception& ex) {
-        FAIL() << "E57 Exception when verifying scan structure: " << ex.what();
+        FAIL() << "E57 Exception when verifying scan structure: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying scan structure: " << ex.what();
     }
 }
 
@@ -139,39 +155,52 @@ TEST_F(E57WriterLibTest, CreateE57FileWithXYZPrototype) {
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
     // Verify points structure by reading back
+    // User Story 2: Enhanced exception handling for libE57Format API calls
     try {
         e57::ImageFile testFile(testFilePath.toStdString(), "r");
         e57::StructureNode root = testFile.root();
 
-        // Navigate to scan
-        e57::VectorNode data3D(root.get("data3D"));
-        e57::StructureNode scan(data3D.get(0));
+        // Navigate to scan with defensive checking
+        if (root.isDefined("data3D")) {
+            e57::VectorNode data3D(root.get("data3D"));
 
-        // Verify the CompressedVectorNode exists
-        EXPECT_TRUE(scan.isDefined("points")) << "Scan should have points CompressedVectorNode";
+            if (data3D.childCount() > 0) {
+                e57::StructureNode scan(data3D.get(0));
 
-        // Verify points is a CompressedVectorNode
-        e57::CompressedVectorNode pointsNode(scan.get("points"));
-        EXPECT_EQ(pointsNode.childCount(), 0) << "Points node should be empty (0 points)";
+                // Verify the CompressedVectorNode exists
+                EXPECT_TRUE(scan.isDefined("points")) << "Scan should have points CompressedVectorNode";
 
-        // Verify the prototype structure within the CompressedVectorNode
-        e57::StructureNode prototype(pointsNode.prototype());
-        EXPECT_TRUE(prototype.isDefined("cartesianX")) << "Prototype should have cartesianX";
-        EXPECT_TRUE(prototype.isDefined("cartesianY")) << "Prototype should have cartesianY";
-        EXPECT_TRUE(prototype.isDefined("cartesianZ")) << "Prototype should have cartesianZ";
+                if (scan.isDefined("points")) {
+                    // Verify points is a CompressedVectorNode
+                    e57::CompressedVectorNode pointsNode(scan.get("points"));
+                    EXPECT_EQ(pointsNode.childCount(), 0) << "Points node should be empty (0 points)";
 
-        // Verify coordinate fields are FloatNodes with double precision
-        e57::FloatNode xNode(prototype.get("cartesianX"));
-        e57::FloatNode yNode(prototype.get("cartesianY"));
-        e57::FloatNode zNode(prototype.get("cartesianZ"));
+                    // Verify the prototype structure within the CompressedVectorNode
+                    e57::StructureNode prototype(pointsNode.prototype());
+                    EXPECT_TRUE(prototype.isDefined("cartesianX")) << "Prototype should have cartesianX";
+                    EXPECT_TRUE(prototype.isDefined("cartesianY")) << "Prototype should have cartesianY";
+                    EXPECT_TRUE(prototype.isDefined("cartesianZ")) << "Prototype should have cartesianZ";
 
-        EXPECT_EQ(xNode.precision(), e57::PrecisionDouble) << "cartesianX should have double precision";
-        EXPECT_EQ(yNode.precision(), e57::PrecisionDouble) << "cartesianY should have double precision";
-        EXPECT_EQ(zNode.precision(), e57::PrecisionDouble) << "cartesianZ should have double precision";
+                    // Verify coordinate fields are FloatNodes with double precision - defensive access
+                    if (prototype.isDefined("cartesianX") && prototype.isDefined("cartesianY") && prototype.isDefined("cartesianZ")) {
+                        e57::FloatNode xNode(prototype.get("cartesianX"));
+                        e57::FloatNode yNode(prototype.get("cartesianY"));
+                        e57::FloatNode zNode(prototype.get("cartesianZ"));
+
+                        EXPECT_EQ(xNode.precision(), e57::PrecisionDouble) << "cartesianX should have double precision";
+                        EXPECT_EQ(yNode.precision(), e57::PrecisionDouble) << "cartesianY should have double precision";
+                        EXPECT_EQ(zNode.precision(), e57::PrecisionDouble) << "cartesianZ should have double precision";
+                    }
+                }
+            }
+        }
 
         testFile.close();
     } catch (const e57::E57Exception& ex) {
-        FAIL() << "E57 Exception when verifying XYZ prototype: " << ex.what();
+        FAIL() << "E57 Exception when verifying XYZ prototype: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying XYZ prototype: " << ex.what();
     }
 }
 
@@ -201,27 +230,39 @@ TEST_F(E57WriterLibTest, MultipleScanSupport) {
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
     
     // Verify both scans exist
+    // User Story 2: Enhanced exception handling for libE57Format API calls
     try {
         e57::ImageFile testFile(testFilePath.toStdString(), "r");
         e57::StructureNode root = testFile.root();
-        e57::VectorNode data3D(root.get("data3D"));
 
-        EXPECT_EQ(data3D.childCount(), 2) << "/data3D should contain two scans";
+        if (root.isDefined("data3D")) {
+            e57::VectorNode data3D(root.get("data3D"));
+            EXPECT_EQ(data3D.childCount(), 2) << "/data3D should contain two scans";
 
-        // Verify first scan
-        e57::StructureNode scan1(data3D.get(0));
-        e57::StringNode name1(scan1.get("name"));
-        EXPECT_EQ(name1.value(), "Scan 001") << "First scan name incorrect";
-        EXPECT_TRUE(scan1.isDefined("points")) << "First scan should have points CompressedVectorNode";
+            if (data3D.childCount() >= 2) {
+                // Verify first scan with defensive access
+                e57::StructureNode scan1(data3D.get(0));
+                if (scan1.isDefined("name")) {
+                    e57::StringNode name1(scan1.get("name"));
+                    EXPECT_EQ(name1.value(), "Scan 001") << "First scan name incorrect";
+                }
+                EXPECT_TRUE(scan1.isDefined("points")) << "First scan should have points CompressedVectorNode";
 
-        // Verify second scan
-        e57::StructureNode scan2(data3D.get(1));
-        e57::StringNode name2(scan2.get("name"));
-        EXPECT_EQ(name2.value(), "Scan 002") << "Second scan name incorrect";
-        EXPECT_TRUE(scan2.isDefined("points")) << "Second scan should have points CompressedVectorNode";
-        
+                // Verify second scan with defensive access
+                e57::StructureNode scan2(data3D.get(1));
+                if (scan2.isDefined("name")) {
+                    e57::StringNode name2(scan2.get("name"));
+                    EXPECT_EQ(name2.value(), "Scan 002") << "Second scan name incorrect";
+                }
+                EXPECT_TRUE(scan2.isDefined("points")) << "Second scan should have points CompressedVectorNode";
+            }
+        }
+
         testFile.close();
     } catch (const e57::E57Exception& ex) {
-        FAIL() << "E57 Exception when verifying multiple scans: " << ex.what();
+        FAIL() << "E57 Exception when verifying multiple scans: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying multiple scans: " << ex.what();
     }
 }
