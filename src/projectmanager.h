@@ -6,12 +6,15 @@
 #include <QJsonObject>
 #include <QList>
 #include <QDir>
+#include <QTimer>
 #include <stdexcept>
+#include <memory>
 #include "project.h"
 
 // Forward declarations
 class SQLiteManager;
 class ScanImportManager;
+class ProjectTreeModel;
 
 // Scan metadata structure for database storage - Enhanced for Sprint 2.2
 struct ScanInfo {
@@ -74,15 +77,46 @@ struct ClusterInfo {
     }
 };
 
+// Sprint 3.1 - Enhanced project metadata structure
+struct ProjectMetadata {
+    QString name;
+    QString description;
+    QString created_date;
+    QString last_modified_date;
+    QString version;
+
+    bool isValid() const {
+        return !name.isEmpty() && !version.isEmpty() && !created_date.isEmpty();
+    }
+};
+
+// Sprint 3.1 - Enhanced result enums for better error handling
+enum class ProjectLoadResult {
+    Success,
+    MetadataCorrupted,
+    DatabaseCorrupted,
+    DatabaseMissing,
+    MetadataMissing,
+    UnknownError
+};
+
+enum class SaveResult {
+    Success,
+    MetadataWriteFailed,
+    DatabaseWriteFailed,
+    TransactionFailed,
+    UnknownError
+};
+
 class ProjectCreationException : public std::runtime_error {
 public:
-    explicit ProjectCreationException(const QString &message) 
+    explicit ProjectCreationException(const QString &message)
         : std::runtime_error(message.toStdString()) {}
 };
 
 class ProjectLoadException : public std::runtime_error {
 public:
-    explicit ProjectLoadException(const QString &message) 
+    explicit ProjectLoadException(const QString &message)
         : std::runtime_error(message.toStdString()) {}
 };
 
@@ -94,17 +128,35 @@ public:
     explicit ProjectManager(QObject *parent = nullptr);
     ~ProjectManager();
 
+    // Sprint 3.1 - Enhanced save/load with comprehensive error handling
+    SaveResult saveProject();
+    ProjectLoadResult loadProject(const QString &projectPath);
+
     // Enhanced from Sprint 1.1
     QString createProject(const QString &name, const QString &basePath);
     bool isValidProject(const QString &projectPath);
-    ProjectInfo loadProject(const QString &projectPath);
+    ProjectInfo loadProjectLegacy(const QString &projectPath);  // Renamed for compatibility
     bool validateProjectMetadata(const QJsonObject &metadata);
+
+    // Sprint 3.1 - File validation and recovery
+    void validateAllLinkedFiles();
+    bool relinkScanFile(const QString &scanId, const QString &newFilePath);
+    bool removeMissingScanReference(const QString &scanId);
 
     // New for Sprint 1.2
     bool hasScans(const QString &projectPath);
     QList<ScanInfo> getProjectScans(const QString &projectPath);
     SQLiteManager* getSQLiteManager() const { return m_sqliteManager; }
     ScanImportManager* getScanImportManager() const { return m_scanImportManager; }
+
+    // Sprint 3.1 - Enhanced getters
+    QString currentProjectPath() const { return m_currentProjectPath; }
+    ProjectMetadata currentMetadata() const { return m_metadata; }
+    QString lastError() const { return m_lastError; }
+    QString lastDetailedError() const { return m_detailedError; }
+
+    // Model access
+    ProjectTreeModel* treeModel() const { return m_treeModel.get(); }
 
     // New for Sprint 1.3 - Cluster Management
     QString createCluster(const QString &clusterName, const QString &parentClusterId = QString());
@@ -139,24 +191,69 @@ signals:
     void scanDeleted(const QString &scanId);
     void clusterDeletedRecursive(const QString &clusterId);
 
+    // Sprint 3.1 - Enhanced signals for save/load and error handling
+    void projectSaved(SaveResult result);
+    void projectLoaded(ProjectLoadResult result);
+    void scanFileMissing(const QString &scanId, const QString &originalPath, const QString &scanName);
+    void scanFileRelinked(const QString &scanId, const QString &newPath);
+    void scanReferenceRemoved(const QString &scanId);
+    void errorOccurred(const QString &error, const QString &details = QString());
+
+private slots:
+    void onValidationTimerTimeout();
+
 private:
+    // Sprint 3.1 - Enhanced persistence operations
+    bool saveProjectMetadataTransactional();
+    bool loadProjectMetadataWithValidation();
+    SaveResult saveProjectDatabaseTransactional();
+    bool loadProjectDatabaseWithValidation();
+
+    // Sprint 3.1 - File validation and recovery
+    void validateLinkedScanFile(const QString &scanId, const QString &filePath, const QString &scanName);
+    bool isFileAccessible(const QString &filePath);
+
+    // Sprint 3.1 - Error handling and validation
+    bool validateProjectDirectory(const QString &projectPath);
+    bool validateJsonStructure(const QString &filePath);
+    bool validateDatabaseIntegrity(const QString &dbPath);
+    void setError(const QString &error, const QString &details = QString());
+
+    // Sprint 3.1 - Backup and recovery
+    bool createBackupFiles();
+    bool restoreFromBackup();
+
+    // Legacy methods (kept for compatibility)
     bool createProjectMetadata(const QString &projectPath, const QString &projectName);
     QJsonObject readProjectMetadata(const QString &projectPath);
     bool validateDirectoryPermissions(const QString &path, bool requireWrite = false);
-
-    // New for Sprint 1.2
     bool createProjectDatabase(const QString &projectPath);
     bool initializeDatabaseSchema();
     void updateProjectMetadata(const QString &projectPath);
 
+    // Sprint 3.1 - Path utilities
+    QString getMetadataFilePath() const;
+    QString getDatabaseFilePath() const;
+    QString getBackupMetadataPath() const;
+    QString getBackupDatabasePath() const;
+
     SQLiteManager *m_sqliteManager;
     ScanImportManager *m_scanImportManager;
+    std::unique_ptr<ProjectTreeModel> m_treeModel;
+    std::unique_ptr<QTimer> m_validationTimer;
+
     ProjectInfo m_currentProject;
+    QString m_currentProjectPath;
+    ProjectMetadata m_metadata;
+    QString m_lastError;
+    QString m_detailedError;
 
     static const QString METADATA_FILENAME;
     static const QString DATABASE_FILENAME;
     static const QString SCANS_SUBFOLDER;
     static const QString CURRENT_FORMAT_VERSION;
+    static const QString BACKUP_SUFFIX;
+    static constexpr int VALIDATION_INTERVAL_MS = 30000; // 30 seconds
 };
 
 #endif // PROJECTMANAGER_H

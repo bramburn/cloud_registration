@@ -126,6 +126,9 @@ set(SOURCES
     src/e57writer_lib.cpp
     # Sprint 2.3: Cluster Locking & Enhanced Context Menus
     src/confirmationdialog.cpp
+    # Sprint 3.1: Robust Data Persistence & Error Handling
+    src/errordialog.cpp
+    src/relinkfiledialog.cpp
 )
 
 # Header files
@@ -157,6 +160,9 @@ set(HEADERS
     src/e57writer_lib.h
     # Sprint 2.3: Cluster Locking & Enhanced Context Menus
     src/confirmationdialog.h
+    # Sprint 3.1: Robust Data Persistence & Error Handling
+    src/errordialog.h
+    src/relinkfiledialog.h
 )
 
 # Shader files
@@ -497,6 +503,31 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(Sprint12CompressedVectorTests PRIVATE src)
     add_test(NAME Sprint12CompressedVectorTests COMMAND Sprint12CompressedVectorTests)
+
+    # Sprint 3.1: Robust Data Persistence & Error Handling Tests
+    add_executable(Sprint31PersistenceTests
+        tests/test_sprint31_persistence.cpp
+        src/projectmanager.cpp
+        src/sqlitemanager.cpp
+        src/projecttreemodel.cpp
+        src/errordialog.cpp
+        src/relinkfiledialog.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/confirmationdialog.cpp
+    )
+
+    target_link_libraries(Sprint31PersistenceTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Sql
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint31PersistenceTests PRIVATE src)
+    add_test(NAME Sprint31PersistenceTests COMMAND Sprint31PersistenceTests)
 
     # Sprint 1.2 Integration Tests (without E57Format dependency)
     add_executable(Sprint12IntegrationTests

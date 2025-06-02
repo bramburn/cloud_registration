@@ -948,3 +948,167 @@ bool SQLiteManager::deleteClusterRecursive(const QString &clusterId)
         return false;
     }
 }
+
+// Sprint 3.1 - Transactional operations and integrity checks
+bool SQLiteManager::beginTransaction() {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+    return m_database.transaction();
+}
+
+bool SQLiteManager::commitTransaction() {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+    return m_database.commit();
+}
+
+bool SQLiteManager::rollbackTransaction() {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+    return m_database.rollback();
+}
+
+bool SQLiteManager::saveAllClusters(const QList<ClusterInfo> &clusters) {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    // Clear existing clusters and insert new ones
+    QSqlQuery deleteQuery(m_database);
+    if (!deleteQuery.exec("DELETE FROM clusters")) {
+        qWarning() << "Failed to clear clusters table:" << deleteQuery.lastError().text();
+        return false;
+    }
+
+    // Insert all clusters
+    for (const ClusterInfo &cluster : clusters) {
+        if (!insertCluster(cluster)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SQLiteManager::saveAllScans(const QList<ScanInfo> &scans) {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    // Clear existing scans and insert new ones
+    QSqlQuery deleteQuery(m_database);
+    if (!deleteQuery.exec("DELETE FROM scans")) {
+        qWarning() << "Failed to clear scans table:" << deleteQuery.lastError().text();
+        return false;
+    }
+
+    // Insert all scans
+    for (const ScanInfo &scan : scans) {
+        if (!insertScan(scan)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+QList<ClusterInfo> SQLiteManager::loadAllClusters() {
+    return getAllClusters();
+}
+
+QList<ScanInfo> SQLiteManager::loadAllScans() {
+    return getAllScans();
+}
+
+bool SQLiteManager::validateReferentialIntegrity() {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    try {
+        QSqlQuery query(m_database);
+
+        // Check for orphaned scans (scans with non-existent parent clusters)
+        query.prepare(R"(
+            SELECT COUNT(*) FROM scans s
+            LEFT JOIN clusters c ON s.parent_cluster_id = c.cluster_id
+            WHERE s.parent_cluster_id IS NOT NULL AND c.cluster_id IS NULL
+        )");
+
+        if (!query.exec()) {
+            qWarning() << "Failed to check orphaned scans:" << query.lastError().text();
+            return false;
+        }
+
+        if (query.next() && query.value(0).toInt() > 0) {
+            qWarning() << "Found orphaned scans with invalid parent cluster references";
+            return false;
+        }
+
+        // Check for circular cluster references (simplified check)
+        query.prepare(R"(
+            SELECT COUNT(*) FROM clusters c1
+            JOIN clusters c2 ON c1.cluster_id = c2.parent_cluster_id
+            WHERE c1.parent_cluster_id = c2.cluster_id
+        )");
+
+        if (!query.exec()) {
+            qWarning() << "Failed to check circular references:" << query.lastError().text();
+            return false;
+        }
+
+        if (query.next() && query.value(0).toInt() > 0) {
+            qWarning() << "Found circular references in cluster hierarchy";
+            return false;
+        }
+
+        return true;
+
+    } catch (const std::exception& ex) {
+        qWarning() << "Exception during integrity validation:" << ex.what();
+        return false;
+    }
+}
+
+bool SQLiteManager::updateScanFilePath(const QString &scanId, const QString &newPath) {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("UPDATE scans SET file_path_absolute_linked = :new_path WHERE scan_id = :scan_id");
+    query.bindValue(":new_path", newPath);
+    query.bindValue(":scan_id", scanId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to update scan file path:" << query.lastError().text();
+        return false;
+    }
+
+    return query.numRowsAffected() > 0;
+}
+
+bool SQLiteManager::createDatabaseBackup(const QString &backupPath) {
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    try {
+        QSqlQuery query(m_database);
+        QString backupSql = QString("VACUUM INTO '%1'").arg(backupPath);
+
+        if (!query.exec(backupSql)) {
+            qWarning() << "Failed to create database backup:" << query.lastError().text();
+            return false;
+        }
+
+        return true;
+
+    } catch (const std::exception& ex) {
+        qWarning() << "Exception creating backup:" << ex.what();
+        return false;
+    }
+}
