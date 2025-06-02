@@ -205,29 +205,74 @@ QStringList PointCloudLoadManager::getClusterScanIds(const QString &clusterId) c
 bool PointCloudLoadManager::viewPointCloud(const QString &itemId, const QString &itemType)
 {
     if (itemType == "scan") {
-        // For scans, ensure it's loaded and show placeholder message
-        bool success = loadScan(itemId);
-        if (success) {
-            QMessageBox::information(nullptr, "View Point Cloud", 
-                QString("Scan '%1' is now loaded and ready for viewing.\n\n"
-                        "Note: Actual 3D rendering will be implemented in Phase 3.").arg(itemId));
-        }
-        return success;
+        return viewScan(itemId);
     } else if (itemType == "cluster") {
-        // For clusters, load all scans and show placeholder message
-        bool success = loadCluster(itemId);
-        if (success) {
-            QStringList scanIds = getClusterScanIds(itemId);
-            QMessageBox::information(nullptr, "View Point Cloud", 
-                QString("All scans in cluster '%1' (%2 scans) are now loaded and ready for viewing.\n\n"
-                        "Note: Actual 3D rendering will be implemented in Phase 3.")
-                        .arg(itemId).arg(scanIds.size()));
-        }
-        return success;
+        return viewCluster(itemId);
     }
-    
+
     m_lastError = "Invalid item type for viewing: " + itemType;
+    emit pointCloudViewFailed(m_lastError);
     return false;
+}
+
+bool PointCloudLoadManager::viewScan(const QString &scanId)
+{
+    // Ensure scan is loaded
+    if (!loadScan(scanId)) {
+        emit pointCloudViewFailed(m_lastError);
+        return false;
+    }
+
+    // Get point cloud data for rendering
+    std::vector<float> points = getScanPointCloudData(scanId);
+    if (points.empty()) {
+        m_lastError = "No point cloud data available for scan: " + scanId;
+        emit pointCloudViewFailed(m_lastError);
+        return false;
+    }
+
+    QString sourceInfo = QString("Scan: %1 (%2 points)").arg(scanId).arg(points.size() / 3);
+    emit pointCloudDataReady(points, sourceInfo);
+    return true;
+}
+
+bool PointCloudLoadManager::viewCluster(const QString &clusterId)
+{
+    // Get all scan IDs in cluster
+    QStringList scanIds = getClusterScanIds(clusterId);
+    if (scanIds.isEmpty()) {
+        m_lastError = "No scans found in cluster: " + clusterId;
+        emit pointCloudViewFailed(m_lastError);
+        return false;
+    }
+
+    // Load all scans in cluster
+    bool allLoaded = true;
+    for (const QString &scanId : scanIds) {
+        if (!loadScan(scanId)) {
+            allLoaded = false;
+            qDebug() << "Failed to load scan in cluster:" << scanId;
+        }
+    }
+
+    if (!allLoaded) {
+        m_lastError = "Failed to load some scans in cluster: " + clusterId;
+        emit pointCloudViewFailed(m_lastError);
+        return false;
+    }
+
+    // Get aggregated point cloud data
+    std::vector<float> points = getAggregatedPointCloudData(scanIds);
+    if (points.empty()) {
+        m_lastError = "No point cloud data available for cluster: " + clusterId;
+        emit pointCloudViewFailed(m_lastError);
+        return false;
+    }
+
+    QString sourceInfo = QString("Cluster: %1 (%2 scans, %3 points)")
+                        .arg(clusterId).arg(scanIds.size()).arg(points.size() / 3);
+    emit pointCloudDataReady(points, sourceInfo);
+    return true;
 }
 
 size_t PointCloudLoadManager::getTotalMemoryUsage() const
@@ -540,4 +585,58 @@ void PointCloudLoadManager::logMemoryUsage() const
     qDebug() << "Memory usage:" << (m_currentMemoryUsage / (1024 * 1024)) << "MB /"
              << m_memoryLimitMB << "MB ("
              << (m_currentMemoryUsage * 100 / (m_memoryLimitMB * 1024 * 1024)) << "%)";
+}
+
+std::vector<float> PointCloudLoadManager::getAggregatedPointCloudData(const QStringList &scanIds)
+{
+    std::vector<float> aggregatedPoints;
+
+    QMutexLocker locker(&m_stateMutex);
+
+    // Calculate total size for efficient memory allocation
+    size_t totalPoints = 0;
+    for (const QString &scanId : scanIds) {
+        auto it = m_scanStates.find(scanId);
+        if (it != m_scanStates.end() && it.value()->data && it.value()->data->isValid()) {
+            totalPoints += it.value()->data->pointCount;
+        }
+    }
+
+    if (totalPoints == 0) {
+        return aggregatedPoints;
+    }
+
+    // Reserve space for all points (3 floats per point)
+    aggregatedPoints.reserve(totalPoints * 3);
+
+    // Aggregate point data from all loaded scans
+    for (const QString &scanId : scanIds) {
+        auto it = m_scanStates.find(scanId);
+        if (it != m_scanStates.end() && it.value()->data && it.value()->data->isValid()) {
+            const auto &points = it.value()->data->points;
+            aggregatedPoints.insert(aggregatedPoints.end(), points.begin(), points.end());
+
+            // Update last accessed time
+            it.value()->lastAccessed = QDateTime::currentDateTime();
+        }
+    }
+
+    qDebug() << "Aggregated point cloud data from" << scanIds.size() << "scans:"
+             << (aggregatedPoints.size() / 3) << "total points";
+
+    return aggregatedPoints;
+}
+
+std::vector<float> PointCloudLoadManager::getScanPointCloudData(const QString &scanId)
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it != m_scanStates.end() && it.value()->data && it.value()->data->isValid()) {
+        // Update last accessed time
+        it.value()->lastAccessed = QDateTime::currentDateTime();
+        return it.value()->data->points;
+    }
+
+    return std::vector<float>();
 }

@@ -12,6 +12,7 @@ class ProjectHubWidget;
 class SidebarWidget;
 class PointCloudViewerWidget;
 class ProjectManager;
+class PointCloudLoadManager;
 class Project;
 class E57ParserLib;
 class LasParser;
@@ -58,6 +59,10 @@ private slots:
     void onRightViewClicked();
     void onBottomViewClicked();
 
+    // Sprint 3.2: Point cloud viewing slots
+    void onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
+    void onPointCloudViewFailed(const QString &error);
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -83,6 +88,10 @@ private:
                           double maxX, double maxY, double maxZ);
     void setStatusViewChanged(const QString &viewName);
 
+    // Sprint 3.2: Test helper methods
+    PointCloudViewerWidget* getPointCloudViewer() const { return m_viewer; }
+    PointCloudLoadManager* getPointCloudLoadManager() const { return m_loadManager; }
+
     // Main UI Components
     QStackedWidget *m_centralStack;
     ProjectHubWidget *m_projectHub;
@@ -97,6 +106,7 @@ private:
 
     // Project management
     ProjectManager *m_projectManager;
+    PointCloudLoadManager *m_loadManager;
     Project *m_currentProject;
 
     // Menu actions

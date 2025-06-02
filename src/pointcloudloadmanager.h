@@ -94,8 +94,14 @@ public:
     bool unloadCluster(const QString &clusterId);
     QStringList getClusterScanIds(const QString &clusterId) const;
     
-    // View operations (placeholder for Sprint 2.1)
+    // Sprint 3.2: Enhanced view operations for point cloud rendering
     bool viewPointCloud(const QString &itemId, const QString &itemType);
+    bool viewScan(const QString &scanId);
+    bool viewCluster(const QString &clusterId);
+
+    // Get aggregated point cloud data for rendering
+    std::vector<float> getAggregatedPointCloudData(const QStringList &scanIds);
+    std::vector<float> getScanPointCloudData(const QString &scanId);
     
     // Memory management
     size_t getTotalMemoryUsage() const;
@@ -124,6 +130,10 @@ signals:
     void clusterUnloaded(const QString &clusterId);
     void memoryLimitExceeded(size_t currentUsage, size_t limit);
     void loadingProgress(const QString &scanId, int percentage);
+
+    // Sprint 3.2: Point cloud viewing signals
+    void pointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
+    void pointCloudViewFailed(const QString &error);
 
 private slots:
     void onMemoryCheckTimer();

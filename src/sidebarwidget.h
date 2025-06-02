@@ -27,6 +27,9 @@ public:
     void refreshFromDatabase();
     void addScan(const ScanInfo &scan);
 
+    // Sprint 3.2: Model access for load manager
+    ProjectTreeModel* getModel() const { return m_model; }
+
     // New methods for Sprint 1.3
     void addCluster(const ClusterInfo &cluster);
     void removeCluster(const QString &clusterId);
