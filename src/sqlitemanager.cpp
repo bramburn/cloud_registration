@@ -48,6 +48,33 @@ CREATE TABLE IF NOT EXISTS clusters (
 )
 )";
 
+// Sprint 3.4: Registration data table schemas
+const QString SQLiteManager::REGISTRATION_STATUS_TABLE_SCHEMA = R"(
+CREATE TABLE IF NOT EXISTS registration_status (
+    item_id TEXT PRIMARY KEY,
+    item_type TEXT NOT NULL CHECK (item_type IN ('SCAN', 'CLUSTER')),
+    status TEXT NOT NULL CHECK (status IN (
+        'UNREGISTERED', 'PROCESSING', 'REGISTERED_MANUAL',
+        'REGISTERED_AUTO', 'FAILED_REGISTRATION', 'NEEDS_REVIEW'
+    )),
+    error_metric_value REAL,
+    error_metric_type TEXT,
+    last_registration_date TEXT,
+    FOREIGN KEY (item_id) REFERENCES scans(scan_id) ON DELETE CASCADE
+)
+)";
+
+const QString SQLiteManager::TRANSFORMATION_MATRICES_TABLE_SCHEMA = R"(
+CREATE TABLE IF NOT EXISTS transformation_matrices (
+    item_id TEXT PRIMARY KEY,
+    item_type TEXT NOT NULL CHECK (item_type IN ('SCAN', 'CLUSTER')),
+    matrix_data BLOB NOT NULL,
+    relative_to_item_id TEXT,
+    last_transform_date TEXT,
+    FOREIGN KEY (item_id) REFERENCES scans(scan_id) ON DELETE CASCADE
+)
+)";
+
 SQLiteManager::SQLiteManager(QObject *parent)
     : QObject(parent)
     , m_connectionName(generateConnectionName())
@@ -139,6 +166,13 @@ bool SQLiteManager::initializeSchema()
         }
     }
 
+    // Sprint 3.4: Check for version 4 migration (registration tables)
+    if (currentVersion < 4) {
+        if (!migrateToVersion4()) {
+            return false;
+        }
+    }
+
     // Create clusters table first due to foreign key dependency
     if (!createClustersTable()) {
         return false;
@@ -149,7 +183,12 @@ bool SQLiteManager::initializeSchema()
     }
 
     // Add parent_cluster_id column to existing scans table if it doesn't exist
-    return addParentClusterIdToScans();
+    if (!addParentClusterIdToScans()) {
+        return false;
+    }
+
+    // Sprint 3.4: Create registration tables
+    return createRegistrationTables();
 }
 
 bool SQLiteManager::createScansTable()
@@ -1109,6 +1148,65 @@ bool SQLiteManager::createDatabaseBackup(const QString &backupPath) {
 
     } catch (const std::exception& ex) {
         qWarning() << "Exception creating backup:" << ex.what();
+        return false;
+    }
+}
+
+// Sprint 3.4: Registration data table implementation
+bool SQLiteManager::createRegistrationTables()
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    // Create registration status table
+    QSqlQuery query(m_database);
+    if (!query.exec(REGISTRATION_STATUS_TABLE_SCHEMA)) {
+        qCritical() << "Failed to create registration_status table:" << query.lastError().text();
+        return false;
+    }
+    qDebug() << "Registration status table created successfully";
+
+    // Create transformation matrices table
+    if (!query.exec(TRANSFORMATION_MATRICES_TABLE_SCHEMA)) {
+        qCritical() << "Failed to create transformation_matrices table:" << query.lastError().text();
+        return false;
+    }
+    qDebug() << "Transformation matrices table created successfully";
+
+    return true;
+}
+
+bool SQLiteManager::migrateToVersion4()
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    qInfo() << "Migrating database schema to version 4 (registration tables)...";
+
+    // Start transaction
+    m_database.transaction();
+
+    try {
+        // Create registration tables
+        if (!createRegistrationTables()) {
+            throw std::runtime_error("Failed to create registration tables");
+        }
+
+        // Update schema version
+        if (!updateSchemaVersion(4)) {
+            throw std::runtime_error("Failed to update schema version to 4");
+        }
+
+        // Commit transaction
+        m_database.commit();
+        qInfo() << "Successfully migrated to schema version 4";
+        return true;
+
+    } catch (const std::exception& ex) {
+        m_database.rollback();
+        qCritical() << "Failed to migrate to version 4:" << ex.what();
         return false;
     }
 }

@@ -64,6 +64,10 @@ public slots:
     void onLoadingFinished(bool success, const QString &message,
                           const std::vector<float> &points);
 
+    // Sprint 3.4: LOD control slots
+    void toggleLOD(bool enabled);
+    void setLODSubsampleRate(float rate);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -174,6 +178,10 @@ private:
     // Fonts for overlay text
     QFont m_overlayFont;
     QFont m_detailFont;
+
+    // Sprint 3.4: LOD state
+    bool m_lodEnabled;
+    float m_lodSubsampleRate;
 };
 
 #endif // POINTCLOUDVIEWERWIDGET_H

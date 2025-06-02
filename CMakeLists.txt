@@ -86,7 +86,7 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
 endif()
 
 # Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql)
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
 
 # Find E57Format library for enhanced E57 parsing (Sprint 1.2)
 find_package(E57Format CONFIG REQUIRED)
@@ -201,6 +201,7 @@ target_link_libraries(CloudRegistration
     Qt6::OpenGLWidgets
     Qt6::Xml
     Qt6::Sql
+    Qt6::Concurrent
     E57Format
 )
 
@@ -431,6 +432,30 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(Sprint2SimpleTest PRIVATE src)
 
+    # Sprint 3.4 Demo Program
+    add_executable(Sprint34Demo
+        tests/demos/test_sprint3_4_demo.cpp
+        src/pointcloudloadmanager.cpp
+        src/pointcloudviewerwidget.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/projecttreemodel.cpp
+    )
+
+    target_link_libraries(Sprint34Demo
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
+        Qt6::OpenGLWidgets
+        Qt6::Sql
+        Qt6::Concurrent
+    )
+
+    target_include_directories(Sprint34Demo PRIVATE src)
+
     # libE57Format Linkage Test (Sprint 1)
     add_executable(LibE57LinkageTest
         tests/test_libe57_linkage.cpp
@@ -575,6 +600,30 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(Sprint12CompressedVectorTests PRIVATE src)
     add_test(NAME Sprint12CompressedVectorTests COMMAND Sprint12CompressedVectorTests)
+
+    # Sprint 3.4: Advanced Memory Management & Registration Data Storage Tests
+    add_executable(Sprint34Tests
+        tests/test_sprint3_4.cpp
+        src/pointcloudloadmanager.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/projecttreemodel.cpp
+    )
+
+    target_link_libraries(Sprint34Tests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Sql
+        Qt6::Concurrent
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint34Tests PRIVATE src)
+    add_test(NAME Sprint34Tests COMMAND Sprint34Tests)
 
     # Sprint 3.1: Robust Data Persistence & Error Handling Tests
     add_executable(Sprint31PersistenceTests

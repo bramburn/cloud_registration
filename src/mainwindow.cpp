@@ -298,6 +298,9 @@ void MainWindow::setupStatusBar()
     statusBar()->addPermanentWidget(m_cancelButton);
     statusBar()->addPermanentWidget(m_permanentStatusLabel);
 
+    // Sprint 3.4: Setup memory display
+    setupMemoryDisplay();
+
     // Setup status bar style
     statusBar()->setStyleSheet(
         "QStatusBar { border-top: 1px solid #cccccc; }"
@@ -1129,5 +1132,56 @@ void MainWindow::onCancelCurrentOperation()
 {
     if (!m_currentOperationId.isEmpty()) {
         ProgressManager::instance().cancelOperation(m_currentOperationId);
+    }
+}
+
+// Sprint 3.4: Memory statistics display implementation
+void MainWindow::setupMemoryDisplay()
+{
+    m_memoryLabel = new QLabel(this);
+    m_memoryLabel->setText("Memory: 0 MB");
+    m_memoryLabel->setMinimumWidth(100);
+    m_memoryLabel->setAlignment(Qt::AlignCenter);
+    m_memoryLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    // Add to status bar before the permanent status label
+    statusBar()->addPermanentWidget(m_memoryLabel);
+
+    // Connect to load manager memory usage signal
+    if (m_loadManager) {
+        connect(m_loadManager, &PointCloudLoadManager::memoryUsageChanged,
+                this, &MainWindow::onMemoryUsageChanged);
+    }
+
+    qDebug() << "Memory display setup completed";
+}
+
+void MainWindow::onMemoryUsageChanged(size_t totalBytes)
+{
+    if (m_memoryLabel) {
+        double megabytes = totalBytes / (1024.0 * 1024.0);
+        QString text;
+
+        if (megabytes >= 1024.0) {
+            // Display in GB if >= 1GB
+            double gigabytes = megabytes / 1024.0;
+            text = QString("Memory: %1 GB").arg(gigabytes, 0, 'f', 1);
+        } else {
+            // Display in MB
+            text = QString("Memory: %1 MB").arg(megabytes, 0, 'f', 1);
+        }
+
+        m_memoryLabel->setText(text);
+
+        // Change color based on usage level (assuming 2GB default limit)
+        if (megabytes > 1536) { // > 1.5GB (75% of 2GB)
+            m_memoryLabel->setStyleSheet("QLabel { color: #d32f2f; margin: 0 5px; font-weight: bold; }");
+        } else if (megabytes > 1024) { // > 1GB (50% of 2GB)
+            m_memoryLabel->setStyleSheet("QLabel { color: #f57c00; margin: 0 5px; }");
+        } else {
+            m_memoryLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+        }
+
+        qDebug() << "Memory usage updated:" << text;
     }
 }

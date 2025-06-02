@@ -39,6 +39,8 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_currentState(ViewerState::Idle)  // Sprint 2.3: Initialize state
     , m_loadingProgress(0)
     , m_loadingAngle(0)
+    , m_lodEnabled(false)  // Sprint 3.4: Initialize LOD state
+    , m_lodSubsampleRate(0.5f)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -1139,4 +1141,25 @@ void PointCloudViewerWidget::simulateZoomCamera(float factor)
     m_cameraDistance = std::max(0.1f, std::min(m_boundingBoxSize * 10.0f, m_cameraDistance));
 
     updateCamera();
+}
+
+// Sprint 3.4: LOD control slot implementations
+void PointCloudViewerWidget::toggleLOD(bool enabled)
+{
+    m_lodEnabled = enabled;
+    qDebug() << "LOD toggled:" << (enabled ? "enabled" : "disabled");
+
+    // Trigger repaint to show LOD changes
+    update();
+}
+
+void PointCloudViewerWidget::setLODSubsampleRate(float rate)
+{
+    m_lodSubsampleRate = qBound(0.1f, rate, 1.0f);
+    qDebug() << "LOD subsample rate set to:" << m_lodSubsampleRate;
+
+    // If LOD is currently enabled, trigger repaint
+    if (m_lodEnabled) {
+        update();
+    }
 }
