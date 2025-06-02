@@ -339,6 +339,9 @@ void ProjectTreeModel::initializeIcons()
     m_partialIcon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxWarning);
     m_loadingIcon = QApplication::style()->standardIcon(QStyle::SP_BrowserReload);
     m_errorIcon = QApplication::style()->standardIcon(QStyle::SP_MessageBoxCritical);
+
+    // Sprint 3.1 - Missing file icon
+    m_missingFileIcon = QApplication::style()->standardIcon(QStyle::SP_DialogCancelButton);
 }
 
 void ProjectTreeModel::setScanLoadedState(const QString &scanId, LoadedState state)
@@ -534,4 +537,122 @@ QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
     }
 
     return QStandardItemModel::data(index, role);
+}
+
+// Sprint 3.1 - Missing file support and data export methods
+void ProjectTreeModel::markScanAsMissing(const QString &scanId) {
+    m_missingScanIds.insert(scanId);
+
+    QStandardItem *scanItem = findScanItem(scanId);
+    if (scanItem) {
+        // Update icon to show missing file
+        scanItem->setIcon(m_missingFileIcon);
+
+        // Update tooltip
+        QString tooltip = scanItem->toolTip();
+        if (!tooltip.contains("FILE MISSING")) {
+            tooltip += "\n⚠ FILE MISSING";
+            scanItem->setToolTip(tooltip);
+        }
+
+        // Set custom data role
+        scanItem->setData(true, IsMissingRole);
+    }
+}
+
+void ProjectTreeModel::clearScanMissingFlag(const QString &scanId) {
+    m_missingScanIds.remove(scanId);
+
+    QStandardItem *scanItem = findScanItem(scanId);
+    if (scanItem) {
+        // Restore original icon based on file type
+        ScanInfo scan = m_sqliteManager->getScanById(scanId);
+        QString extension = QFileInfo(scan.filePathRelative).suffix().toLower();
+        scanItem->setIcon(QApplication::style()->standardIcon(QStyle::SP_FileIcon));
+
+        // Update tooltip to remove missing file warning
+        QString tooltip = scanItem->toolTip();
+        tooltip.remove("\n⚠ FILE MISSING");
+        scanItem->setToolTip(tooltip);
+
+        // Clear custom data role
+        scanItem->setData(false, IsMissingRole);
+    }
+}
+
+bool ProjectTreeModel::isScanMissing(const QString &scanId) const {
+    return m_missingScanIds.contains(scanId);
+}
+
+void ProjectTreeModel::updateScanFilePath(const QString &scanId, const QString &newPath) {
+    QStandardItem *scanItem = findScanItem(scanId);
+    if (scanItem) {
+        // Update tooltip with new path
+        ScanInfo scan = m_sqliteManager->getScanById(scanId);
+        QString tooltip = QString("Scan: %1\nFile: %2\nImported: %3\nMethod: %4")
+                         .arg(scan.scanName)
+                         .arg(newPath)
+                         .arg(scan.dateAdded)
+                         .arg(scan.importType);
+        scanItem->setToolTip(tooltip);
+
+        // Set custom data role
+        scanItem->setData(newPath, FilePathRole);
+    }
+}
+
+void ProjectTreeModel::removeScan(const QString &scanId) {
+    QStandardItem *scanItem = m_scanItems.value(scanId);
+    if (scanItem) {
+        QStandardItem *parentItem = scanItem->parent();
+        if (parentItem) {
+            parentItem->removeRow(scanItem->row());
+        }
+        m_scanItems.remove(scanId);
+        m_scanLoadedStates.remove(scanId);
+        m_missingScanIds.remove(scanId);
+        qDebug() << "Removed scan from tree model:" << scanId;
+    }
+}
+
+QList<ClusterInfo> ProjectTreeModel::getAllClusters() const {
+    if (!m_sqliteManager) {
+        return QList<ClusterInfo>();
+    }
+    return m_sqliteManager->getAllClusters();
+}
+
+QList<ScanInfo> ProjectTreeModel::getAllScans() const {
+    if (!m_sqliteManager) {
+        return QList<ScanInfo>();
+    }
+    return m_sqliteManager->getAllScans();
+}
+
+void ProjectTreeModel::populateFromData(const QList<ClusterInfo> &clusters, const QList<ScanInfo> &scans) {
+    // Clear existing structure except root
+    if (m_rootItem) {
+        m_rootItem->removeRows(0, m_rootItem->rowCount());
+    }
+
+    // Clear caches
+    m_clusterItems.clear();
+    m_scanItems.clear();
+    m_scansFolder = nullptr;
+    m_missingScanIds.clear();
+
+    // Create cluster items
+    for (const ClusterInfo &cluster : clusters) {
+        QStandardItem *clusterItem = createClusterItem(cluster);
+        m_clusterItems[cluster.clusterId] = clusterItem;
+    }
+
+    // Create scan items
+    for (const ScanInfo &scan : scans) {
+        QStandardItem *scanItem = createScanItem(scan);
+        m_scanItems[scan.scanId] = scanItem;
+    }
+
+    // Build hierarchical structure
+    buildHierarchicalStructure();
 }
