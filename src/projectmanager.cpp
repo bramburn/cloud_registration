@@ -509,3 +509,120 @@ bool ProjectManager::moveScansToCluster(const QStringList &scanIds, const QStrin
 
     return allSuccess;
 }
+
+// Sprint 2.3 - Cluster locking and enhanced deletion methods
+bool ProjectManager::setClusterLockState(const QString &clusterId, bool isLocked)
+{
+    if (clusterId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    if (m_sqliteManager->setClusterLockState(clusterId, isLocked)) {
+        emit clusterLockStateChanged(clusterId, isLocked);
+        qDebug() << "Cluster lock state changed:" << clusterId << "locked:" << isLocked;
+        return true;
+    }
+
+    qWarning() << "Failed to set cluster lock state:" << clusterId;
+    return false;
+}
+
+bool ProjectManager::getClusterLockState(const QString &clusterId)
+{
+    if (clusterId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    return m_sqliteManager->getClusterLockState(clusterId);
+}
+
+bool ProjectManager::deleteClusterRecursive(const QString &clusterId, bool deletePhysicalFiles)
+{
+    if (clusterId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    // Get scan paths before deletion if we need to delete physical files
+    QStringList scanPaths;
+    if (deletePhysicalFiles) {
+        scanPaths = m_sqliteManager->getClusterScanPaths(clusterId, m_currentProject.projectPath);
+    }
+
+    // Delete from database
+    if (m_sqliteManager->deleteClusterRecursive(clusterId)) {
+        // Delete physical files if requested
+        if (deletePhysicalFiles) {
+            for (const QString &scanPath : scanPaths) {
+                if (QFile::exists(scanPath)) {
+                    if (QFile::remove(scanPath)) {
+                        qDebug() << "Deleted physical scan file:" << scanPath;
+                    } else {
+                        qWarning() << "Failed to delete physical scan file:" << scanPath;
+                    }
+                }
+            }
+        }
+
+        emit clusterDeletedRecursive(clusterId);
+        qDebug() << "Cluster deleted recursively:" << clusterId;
+        return true;
+    }
+
+    qWarning() << "Failed to delete cluster recursively:" << clusterId;
+    return false;
+}
+
+bool ProjectManager::deleteScan(const QString &scanId, bool deletePhysicalFile)
+{
+    if (scanId.isEmpty()) {
+        return false;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return false;
+    }
+
+    // Get scan info before deletion if we need to delete physical file
+    QString physicalPath;
+    if (deletePhysicalFile) {
+        ScanInfo scan = m_sqliteManager->getScanById(scanId);
+        if (scan.isValid() && (scan.importType == "COPIED" || scan.importType == "MOVED")) {
+            physicalPath = scan.getFilePath(m_currentProject.projectPath);
+        }
+    }
+
+    // Delete from database
+    if (m_sqliteManager->deleteScan(scanId)) {
+        // Delete physical file if requested and applicable
+        if (deletePhysicalFile && !physicalPath.isEmpty() && QFile::exists(physicalPath)) {
+            if (QFile::remove(physicalPath)) {
+                qDebug() << "Deleted physical scan file:" << physicalPath;
+            } else {
+                qWarning() << "Failed to delete physical scan file:" << physicalPath;
+            }
+        }
+
+        emit scanDeleted(scanId);
+        qDebug() << "Scan deleted:" << scanId;
+        return true;
+    }
+
+    qWarning() << "Failed to delete scan:" << scanId;
+    return false;
+}

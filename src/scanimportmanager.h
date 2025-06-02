@@ -12,7 +12,8 @@ struct ScanInfo;
 
 enum class ImportMode {
     Copy,
-    Move
+    Move,
+    Link  // New for Sprint 2.2 - Link to Source
 };
 
 struct ImportResult {
@@ -53,9 +54,10 @@ private:
     bool performFileOperation(const QString &sourcePath, 
                             const QString &targetPath, 
                             ImportMode mode);
-    ScanInfo createScanInfo(const QString &filePath, 
+    ScanInfo createScanInfo(const QString &sourcePath,
+                          const QString &targetPath,
                           const QString &projectPath,
-                          const QString &projectId, 
+                          const QString &projectId,
                           ImportMode mode);
     QString getRelativePath(const QString &filePath, const QString &projectPath);
     

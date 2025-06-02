@@ -124,6 +124,8 @@ set(SOURCES
     src/pointcloudloadmanager.cpp
     # Sprint W1: E57 Writing - Basic E57 Structure Writing
     src/e57writer_lib.cpp
+    # Sprint 2.3: Cluster Locking & Enhanced Context Menus
+    src/confirmationdialog.cpp
 )
 
 # Header files
@@ -153,6 +155,8 @@ set(HEADERS
     src/pointcloudloadmanager.h
     # Sprint W1: E57 Writing - Basic E57 Structure Writing
     src/e57writer_lib.h
+    # Sprint 2.3: Cluster Locking & Enhanced Context Menus
+    src/confirmationdialog.h
 )
 
 # Shader files
@@ -435,6 +439,28 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(VoxelGridFilterTests PRIVATE src)
     add_test(NAME VoxelGridFilterTests COMMAND VoxelGridFilterTests)
+
+    # Sprint 2.3: Cluster Locking Tests
+    add_executable(Sprint23ClusterLockingTests
+        tests/test_sprint2_3_cluster_locking.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/confirmationdialog.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+    )
+
+    target_link_libraries(Sprint23ClusterLockingTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Sql
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint23ClusterLockingTests PRIVATE src)
+    add_test(NAME Sprint23ClusterLockingTests COMMAND Sprint23ClusterLockingTests)
 
     # Sprint 1 Functionality Tests
     add_executable(Sprint1FunctionalityTests

@@ -14,12 +14,25 @@ CREATE TABLE IF NOT EXISTS scans (
     scan_id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
     scan_name TEXT NOT NULL,
-    file_path_relative TEXT NOT NULL,
-    import_type TEXT NOT NULL CHECK (import_type IN ('COPIED', 'MOVED')),
+    file_path_project_relative TEXT,
+    file_path_absolute_linked TEXT,
+    import_type TEXT NOT NULL CHECK (import_type IN ('COPIED', 'MOVED', 'LINKED')),
+    original_source_path TEXT,
+    point_count_estimate INTEGER DEFAULT 0,
+    bounding_box_min_x REAL,
+    bounding_box_min_y REAL,
+    bounding_box_min_z REAL,
+    bounding_box_max_x REAL,
+    bounding_box_max_y REAL,
+    bounding_box_max_z REAL,
     date_added TEXT NOT NULL,
+    scan_file_last_modified TEXT,
     parent_cluster_id TEXT,
-    UNIQUE(file_path_relative),
-    FOREIGN KEY (parent_cluster_id) REFERENCES clusters(cluster_id) ON DELETE SET NULL
+    FOREIGN KEY (parent_cluster_id) REFERENCES clusters(cluster_id) ON DELETE SET NULL,
+    CHECK (
+        (import_type = 'LINKED' AND file_path_absolute_linked IS NOT NULL AND file_path_project_relative IS NULL) OR
+        (import_type IN ('COPIED', 'MOVED') AND file_path_project_relative IS NOT NULL AND file_path_absolute_linked IS NULL)
+    )
 )
 )";
 
@@ -30,6 +43,7 @@ CREATE TABLE IF NOT EXISTS clusters (
     cluster_name TEXT NOT NULL,
     parent_cluster_id TEXT,
     creation_date TEXT NOT NULL,
+    is_locked BOOLEAN DEFAULT 0 NOT NULL,
     FOREIGN KEY (parent_cluster_id) REFERENCES clusters(cluster_id) ON DELETE CASCADE
 )
 )";
@@ -117,6 +131,14 @@ bool SQLiteManager::initializeSchema()
         return false;
     }
 
+    // Check current schema version and migrate if needed
+    int currentVersion = getCurrentSchemaVersion();
+    if (currentVersion < 3) {
+        if (!migrateToVersion3()) {
+            return false;
+        }
+    }
+
     // Create clusters table first due to foreign key dependency
     if (!createClustersTable()) {
         return false;
@@ -188,31 +210,57 @@ bool SQLiteManager::insertScan(const ScanInfo &scan)
         qWarning() << "Database not open";
         return false;
     }
-    
+
     if (!scan.isValid()) {
         qWarning() << "Invalid scan info provided";
         return false;
     }
-    
+
     QSqlQuery query(m_database);
     query.prepare(R"(
-        INSERT INTO scans (scan_id, project_id, scan_name, file_path_relative, import_type, date_added, parent_cluster_id)
-        VALUES (:scan_id, :project_id, :scan_name, :file_path_relative, :import_type, :date_added, :parent_cluster_id)
+        INSERT INTO scans (
+            scan_id, project_id, scan_name,
+            file_path_project_relative, file_path_absolute_linked,
+            import_type, original_source_path,
+            point_count_estimate,
+            bounding_box_min_x, bounding_box_min_y, bounding_box_min_z,
+            bounding_box_max_x, bounding_box_max_y, bounding_box_max_z,
+            date_added, scan_file_last_modified, parent_cluster_id
+        )
+        VALUES (
+            :scan_id, :project_id, :scan_name,
+            :file_path_project_relative, :file_path_absolute_linked,
+            :import_type, :original_source_path,
+            :point_count_estimate,
+            :bounding_box_min_x, :bounding_box_min_y, :bounding_box_min_z,
+            :bounding_box_max_x, :bounding_box_max_y, :bounding_box_max_z,
+            :date_added, :scan_file_last_modified, :parent_cluster_id
+        )
     )");
 
     query.bindValue(":scan_id", scan.scanId);
     query.bindValue(":project_id", scan.projectId);
     query.bindValue(":scan_name", scan.scanName);
-    query.bindValue(":file_path_relative", scan.filePathRelative);
+    query.bindValue(":file_path_project_relative", scan.filePathRelative.isEmpty() ? QVariant() : scan.filePathRelative);
+    query.bindValue(":file_path_absolute_linked", scan.filePathAbsoluteLinked.isEmpty() ? QVariant() : scan.filePathAbsoluteLinked);
     query.bindValue(":import_type", scan.importType);
+    query.bindValue(":original_source_path", scan.originalSourcePath.isEmpty() ? QVariant() : scan.originalSourcePath);
+    query.bindValue(":point_count_estimate", scan.pointCountEstimate);
+    query.bindValue(":bounding_box_min_x", scan.boundingBoxMinX);
+    query.bindValue(":bounding_box_min_y", scan.boundingBoxMinY);
+    query.bindValue(":bounding_box_min_z", scan.boundingBoxMinZ);
+    query.bindValue(":bounding_box_max_x", scan.boundingBoxMaxX);
+    query.bindValue(":bounding_box_max_y", scan.boundingBoxMaxY);
+    query.bindValue(":bounding_box_max_z", scan.boundingBoxMaxZ);
     query.bindValue(":date_added", scan.dateAdded);
+    query.bindValue(":scan_file_last_modified", scan.scanFileLastModified.isEmpty() ? QVariant() : scan.scanFileLastModified);
     query.bindValue(":parent_cluster_id", scan.parentClusterId.isEmpty() ? QVariant() : scan.parentClusterId);
-    
+
     if (!query.exec()) {
         qWarning() << "Failed to insert scan:" << query.lastError().text();
         return false;
     }
-    
+
     qDebug() << "Scan inserted successfully:" << scan.scanName;
     return true;
 }
@@ -246,51 +294,71 @@ bool SQLiteManager::insertScans(const QList<ScanInfo> &scans)
 QList<ScanInfo> SQLiteManager::getAllScans()
 {
     QList<ScanInfo> scans;
-    
+
     if (!m_database.isOpen()) {
         return scans;
     }
-    
+
     QSqlQuery query("SELECT * FROM scans ORDER BY date_added", m_database);
-    
+
     while (query.next()) {
         ScanInfo scan;
         scan.scanId = query.value("scan_id").toString();
         scan.projectId = query.value("project_id").toString();
         scan.scanName = query.value("scan_name").toString();
-        scan.filePathRelative = query.value("file_path_relative").toString();
+        scan.filePathRelative = query.value("file_path_project_relative").toString();
+        scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
         scan.importType = query.value("import_type").toString();
+        scan.originalSourcePath = query.value("original_source_path").toString();
+        scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+        scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+        scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+        scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+        scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+        scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+        scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
         scan.dateAdded = query.value("date_added").toString();
+        scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
         scan.parentClusterId = query.value("parent_cluster_id").toString();
 
         scans.append(scan);
     }
-    
+
     return scans;
 }
 
 ScanInfo SQLiteManager::getScanById(const QString &scanId)
 {
     ScanInfo scan;
-    
+
     if (!m_database.isOpen()) {
         return scan;
     }
-    
+
     QSqlQuery query(m_database);
     query.prepare("SELECT * FROM scans WHERE scan_id = :scan_id");
     query.bindValue(":scan_id", scanId);
-    
+
     if (query.exec() && query.next()) {
         scan.scanId = query.value("scan_id").toString();
         scan.projectId = query.value("project_id").toString();
         scan.scanName = query.value("scan_name").toString();
-        scan.filePathRelative = query.value("file_path_relative").toString();
+        scan.filePathRelative = query.value("file_path_project_relative").toString();
+        scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
         scan.importType = query.value("import_type").toString();
+        scan.originalSourcePath = query.value("original_source_path").toString();
+        scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+        scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+        scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+        scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+        scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+        scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+        scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
         scan.dateAdded = query.value("date_added").toString();
+        scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
         scan.parentClusterId = query.value("parent_cluster_id").toString();
     }
-    
+
     return scan;
 }
 
@@ -375,9 +443,19 @@ QList<ScanInfo> SQLiteManager::getScansByCluster(const QString &clusterId)
             scan.scanId = query.value("scan_id").toString();
             scan.projectId = query.value("project_id").toString();
             scan.scanName = query.value("scan_name").toString();
-            scan.filePathRelative = query.value("file_path_relative").toString();
+            scan.filePathRelative = query.value("file_path_project_relative").toString();
+            scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
             scan.importType = query.value("import_type").toString();
+            scan.originalSourcePath = query.value("original_source_path").toString();
+            scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+            scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+            scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+            scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+            scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+            scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+            scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
             scan.dateAdded = query.value("date_added").toString();
+            scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
             scan.parentClusterId = query.value("parent_cluster_id").toString();
 
             scans.append(scan);
@@ -456,6 +534,7 @@ QList<ClusterInfo> SQLiteManager::getAllClusters()
         cluster.clusterName = query.value("cluster_name").toString();
         cluster.parentClusterId = query.value("parent_cluster_id").toString();
         cluster.creationDate = query.value("creation_date").toString();
+        cluster.isLocked = query.value("is_locked").toBool();
 
         clusters.append(cluster);
     }
@@ -488,6 +567,7 @@ QList<ClusterInfo> SQLiteManager::getChildClusters(const QString &parentClusterI
             cluster.clusterName = query.value("cluster_name").toString();
             cluster.parentClusterId = query.value("parent_cluster_id").toString();
             cluster.creationDate = query.value("creation_date").toString();
+            cluster.isLocked = query.value("is_locked").toBool();
 
             clusters.append(cluster);
         }
@@ -514,6 +594,7 @@ ClusterInfo SQLiteManager::getClusterById(const QString &clusterId)
         cluster.clusterName = query.value("cluster_name").toString();
         cluster.parentClusterId = query.value("parent_cluster_id").toString();
         cluster.creationDate = query.value("creation_date").toString();
+        cluster.isLocked = query.value("is_locked").toBool();
     }
 
     return cluster;
@@ -602,4 +683,268 @@ int SQLiteManager::getClusterCount()
     }
 
     return 0;
+}
+
+// Sprint 2.3 - Schema migration methods
+int SQLiteManager::getCurrentSchemaVersion()
+{
+    if (!m_database.isOpen()) {
+        return 0;
+    }
+
+    // Check if schema_version table exists
+    QSqlQuery checkQuery(m_database);
+    checkQuery.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'");
+
+    if (!checkQuery.next()) {
+        // Create schema_version table if it doesn't exist
+        QSqlQuery createQuery(m_database);
+        if (!createQuery.exec("CREATE TABLE schema_version (version INTEGER)")) {
+            qWarning() << "Failed to create schema_version table:" << createQuery.lastError().text();
+            return 0;
+        }
+
+        // Insert initial version
+        QSqlQuery insertQuery(m_database);
+        if (!insertQuery.exec("INSERT INTO schema_version (version) VALUES (2)")) {
+            qWarning() << "Failed to insert initial schema version:" << insertQuery.lastError().text();
+            return 0;
+        }
+        return 2;
+    }
+
+    // Get current version
+    QSqlQuery versionQuery(m_database);
+    if (versionQuery.exec("SELECT version FROM schema_version") && versionQuery.next()) {
+        return versionQuery.value(0).toInt();
+    }
+
+    return 0;
+}
+
+bool SQLiteManager::updateSchemaVersion(int version)
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("UPDATE schema_version SET version = ?");
+    query.addBindValue(version);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to update schema version:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+bool SQLiteManager::migrateToVersion3()
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    qInfo() << "Migrating database schema to version 3...";
+
+    // Start transaction
+    m_database.transaction();
+
+    try {
+        // Check if is_locked column already exists
+        QSqlQuery checkQuery(m_database);
+        checkQuery.exec("PRAGMA table_info(clusters)");
+
+        bool columnExists = false;
+        while (checkQuery.next()) {
+            if (checkQuery.value("name").toString() == "is_locked") {
+                columnExists = true;
+                break;
+            }
+        }
+
+        if (!columnExists) {
+            // Add is_locked column to clusters table
+            QSqlQuery alterQuery(m_database);
+            if (!alterQuery.exec("ALTER TABLE clusters ADD COLUMN is_locked BOOLEAN DEFAULT 0 NOT NULL")) {
+                throw std::runtime_error("Failed to add is_locked column: " + alterQuery.lastError().text().toStdString());
+            }
+            qDebug() << "Added is_locked column to clusters table";
+        }
+
+        // Update schema version
+        if (!updateSchemaVersion(3)) {
+            throw std::runtime_error("Failed to update schema version");
+        }
+
+        m_database.commit();
+        qInfo() << "Database migration to version 3 completed successfully";
+        return true;
+
+    } catch (const std::exception& e) {
+        m_database.rollback();
+        qCritical() << "Database migration failed:" << e.what();
+        return false;
+    }
+}
+
+// Sprint 2.3 - Cluster locking operations
+bool SQLiteManager::setClusterLockState(const QString &clusterId, bool isLocked)
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("UPDATE clusters SET is_locked = ? WHERE cluster_id = ?");
+    query.addBindValue(isLocked);
+    query.addBindValue(clusterId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to set cluster lock state:" << query.lastError().text();
+        return false;
+    }
+
+    return query.numRowsAffected() > 0;
+}
+
+bool SQLiteManager::getClusterLockState(const QString &clusterId)
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("SELECT is_locked FROM clusters WHERE cluster_id = ?");
+    query.addBindValue(clusterId);
+
+    if (query.exec() && query.next()) {
+        return query.value(0).toBool();
+    }
+
+    return false;
+}
+
+// Sprint 2.3 - Enhanced deletion operations
+QStringList SQLiteManager::getChildClusterIds(const QString &clusterId)
+{
+    QStringList childIds;
+
+    if (!m_database.isOpen()) {
+        return childIds;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("SELECT cluster_id FROM clusters WHERE parent_cluster_id = ?");
+    query.addBindValue(clusterId);
+
+    if (query.exec()) {
+        while (query.next()) {
+            childIds.append(query.value(0).toString());
+        }
+    }
+
+    return childIds;
+}
+
+QStringList SQLiteManager::getClusterScanPaths(const QString &clusterId, const QString &projectPath)
+{
+    QStringList scanPaths;
+
+    if (!m_database.isOpen()) {
+        return scanPaths;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare(R"(
+        SELECT file_path_project_relative, file_path_absolute_linked, import_type
+        FROM scans
+        WHERE parent_cluster_id = ?
+    )");
+    query.addBindValue(clusterId);
+
+    if (query.exec()) {
+        while (query.next()) {
+            QString importType = query.value("import_type").toString();
+            QString filePath;
+
+            if (importType == "LINKED") {
+                filePath = query.value("file_path_absolute_linked").toString();
+            } else if (importType == "COPIED" || importType == "MOVED") {
+                QString relativePath = query.value("file_path_project_relative").toString();
+                if (!relativePath.isEmpty() && !projectPath.isEmpty()) {
+                    filePath = QDir(projectPath).absoluteFilePath(relativePath);
+                }
+            }
+
+            if (!filePath.isEmpty()) {
+                scanPaths.append(filePath);
+            }
+        }
+    }
+
+    return scanPaths;
+}
+
+bool SQLiteManager::deleteClusterRecursive(const QString &clusterId)
+{
+    if (!m_database.isOpen()) {
+        return false;
+    }
+
+    // Start transaction for atomicity
+    m_database.transaction();
+
+    try {
+        // Get all child clusters recursively
+        QStringList allClusters;
+        QStringList toProcess;
+        toProcess.append(clusterId);
+
+        while (!toProcess.isEmpty()) {
+            QString currentId = toProcess.takeFirst();
+            allClusters.append(currentId);
+
+            // Get child clusters
+            QStringList children = getChildClusterIds(currentId);
+            toProcess.append(children);
+        }
+
+        // Delete all scans in all clusters (from deepest to shallowest)
+        for (int i = allClusters.size() - 1; i >= 0; --i) {
+            const QString &clusterIdToDelete = allClusters[i];
+
+            // Delete scans in this cluster
+            QSqlQuery deleteScanQuery(m_database);
+            deleteScanQuery.prepare("DELETE FROM scans WHERE parent_cluster_id = ?");
+            deleteScanQuery.bindValue(0, clusterIdToDelete);
+
+            if (!deleteScanQuery.exec()) {
+                throw std::runtime_error("Failed to delete scans in cluster: " + deleteScanQuery.lastError().text().toStdString());
+            }
+        }
+
+        // Delete all clusters (from deepest to shallowest)
+        for (int i = allClusters.size() - 1; i >= 0; --i) {
+            const QString &clusterIdToDelete = allClusters[i];
+
+            QSqlQuery deleteClusterQuery(m_database);
+            deleteClusterQuery.prepare("DELETE FROM clusters WHERE cluster_id = ?");
+            deleteClusterQuery.bindValue(0, clusterIdToDelete);
+
+            if (!deleteClusterQuery.exec()) {
+                throw std::runtime_error("Failed to delete cluster: " + deleteClusterQuery.lastError().text().toStdString());
+            }
+        }
+
+        m_database.commit();
+        qDebug() << "Recursively deleted cluster and all children:" << clusterId;
+        return true;
+
+    } catch (const std::exception& e) {
+        m_database.rollback();
+        qWarning() << "Failed to recursively delete cluster:" << e.what();
+        return false;
+    }
 }
