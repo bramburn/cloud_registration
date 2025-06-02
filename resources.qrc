@@ -1,0 +1,27 @@
+<RCC>
+    <qresource prefix="/icons">
+        <!-- Base item type icons -->
+        <file>icons/scan.svg</file>
+        <file>icons/cluster.svg</file>
+        <file>icons/project.svg</file>
+        
+        <!-- State overlay icons -->
+        <file>icons/overlays/loaded.svg</file>
+        <file>icons/overlays/unloaded.svg</file>
+        <file>icons/overlays/locked.svg</file>
+        <file>icons/overlays/missing.svg</file>
+        <file>icons/overlays/loading.svg</file>
+        <file>icons/overlays/error.svg</file>
+        
+        <!-- Import type badge icons -->
+        <file>icons/badges/copy.svg</file>
+        <file>icons/badges/move.svg</file>
+        <file>icons/badges/link.svg</file>
+        
+        <!-- Theme-specific variants -->
+        <file>icons/light/scan.svg</file>
+        <file>icons/light/cluster.svg</file>
+        <file>icons/dark/scan.svg</file>
+        <file>icons/dark/cluster.svg</file>
+    </qresource>
+</RCC>
