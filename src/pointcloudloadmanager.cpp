@@ -496,11 +496,16 @@ void PointCloudLoadManager::updateMemoryUsage()
     for (auto it = m_scanStates.begin(); it != m_scanStates.end(); ++it) {
         auto &scanState = it.value();
         if (scanState->data && scanState->data->isValid()) {
-            totalUsage += scanState->data->memoryUsage;
+            // Sprint 3.4: Include LOD memory in total usage
+            totalUsage += scanState->data->getTotalMemoryUsage();
         }
     }
 
-    m_currentMemoryUsage = totalUsage;
+    if (m_currentMemoryUsage != totalUsage) {
+        m_currentMemoryUsage = totalUsage;
+        // Sprint 3.4: Emit memory usage changed signal
+        emit memoryUsageChanged(m_currentMemoryUsage);
+    }
 }
 
 void PointCloudLoadManager::evictLeastRecentlyUsed()
@@ -635,8 +640,145 @@ std::vector<float> PointCloudLoadManager::getScanPointCloudData(const QString &s
     if (it != m_scanStates.end() && it.value()->data && it.value()->data->isValid()) {
         // Update last accessed time
         it.value()->lastAccessed = QDateTime::currentDateTime();
+
+        // Sprint 3.4: Return LOD data if active, otherwise return full data
+        if (it.value()->data->lodActive && !it.value()->data->lodPoints.empty()) {
+            return it.value()->data->lodPoints;
+        }
         return it.value()->data->points;
     }
 
     return std::vector<float>();
+}
+
+// Sprint 3.4: LOD functionality implementation
+QFuture<bool> PointCloudLoadManager::loadScanWithLOD(const QString &scanId, float subsampleRate)
+{
+    return QtConcurrent::run([this, scanId, subsampleRate]() {
+        // First load the scan normally
+        bool success = loadScan(scanId);
+        if (!success) {
+            return false;
+        }
+
+        // Generate LOD data
+        generateLODForScan(scanId, subsampleRate);
+        return true;
+    });
+}
+
+std::vector<float> PointCloudLoadManager::subsamplePointCloud(const std::vector<float> &points, float rate)
+{
+    if (points.empty() || rate <= 0.0f || rate >= 1.0f) {
+        return points;
+    }
+
+    std::vector<float> subsampled;
+    QRandomGenerator rand(QDateTime::currentSecsSinceEpoch());
+
+    // Process points in groups of 3 (x, y, z)
+    for (size_t i = 0; i < points.size(); i += 3) {
+        if (i + 2 < points.size()) {
+            float randomValue = rand.generateDouble();
+            if (randomValue < rate) {
+                subsampled.push_back(points[i]);     // x
+                subsampled.push_back(points[i + 1]); // y
+                subsampled.push_back(points[i + 2]); // z
+            }
+        }
+    }
+
+    qDebug() << "Subsampled point cloud: Original" << (points.size() / 3)
+             << "points, Subsampled" << (subsampled.size() / 3)
+             << "points (rate:" << rate << ")";
+
+    return subsampled;
+}
+
+void PointCloudLoadManager::generateLODForScan(const QString &scanId, float subsampleRate)
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it == m_scanStates.end() || !it.value()->data || !it.value()->data->isValid()) {
+        qDebug() << "Cannot generate LOD for scan - not loaded:" << scanId;
+        return;
+    }
+
+    emit lodGenerationStarted(scanId);
+
+    auto &data = it.value()->data;
+    data->lodPoints = subsamplePointCloud(data->points, subsampleRate);
+    data->lodPointCount = data->lodPoints.size() / 3;
+    data->lodSubsampleRate = subsampleRate;
+
+    qDebug() << "Generated LOD for scan:" << scanId
+             << "Original:" << data->pointCount
+             << "LOD:" << data->lodPointCount
+             << "Rate:" << subsampleRate;
+
+    emit lodGenerationFinished(scanId, true);
+}
+
+bool PointCloudLoadManager::isLODActive(const QString &scanId) const
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it != m_scanStates.end() && it.value()->data) {
+        return it.value()->data->lodActive;
+    }
+
+    return false;
+}
+
+void PointCloudLoadManager::setLODActive(const QString &scanId, bool active)
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it != m_scanStates.end() && it.value()->data) {
+        it.value()->data->lodActive = active;
+        emit lodStateChanged(scanId, active);
+        qDebug() << "LOD state changed for scan:" << scanId << "Active:" << active;
+    }
+}
+
+std::vector<float> PointCloudLoadManager::getLODPointCloudData(const QString &scanId)
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it != m_scanStates.end() && it.value()->data && it.value()->data->isValid()) {
+        // Update last accessed time
+        it.value()->lastAccessed = QDateTime::currentDateTime();
+        return it.value()->data->lodPoints;
+    }
+
+    return std::vector<float>();
+}
+
+// Sprint 3.4: Enhanced memory tracking
+size_t PointCloudLoadManager::getScanMemoryUsage(const QString &scanId) const
+{
+    QMutexLocker locker(&m_stateMutex);
+
+    auto it = m_scanStates.find(scanId);
+    if (it != m_scanStates.end() && it.value()->data) {
+        return it.value()->data->getTotalMemoryUsage();
+    }
+
+    return 0;
+}
+
+size_t PointCloudLoadManager::getClusterMemoryUsage(const QString &clusterId) const
+{
+    QStringList scanIds = getClusterScanIds(clusterId);
+    size_t totalMemory = 0;
+
+    for (const QString &scanId : scanIds) {
+        totalMemory += getScanMemoryUsage(scanId);
+    }
+
+    return totalMemory;
 }

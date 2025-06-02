@@ -102,6 +102,10 @@ private:
     PointCloudViewerWidget* getPointCloudViewer() const { return m_viewer; }
     PointCloudLoadManager* getPointCloudLoadManager() const { return m_loadManager; }
 
+    // Sprint 3.4: Memory statistics display
+    void setupMemoryDisplay();
+    void onMemoryUsageChanged(size_t totalBytes);
+
     // Main UI Components
     QStackedWidget *m_centralStack;
     ProjectHubWidget *m_projectHub;
@@ -152,6 +156,9 @@ private:
     QLabel *m_permanentStatusLabel;
     QString m_currentFileName;
     int m_currentPointCount;
+
+    // Sprint 3.4: Memory usage display
+    QLabel *m_memoryLabel;
 
     // Sprint 3.3: Progress display widgets
     QProgressBar* m_progressBar;
