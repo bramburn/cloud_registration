@@ -54,7 +54,8 @@ TEST_F(E57WriterLibTest, CreateE57FileInWritableDirectory) {
     // Verify file exists and has content after closing
     QFileInfo fileInfo(testFilePath);
     EXPECT_TRUE(fileInfo.exists()) << "E57 file was not created";
-    EXPECT_GT(fileInfo.size(), 0) << "E57 file is empty";
+    qDebug() << "File size:" << fileInfo.size() << "bytes";
+    EXPECT_GT(fileInfo.size(), 0) << "E57 file is empty - size: " << fileInfo.size();
     
     // Verify file can be opened by libE57Format for reading
     try {
@@ -67,7 +68,7 @@ TEST_F(E57WriterLibTest, CreateE57FileInWritableDirectory) {
         EXPECT_TRUE(root.isDefined("guid")) << "guid not found in E57Root";
         
         // Verify formatName value
-        e57::StringNode formatName = static_cast<e57::StringNode>(root.get("formatName"));
+        e57::StringNode formatName(root.get("formatName"));
         EXPECT_EQ(formatName.value(), "ASTM E57 3D Imaging Data File") << "Incorrect formatName value";
         
         testFile.close();
@@ -143,26 +144,26 @@ TEST_F(E57WriterLibTest, CreateE57FileWithXYZPrototype) {
         e57::StructureNode root = testFile.root();
 
         // Navigate to scan
-        e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("data3D"));
-        e57::StructureNode scan = static_cast<e57::StructureNode>(data3D.get(0));
+        e57::VectorNode data3D(root.get("data3D"));
+        e57::StructureNode scan(data3D.get(0));
 
         // Verify the CompressedVectorNode exists
         EXPECT_TRUE(scan.isDefined("points")) << "Scan should have points CompressedVectorNode";
 
         // Verify points is a CompressedVectorNode
-        e57::CompressedVectorNode pointsNode = static_cast<e57::CompressedVectorNode>(scan.get("points"));
+        e57::CompressedVectorNode pointsNode(scan.get("points"));
         EXPECT_EQ(pointsNode.childCount(), 0) << "Points node should be empty (0 points)";
 
         // Verify the prototype structure within the CompressedVectorNode
-        e57::StructureNode prototype = pointsNode.prototype();
+        e57::StructureNode prototype(pointsNode.prototype());
         EXPECT_TRUE(prototype.isDefined("cartesianX")) << "Prototype should have cartesianX";
         EXPECT_TRUE(prototype.isDefined("cartesianY")) << "Prototype should have cartesianY";
         EXPECT_TRUE(prototype.isDefined("cartesianZ")) << "Prototype should have cartesianZ";
 
         // Verify coordinate fields are FloatNodes with double precision
-        e57::FloatNode xNode = static_cast<e57::FloatNode>(prototype.get("cartesianX"));
-        e57::FloatNode yNode = static_cast<e57::FloatNode>(prototype.get("cartesianY"));
-        e57::FloatNode zNode = static_cast<e57::FloatNode>(prototype.get("cartesianZ"));
+        e57::FloatNode xNode(prototype.get("cartesianX"));
+        e57::FloatNode yNode(prototype.get("cartesianY"));
+        e57::FloatNode zNode(prototype.get("cartesianZ"));
 
         EXPECT_EQ(xNode.precision(), e57::PrecisionDouble) << "cartesianX should have double precision";
         EXPECT_EQ(yNode.precision(), e57::PrecisionDouble) << "cartesianY should have double precision";
@@ -203,19 +204,19 @@ TEST_F(E57WriterLibTest, MultipleScanSupport) {
     try {
         e57::ImageFile testFile(testFilePath.toStdString(), "r");
         e57::StructureNode root = testFile.root();
-        e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("data3D"));
+        e57::VectorNode data3D(root.get("data3D"));
 
         EXPECT_EQ(data3D.childCount(), 2) << "/data3D should contain two scans";
 
         // Verify first scan
-        e57::StructureNode scan1 = static_cast<e57::StructureNode>(data3D.get(0));
-        e57::StringNode name1 = static_cast<e57::StringNode>(scan1.get("name"));
+        e57::StructureNode scan1(data3D.get(0));
+        e57::StringNode name1(scan1.get("name"));
         EXPECT_EQ(name1.value(), "Scan 001") << "First scan name incorrect";
         EXPECT_TRUE(scan1.isDefined("points")) << "First scan should have points CompressedVectorNode";
 
         // Verify second scan
-        e57::StructureNode scan2 = static_cast<e57::StructureNode>(data3D.get(1));
-        e57::StringNode name2 = static_cast<e57::StringNode>(scan2.get("name"));
+        e57::StructureNode scan2(data3D.get(1));
+        e57::StringNode name2(scan2.get("name"));
         EXPECT_EQ(name2.value(), "Scan 002") << "Second scan name incorrect";
         EXPECT_TRUE(scan2.isDefined("points")) << "Second scan should have points CompressedVectorNode";
         
