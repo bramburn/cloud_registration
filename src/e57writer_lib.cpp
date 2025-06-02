@@ -73,18 +73,36 @@ bool E57WriterLib::initializeE57Root()
         // Task W1.1.1: Setup basic E57Root elements like formatName, guid
         e57::StructureNode rootNode = m_imageFile->root();
 
+        // Required E57Root elements according to ASTM E2807 standard
         e57::StringNode formatNameNode(*m_imageFile, "ASTM E57 3D Imaging Data File");
         rootNode.set("formatName", formatNameNode);
 
         e57::StringNode guidNode(*m_imageFile, generateGUID().toStdString());
         rootNode.set("guid", guidNode);
 
+        // Add version information (required for valid E57 files)
+        e57::IntegerNode versionMajorNode(*m_imageFile, 1, 0, 255);
+        rootNode.set("versionMajor", versionMajorNode);
+
+        e57::IntegerNode versionMinorNode(*m_imageFile, 0, 0, 255);
+        rootNode.set("versionMinor", versionMinorNode);
+
         // Add creation date/time
         QString creationDateTime = QDateTime::currentDateTime().toString(Qt::ISODate);
         e57::StringNode dateTimeNode(*m_imageFile, creationDateTime.toStdString());
         rootNode.set("creationDateTime", dateTimeNode);
 
-        qDebug() << "E57WriterLib: Initialized E57Root with formatName and GUID";
+        // Add coordinate metadata (required for proper E57 structure)
+        e57::StringNode coordinateMetadataNode(*m_imageFile, "");
+        rootNode.set("coordinateMetadata", coordinateMetadataNode);
+
+        // Create the data3D vector immediately to ensure proper file structure
+        // This is critical for libE57Format to recognize the file as valid
+        // Use false for allowHeteroChildren as per E57 standard (all children should be Data3D StructureNodes)
+        e57::VectorNode data3DVector(*m_imageFile, false); // allowHeteroChildren = false for Data3D
+        rootNode.set("data3D", data3DVector);
+
+        qDebug() << "E57WriterLib: Initialized E57Root with required elements and data3D vector";
         return true;
 
     } catch (const e57::E57Exception& ex) {
@@ -133,18 +151,16 @@ bool E57WriterLib::createData3DVectorNode()
     try {
         e57::StructureNode rootNode = m_imageFile->root();
 
-        // Check if /data3D already exists
+        // The data3D vector should already exist from initializeE57Root()
         if (rootNode.isDefined("data3D")) {
             // Get existing data3D node
             e57::VectorNode existingNode = static_cast<e57::VectorNode>(rootNode.get("data3D"));
             m_data3DNode = std::make_shared<e57::VectorNode>(existingNode);
             qDebug() << "E57WriterLib: Using existing /data3D VectorNode";
         } else {
-            // Task W1.2.2: Create new /data3D VectorNode
-            e57::VectorNode data3DNode(*m_imageFile, false); // false for allowHeterogeneousChildren
-            rootNode.set("data3D", data3DNode);
-            m_data3DNode = std::make_shared<e57::VectorNode>(data3DNode);
-            qDebug() << "E57WriterLib: Created new /data3D VectorNode";
+            // This should not happen if initializeE57Root() was called correctly
+            setError("data3D vector not found - initializeE57Root() may have failed");
+            return false;
         }
 
         return true;
@@ -203,10 +219,6 @@ bool E57WriterLib::defineXYZPrototype()
     }
 
     try {
-        // For now, let's create a placeholder structure to indicate the prototype is defined
-        // The actual CompressedVectorNode creation will be implemented in Sprint W2
-        // when we have point data to write
-
         // Task W1.3.2: Create a StructureNode to serve as the prototype
         e57::StructureNode prototypeStructure(*m_imageFile);
 
@@ -220,11 +232,18 @@ bool E57WriterLib::defineXYZPrototype()
         e57::FloatNode zNode(*m_imageFile, 0.0, e57::PrecisionDouble, -DBL_MAX, DBL_MAX);
         prototypeStructure.set("cartesianZ", zNode);
 
-        // For Sprint W1, we'll add the prototype as a placeholder structure
-        // The actual CompressedVectorNode will be created when we have data to write
-        m_currentScanNode->set("pointsPrototype", prototypeStructure);
+        // Task W1.3.1: Create the required 'codecs' VectorNode for the CompressedVectorNode
+        // Even if empty for uncompressed data, it's often expected by the E57 standard
+        e57::VectorNode codecsNode(*m_imageFile, true); // allowHeterogeneousChildren = true for codecs
 
-        qDebug() << "E57WriterLib: Successfully defined XYZ prototype for current scan";
+        // Task W1.3.1: Create a proper CompressedVectorNode with the prototype and codecs
+        // This is required for libE57Format to recognize the file as valid and write to disk
+        e57::CompressedVectorNode pointsNode(*m_imageFile, prototypeStructure, codecsNode);
+
+        // Add the points CompressedVectorNode to the scan
+        m_currentScanNode->set("points", pointsNode);
+
+        qDebug() << "E57WriterLib: Successfully defined XYZ prototype and created CompressedVectorNode for current scan";
         return true;
 
     } catch (const e57::E57Exception& ex) {
@@ -246,14 +265,19 @@ bool E57WriterLib::closeFile()
 
     try {
         if (m_imageFile) {
+            // Ensure the file structure is properly finalized before closing
+            // This is critical for libE57Format to write data to disk
+
+            // The data3D vector should already exist from initializeE57Root()
+            // Just close the file - this triggers the actual write to disk
             m_imageFile->close();
             m_imageFile.reset();
         }
-        
+
         m_fileOpen = false;
         m_currentScanNode.reset();
         m_data3DNode.reset();
-        
+
         qDebug() << "E57WriterLib: Successfully closed E57 file:" << m_currentFilePath;
         return true;
 

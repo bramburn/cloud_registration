@@ -310,6 +310,19 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57WriterLibTests PRIVATE src)
     add_test(NAME E57WriterLibTests COMMAND E57WriterLibTests)
 
+    # E57 Writer Debug Test
+    add_executable(E57WriterDebugTest
+        test_e57_debug.cpp
+        src/e57writer_lib.cpp
+    )
+
+    target_link_libraries(E57WriterDebugTest
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(E57WriterDebugTest PRIVATE src)
+
     # Sprint 3 Demo Program
     add_executable(Sprint3Demo
         tests/demos/test_sprint3_demo.cpp
