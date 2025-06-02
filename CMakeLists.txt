@@ -122,6 +122,8 @@ set(SOURCES
     src/projecttreemodel.cpp
     # Sprint 2.1: Point Cloud Load Management
     src/pointcloudloadmanager.cpp
+    # Sprint W1: E57 Writing - Basic E57 Structure Writing
+    src/e57writer_lib.cpp
 )
 
 # Header files
@@ -149,6 +151,8 @@ set(HEADERS
     src/projecttreemodel.h
     # Sprint 2.1: Point Cloud Load Management
     src/pointcloudloadmanager.h
+    # Sprint W1: E57 Writing - Basic E57 Structure Writing
+    src/e57writer_lib.h
 )
 
 # Shader files
@@ -289,6 +293,22 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserLibSprint3Tests PRIVATE src)
     add_test(NAME E57ParserLibSprint3Tests COMMAND E57ParserLibSprint3Tests)
+
+    # Sprint W1: E57 Writer Library Tests
+    add_executable(E57WriterLibTests
+        tests/test_e57writer_lib.cpp
+        src/e57writer_lib.cpp
+    )
+
+    target_link_libraries(E57WriterLibTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(E57WriterLibTests PRIVATE src)
+    add_test(NAME E57WriterLibTests COMMAND E57WriterLibTests)
 
     # Sprint 3 Demo Program
     add_executable(Sprint3Demo
@@ -576,8 +596,8 @@ if(TARGET GTest::gtest_main)
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests
-        COMMENT "Running all unit tests including Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests
+        COMMENT "Running all unit tests including Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1: E57ParserLib testing targets
@@ -585,6 +605,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57ParserLib.*"
         DEPENDS E57ParserLibTests
         COMMENT "Running Sprint 1 E57ParserLib tests"
+    )
+
+    # Sprint W1: E57WriterLib testing targets
+    add_custom_target(run_sprintw1_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57WriterLib.*"
+        DEPENDS E57WriterLibTests
+        COMMENT "Running Sprint W1 E57WriterLib tests"
     )
 
     # Sprint 2.4: Advanced testing targets

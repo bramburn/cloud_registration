@@ -151,10 +151,9 @@ private:
     {
         qDebug() << "\n--- Test 3: LAS File Profiling ---";
 
-        // Get project root
-        QString projectRoot = "C:/dev/cloud_registration";
-        QString lasFile = projectRoot + "/sample/S2max-Power line202503.las";
-        
+        // Use relative path from tests/demos/
+        QString lasFile = "../../sample/S2max-Power line202503.las";
+
         if (!QFileInfo::exists(lasFile)) {
             qWarning() << "LAS sample file not found:" << lasFile;
             return;

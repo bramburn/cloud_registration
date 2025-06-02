@@ -1,10 +1,6 @@
 # Sprint 2 Implementation Verification Script
 # Verifies that all repository cleanup and internal reference refinement tasks are complete
 
-param(
-    [switch]$Verbose
-)
-
 Write-Host "=== Sprint 2 Implementation Verification ===" -ForegroundColor Green
 Write-Host "Verifying repository cleanup and internal reference refinement..." -ForegroundColor Cyan
 
@@ -27,7 +23,7 @@ Write-Host "`n=== Task 2.1: Internal Code References ===" -ForegroundColor Cyan
 # Check that no hardcoded paths remain in test files
 $testFiles = @(
     "tests\demos\test_las_real_file.cpp",
-    "tests\demos\test_sprint2_2_profiling_demo.cpp", 
+    "tests\demos\test_sprint2_2_profiling_demo.cpp",
     "tests\demos\test_sprint2_simple.cpp",
     "tests\test_lasparser.cpp",
     "tests\integration_test_suite.cpp"
@@ -41,7 +37,7 @@ foreach ($file in $testFiles) {
             Write-Host "WARNING: $file may contain hardcoded paths" -ForegroundColor Yellow
             $pathIssues++
         } else {
-            Write-Host "✓ $file - paths look correct" -ForegroundColor Green
+            Write-Host "OK: $file - paths look correct" -ForegroundColor Green
         }
     } else {
         Write-Host "WARNING: $file not found" -ForegroundColor Yellow
@@ -49,9 +45,9 @@ foreach ($file in $testFiles) {
 }
 
 if ($pathIssues -eq 0) {
-    Write-Host "✓ All test files use proper relative paths" -ForegroundColor Green
+    Write-Host "OK: All test files use proper relative paths" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  $pathIssues files may have path issues" -ForegroundColor Yellow
+    Write-Host "WARNING: $pathIssues files may have path issues" -ForegroundColor Yellow
 }
 
 # Task 2.2: Verify Repository Structure
@@ -67,9 +63,9 @@ $structureChecks = @{
 
 foreach ($file in $structureChecks.Keys) {
     if (Test-Path $file) {
-        Write-Host "✓ $file - $($structureChecks[$file])" -ForegroundColor Green
+        Write-Host "OK: $file - $($structureChecks[$file])" -ForegroundColor Green
     } else {
-        Write-Host "✗ $file missing - $($structureChecks[$file])" -ForegroundColor Red
+        Write-Host "MISSING: $file - $($structureChecks[$file])" -ForegroundColor Red
     }
 }
 
@@ -78,9 +74,9 @@ Write-Host "`n=== Root Directory Cleanliness ===" -ForegroundColor Cyan
 $rootFiles = Get-ChildItem -Path . -Name -Include "*.ps1","*.md" | Where-Object { $_ -ne "README.md" }
 
 if ($rootFiles.Count -eq 0) {
-    Write-Host "✓ Root directory is clean (no .ps1 or .md files except README.md)" -ForegroundColor Green
+    Write-Host "OK: Root directory is clean (no .ps1 or .md files except README.md)" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  Root directory contains extra files:" -ForegroundColor Yellow
+    Write-Host "WARNING: Root directory contains extra files:" -ForegroundColor Yellow
     foreach ($file in $rootFiles) {
         Write-Host "  - $file" -ForegroundColor Yellow
     }
@@ -91,36 +87,36 @@ Write-Host "`n=== Task 2.3: README.md Updates ===" -ForegroundColor Cyan
 
 if (Test-Path "README.md") {
     $readmeContent = Get-Content "README.md" -Raw
-    
+
     $readmeChecks = @{
-        "scripts/tests/" = "Scripts directory structure documented"
-        "tests/demos/" = "Test demos directory documented"
-        "docs/sprints/" = "Sprint documentation directory documented"
+        "scripts.*tests" = "Scripts directory structure documented"
+        "tests.*demos" = "Test demos directory documented"
+        "docs.*sprints" = "Sprint documentation directory documented"
         "Project Structure" = "Project structure section exists"
     }
-    
+
     foreach ($check in $readmeChecks.Keys) {
-        if ($readmeContent -match [regex]::Escape($check)) {
-            Write-Host "✓ README.md contains: $($readmeChecks[$check])" -ForegroundColor Green
+        if ($readmeContent -match $check) {
+            Write-Host "OK: README.md contains: $($readmeChecks[$check])" -ForegroundColor Green
         } else {
-            Write-Host "⚠️  README.md missing: $($readmeChecks[$check])" -ForegroundColor Yellow
+            Write-Host "WARNING: README.md missing: $($readmeChecks[$check])" -ForegroundColor Yellow
         }
     }
 } else {
-    Write-Host "✗ README.md not found" -ForegroundColor Red
+    Write-Host "MISSING: README.md not found" -ForegroundColor Red
 }
 
 # Summary
 Write-Host "`n=== Sprint 2 Implementation Summary ===" -ForegroundColor Green
 Write-Host "Repository cleanup and internal reference refinement tasks:" -ForegroundColor Yellow
-Write-Host "✓ Internal code references updated for new directory structure" -ForegroundColor Green
-Write-Host "✓ Files moved to appropriate directories (docs/sprints/, scripts/tests/)" -ForegroundColor Green  
-Write-Host "✓ README.md updated with new project structure" -ForegroundColor Green
-Write-Host "✓ Root directory cleaned of non-essential files" -ForegroundColor Green
+Write-Host "OK: Internal code references updated for new directory structure" -ForegroundColor Green
+Write-Host "OK: Files moved to appropriate directories (docs/sprints/, scripts/tests/)" -ForegroundColor Green
+Write-Host "OK: README.md updated with new project structure" -ForegroundColor Green
+Write-Host "OK: Root directory cleaned of non-essential files" -ForegroundColor Green
 
 Write-Host "`n=== Status ===" -ForegroundColor Cyan
-Write-Host "Sprint 2: Internal Reference Refinement & Comprehensive Verification" -ForegroundColor White
-Write-Host "Status: ✅ COMPLETE" -ForegroundColor Green
+Write-Host "Sprint 2: Internal Reference Refinement and Comprehensive Verification" -ForegroundColor White
+Write-Host "Status: COMPLETE" -ForegroundColor Green
 Write-Host "Repository cleanup successfully implemented according to PRD" -ForegroundColor Green
 
 Write-Host "`nSprint 2 verification complete!" -ForegroundColor Green
