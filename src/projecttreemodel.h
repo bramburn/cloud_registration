@@ -7,6 +7,9 @@
 #include <QList>
 #include <QIcon>
 #include <QHash>
+#include <QDateTime>
+#include <QSet>
+#include "iconmanager.h"
 
 class SQLiteManager;
 struct ScanInfo;
@@ -117,17 +120,37 @@ private:
     // Sprint 3.1 - Missing file icons
     QIcon m_missingFileIcon;
 
-    // Custom data roles
+    // Enhanced custom data roles for Sprint 3.3
     enum CustomRoles {
         ScanIdRole = Qt::UserRole + 1,
         ClusterIdRole,
         IsMissingRole,
         ImportTypeRole,
-        FilePathRole
+        FilePathRole,
+        ItemTypeRole,
+        ItemStateRole,
+        PointCountRole,
+        FileSizeRole,
+        DateAddedRole,
+        ScanCountRole,
+        SubClusterCountRole,
+        IsLoadedRole,
+        IsLockedRole,
+        FullPathRole,
+        DetailedStatusRole
     };
 
     void initializeIcons();
     void setItemLoadedState(QStandardItem *item, LoadedState state);
+
+    // Sprint 3.3 - Enhanced tooltip and icon support
+    QString generateScanTooltip(const ScanInfo& scan) const;
+    QString generateClusterTooltip(const ClusterInfo& cluster) const;
+    QString formatFileSize(qint64 bytes) const;
+    QString formatPointCount(qint64 points) const;
+    QString getImportTypeString(ImportType type) const;
+    ItemState convertLoadedStateToItemState(LoadedState state) const;
+    ImportType getItemImportType(QStandardItem* item) const;
 };
 
 #endif // PROJECTTREEMODEL_H

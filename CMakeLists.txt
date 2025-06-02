@@ -137,6 +137,9 @@ set(SOURCES
     # Sprint 3.1: Robust Data Persistence & Error Handling
     src/errordialog.cpp
     src/relinkfiledialog.cpp
+    # Sprint 3.3: UI/UX Refinements & Progress Management
+    src/iconmanager.cpp
+    src/progressmanager.cpp
 )
 
 # Header files
@@ -171,6 +174,9 @@ set(HEADERS
     # Sprint 3.1: Robust Data Persistence & Error Handling
     src/errordialog.h
     src/relinkfiledialog.h
+    # Sprint 3.3: UI/UX Refinements & Progress Management
+    src/iconmanager.h
+    src/progressmanager.h
 )
 
 # Shader files
@@ -179,8 +185,13 @@ set(SHADERS
     shaders/point.frag
 )
 
+# Resource files
+set(RESOURCES
+    resources.qrc
+)
+
 # Create the executable
-add_executable(CloudRegistration ${SOURCES} ${HEADERS})
+add_executable(CloudRegistration ${SOURCES} ${HEADERS} ${RESOURCES})
 
 # Link Qt6 libraries and E57Format
 target_link_libraries(CloudRegistration
@@ -724,11 +735,39 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
+    # Sprint 3.3: UI/UX Refinements Tests
+    add_executable(Sprint33UIRefinementsTests
+        tests/test_sprint3_3_ui_refinements.cpp
+        src/iconmanager.cpp
+        src/progressmanager.cpp
+        src/projecttreemodel.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/confirmationdialog.cpp
+        src/errordialog.cpp
+        src/relinkfiledialog.cpp
+        ${RESOURCES}
+    )
+
+    target_link_libraries(Sprint33UIRefinementsTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+        Qt6::Sql
+    )
+
+    target_include_directories(Sprint33UIRefinementsTests PRIVATE src)
+    add_test(NAME Sprint33UIRefinementsTests COMMAND Sprint33UIRefinementsTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests
-        COMMENT "Running all unit tests including Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests
+        COMMENT "Running all unit tests including Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1: E57ParserLib testing targets
@@ -750,6 +789,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint24.*"
         DEPENDS Sprint24AdvancedTests
         COMMENT "Running Sprint 2.4 advanced testing suite"
+    )
+
+    # Sprint 3.3: UI/UX Refinements testing targets
+    add_custom_target(run_sprint33_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint33.*"
+        DEPENDS Sprint33UIRefinementsTests
+        COMMENT "Running Sprint 3.3 UI/UX refinements tests"
     )
 
     add_custom_target(generate_complex_test_files

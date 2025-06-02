@@ -271,8 +271,31 @@ void MainWindow::setupStatusBar()
     m_permanentStatusLabel = new QLabel(this);
     m_permanentStatusLabel->setAlignment(Qt::AlignRight);
 
+    // Sprint 3.3: Create progress display widgets
+    m_progressLabel = new QLabel();
+    m_progressLabel->setVisible(false);
+    m_progressLabel->setMinimumWidth(200);
+
+    m_progressBar = new QProgressBar();
+    m_progressBar->setVisible(false);
+    m_progressBar->setMaximumWidth(200);
+    m_progressBar->setTextVisible(true);
+
+    m_timeLabel = new QLabel();
+    m_timeLabel->setVisible(false);
+    m_timeLabel->setStyleSheet("QLabel { color: #666; }");
+
+    m_cancelButton = new QPushButton("Cancel");
+    m_cancelButton->setVisible(false);
+    m_cancelButton->setMaximumWidth(60);
+
     // Add to status bar
     statusBar()->addWidget(m_statusLabel, 1); // Stretch factor 1
+    statusBar()->addWidget(new QLabel()); // Spacer
+    statusBar()->addPermanentWidget(m_progressLabel);
+    statusBar()->addPermanentWidget(m_progressBar);
+    statusBar()->addPermanentWidget(m_timeLabel);
+    statusBar()->addPermanentWidget(m_cancelButton);
     statusBar()->addPermanentWidget(m_permanentStatusLabel);
 
     // Setup status bar style
@@ -280,6 +303,21 @@ void MainWindow::setupStatusBar()
         "QStatusBar { border-top: 1px solid #cccccc; }"
         "QStatusBar::item { border: none; }"
     );
+
+    // Sprint 3.3: Connect to ProgressManager
+    auto& progressManager = ProgressManager::instance();
+    connect(&progressManager, &ProgressManager::operationStarted,
+            this, &MainWindow::onOperationStarted);
+    connect(&progressManager, &ProgressManager::progressUpdated,
+            this, &MainWindow::onProgressUpdated);
+    connect(&progressManager, &ProgressManager::operationFinished,
+            this, &MainWindow::onOperationFinished);
+    connect(&progressManager, &ProgressManager::operationCancelled,
+            this, &MainWindow::onOperationCancelled);
+    connect(&progressManager, &ProgressManager::estimatedTimeChanged,
+            this, &MainWindow::onEstimatedTimeChanged);
+    connect(m_cancelButton, &QPushButton::clicked,
+            this, &MainWindow::onCancelCurrentOperation);
 }
 
 void MainWindow::onOpenFileClicked()
@@ -990,4 +1028,106 @@ void MainWindow::onPointCloudViewFailed(const QString &error)
 
     // Clear viewer to prevent stale data
     m_viewer->clearPointCloud();
+}
+
+// Sprint 3.3: Progress management slot implementations
+void MainWindow::onOperationStarted(const QString& operationId, const QString& name, OperationType type)
+{
+    m_currentOperationId = operationId;
+
+    // Set operation-specific styling
+    QString color;
+    switch (type) {
+        case OperationType::ScanImport: color = "#2196F3"; break;
+        case OperationType::ClusterLoad: color = "#4CAF50"; break;
+        case OperationType::ProjectSave: color = "#FF9800"; break;
+        case OperationType::DataExport: color = "#9C27B0"; break;
+        default: color = "#607D8B"; break;
+    }
+
+    m_progressBar->setStyleSheet(QString("QProgressBar::chunk { background-color: %1; }").arg(color));
+
+    m_progressLabel->setText(name);
+    m_progressLabel->setVisible(true);
+    m_progressBar->setVisible(true);
+    m_progressBar->setValue(0);
+
+    // Show cancel button if operation is cancellable
+    ProgressInfo info = ProgressManager::instance().getProgressInfo(operationId);
+    m_cancelButton->setVisible(info.isCancellable);
+
+    qDebug() << "Progress operation started:" << name << "ID:" << operationId;
+}
+
+void MainWindow::onProgressUpdated(const QString& operationId, int value, int max, const QString& step, const QString& details)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setMaximum(max);
+        m_progressBar->setValue(value);
+
+        QString labelText = ProgressManager::instance().getProgressInfo(operationId).operationName;
+        if (!step.isEmpty()) {
+            labelText += QString(" - %1").arg(step);
+        }
+        m_progressLabel->setText(labelText);
+
+        // Update tooltip with detailed information
+        if (!details.isEmpty()) {
+            m_progressBar->setToolTip(details);
+        }
+
+        // Update percentage display
+        if (max > 0) {
+            int percentage = (value * 100) / max;
+            m_progressBar->setFormat(QString("%1%").arg(percentage));
+        }
+    }
+}
+
+void MainWindow::onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd)
+{
+    if (operationId == m_currentOperationId) {
+        QString timeText = ProgressManager::instance().formatTimeRemaining(operationId);
+        m_timeLabel->setText(timeText);
+        m_timeLabel->setVisible(!timeText.isEmpty());
+    }
+}
+
+void MainWindow::onOperationFinished(const QString& operationId, const QString& result)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setVisible(false);
+        m_progressLabel->setVisible(false);
+        m_timeLabel->setVisible(false);
+        m_cancelButton->setVisible(false);
+        m_currentOperationId.clear();
+
+        // Show brief success message if result provided
+        if (!result.isEmpty()) {
+            statusBar()->showMessage(result, 3000);
+        }
+
+        qDebug() << "Progress operation finished:" << operationId << "Result:" << result;
+    }
+}
+
+void MainWindow::onOperationCancelled(const QString& operationId)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setVisible(false);
+        m_progressLabel->setVisible(false);
+        m_timeLabel->setVisible(false);
+        m_cancelButton->setVisible(false);
+        m_currentOperationId.clear();
+
+        statusBar()->showMessage("Operation cancelled", 3000);
+        qDebug() << "Progress operation cancelled:" << operationId;
+    }
+}
+
+void MainWindow::onCancelCurrentOperation()
+{
+    if (!m_currentOperationId.isEmpty()) {
+        ProgressManager::instance().cancelOperation(m_currentOperationId);
+    }
 }

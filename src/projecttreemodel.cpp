@@ -1,6 +1,7 @@
 #include "projecttreemodel.h"
 #include "sqlitemanager.h"
 #include "projectmanager.h"
+#include "iconmanager.h"
 #include <QApplication>
 #include <QStyle>
 #include <QFileInfo>
@@ -503,36 +504,135 @@ QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
         return QStandardItemModel::data(index, role);
     }
 
-    if (role == Qt::DecorationRole) {
-        QString itemType = getItemType(item);
-        QString itemId = getItemId(item);
+    QString itemType = getItemType(item);
+    QString itemId = getItemId(item);
 
-        if (itemType == "scan") {
-            LoadedState state = getScanLoadedState(itemId);
-            switch (state) {
-                case LoadedState::Loaded:
-                    return m_loadedIcon;
-                case LoadedState::Loading:
-                    return m_loadingIcon;
-                case LoadedState::Error:
-                    return m_errorIcon;
-                default:
-                    return m_unloadedIcon;
+    switch (role) {
+        case Qt::DecorationRole: {
+            // Use IconManager for enhanced icons
+            if (itemType == "scan") {
+                ItemState state = convertLoadedStateToItemState(getScanLoadedState(itemId));
+                ImportType importType = getItemImportType(item);
+
+                // Check if scan is missing
+                if (isScanMissing(itemId)) {
+                    state = ItemState::Missing;
+                }
+
+                return IconManager::instance().getCompositeIcon(ItemType::Scan, state, importType);
+
+            } else if (itemType == "cluster") {
+                LoadedState loadedState = m_clusterLoadedStates.value(itemId, LoadedState::Unloaded);
+                ItemState state = convertLoadedStateToItemState(loadedState);
+
+                // Check if cluster is locked
+                if (getClusterLockState(itemId)) {
+                    state = ItemState::Locked;
+                }
+
+                return IconManager::instance().getIcon(ItemType::Cluster, state);
+
+            } else if (itemType == "project_root") {
+                return IconManager::instance().getIcon(ItemType::Project, ItemState::Unloaded);
             }
-        } else if (itemType == "cluster") {
-            LoadedState state = m_clusterLoadedStates.value(itemId, LoadedState::Unloaded);
-            switch (state) {
-                case LoadedState::Loaded:
-                    return m_loadedIcon;
-                case LoadedState::Partial:
-                    return m_partialIcon;
-                case LoadedState::Loading:
-                    return m_loadingIcon;
-                case LoadedState::Error:
-                    return m_errorIcon;
-                default:
-                    return QApplication::style()->standardIcon(QStyle::SP_DirIcon);
+            break;
+        }
+
+        case Qt::ToolTipRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return generateScanTooltip(scan);
+
+            } else if (itemType == "cluster" && m_sqliteManager) {
+                ClusterInfo cluster = m_sqliteManager->getClusterById(itemId);
+                return generateClusterTooltip(cluster);
             }
+            break;
+        }
+
+        // Enhanced custom data roles for Sprint 3.3
+        case ItemTypeRole: {
+            if (itemType == "scan") return static_cast<int>(ItemType::Scan);
+            if (itemType == "cluster") return static_cast<int>(ItemType::Cluster);
+            if (itemType == "project_root") return static_cast<int>(ItemType::Project);
+            break;
+        }
+
+        case ItemStateRole: {
+            if (itemType == "scan") {
+                return static_cast<int>(convertLoadedStateToItemState(getScanLoadedState(itemId)));
+            } else if (itemType == "cluster") {
+                LoadedState loadedState = m_clusterLoadedStates.value(itemId, LoadedState::Unloaded);
+                return static_cast<int>(convertLoadedStateToItemState(loadedState));
+            }
+            break;
+        }
+
+        case PointCountRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return scan.pointCount;
+            }
+            break;
+        }
+
+        case FileSizeRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return scan.fileSize;
+            }
+            break;
+        }
+
+        case DateAddedRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return scan.dateAdded;
+            } else if (itemType == "cluster" && m_sqliteManager) {
+                ClusterInfo cluster = m_sqliteManager->getClusterById(itemId);
+                return cluster.creationDate;
+            }
+            break;
+        }
+
+        case FullPathRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return scan.filePathAbsolute;
+            }
+            break;
+        }
+
+        case IsLoadedRole: {
+            if (itemType == "scan") {
+                return getScanLoadedState(itemId) == LoadedState::Loaded;
+            } else if (itemType == "cluster") {
+                LoadedState state = m_clusterLoadedStates.value(itemId, LoadedState::Unloaded);
+                return state == LoadedState::Loaded;
+            }
+            break;
+        }
+
+        case IsLockedRole: {
+            if (itemType == "cluster") {
+                return getClusterLockState(itemId);
+            }
+            break;
+        }
+
+        case IsMissingRole: {
+            if (itemType == "scan") {
+                return isScanMissing(itemId);
+            }
+            break;
+        }
+
+        case ImportTypeRole: {
+            if (itemType == "scan" && m_sqliteManager) {
+                ScanInfo scan = m_sqliteManager->getScanById(itemId);
+                return scan.importType;
+            }
+            break;
         }
     }
 
@@ -655,4 +755,142 @@ void ProjectTreeModel::populateFromData(const QList<ClusterInfo> &clusters, cons
 
     // Build hierarchical structure
     buildHierarchicalStructure();
+}
+
+// Sprint 3.3 - Enhanced tooltip and utility methods
+QString ProjectTreeModel::generateScanTooltip(const ScanInfo& scan) const
+{
+    QString tooltip = QString(
+        "<b>%1</b><br/>"
+        "<b>Path:</b> %2<br/>"
+        "<b>Import Type:</b> %3<br/>"
+        "<b>Points:</b> %4<br/>"
+        "<b>File Size:</b> %5<br/>"
+        "<b>Date Added:</b> %6<br/>"
+        "<b>Status:</b> %7"
+    ).arg(scan.scanName)
+     .arg(scan.filePathRelative)
+     .arg(getImportTypeString(static_cast<ImportType>(scan.importType)))
+     .arg(formatPointCount(scan.pointCount))
+     .arg(formatFileSize(scan.fileSize))
+     .arg(scan.dateAdded.toString("yyyy-MM-dd hh:mm"))
+     .arg(getScanLoadedState(scan.scanId) == LoadedState::Loaded ? "Loaded" : "Unloaded");
+
+    if (isScanMissing(scan.scanId)) {
+        tooltip += "<br/><font color='red'><b>⚠ WARNING: Source file not found</b></font>";
+    }
+
+    return tooltip;
+}
+
+QString ProjectTreeModel::generateClusterTooltip(const ClusterInfo& cluster) const
+{
+    // Count scans and sub-clusters
+    int scanCount = 0;
+    int subClusterCount = 0;
+
+    if (m_sqliteManager) {
+        QList<ScanInfo> allScans = m_sqliteManager->getAllScans();
+        QList<ClusterInfo> allClusters = m_sqliteManager->getAllClusters();
+
+        for (const ScanInfo& scan : allScans) {
+            if (scan.parentClusterId == cluster.clusterId) {
+                scanCount++;
+            }
+        }
+
+        for (const ClusterInfo& subCluster : allClusters) {
+            if (subCluster.parentClusterId == cluster.clusterId) {
+                subClusterCount++;
+            }
+        }
+    }
+
+    QString tooltip = QString(
+        "<b>%1</b><br/>"
+        "<b>Scans:</b> %2<br/>"
+        "<b>Sub-clusters:</b> %3<br/>"
+        "<b>Created:</b> %4<br/>"
+        "<b>Status:</b> %5<br/>"
+        "<b>Lock Status:</b> %6"
+    ).arg(cluster.clusterName)
+     .arg(scanCount)
+     .arg(subClusterCount)
+     .arg(cluster.creationDate.toString("yyyy-MM-dd hh:mm"))
+     .arg(m_clusterLoadedStates.value(cluster.clusterId, LoadedState::Unloaded) == LoadedState::Loaded ? "Loaded" : "Unloaded")
+     .arg(getClusterLockState(cluster.clusterId) ? "Locked" : "Unlocked");
+
+    if (getClusterLockState(cluster.clusterId)) {
+        tooltip += "<br/><font color='orange'><b>🔒 Locked clusters cannot be modified during registration</b></font>";
+    }
+
+    return tooltip;
+}
+
+QString ProjectTreeModel::formatFileSize(qint64 bytes) const
+{
+    const qint64 KB = 1024;
+    const qint64 MB = KB * 1024;
+    const qint64 GB = MB * 1024;
+
+    if (bytes >= GB) {
+        return QString("%1 GB").arg(QString::number(bytes / double(GB), 'f', 2));
+    } else if (bytes >= MB) {
+        return QString("%1 MB").arg(QString::number(bytes / double(MB), 'f', 1));
+    } else if (bytes >= KB) {
+        return QString("%1 KB").arg(QString::number(bytes / double(KB), 'f', 0));
+    }
+    return QString("%1 bytes").arg(bytes);
+}
+
+QString ProjectTreeModel::formatPointCount(qint64 points) const
+{
+    const qint64 K = 1000;
+    const qint64 M = K * 1000;
+    const qint64 B = M * 1000;
+
+    if (points >= B) {
+        return QString("%1B points").arg(QString::number(points / double(B), 'f', 2));
+    } else if (points >= M) {
+        return QString("%1M points").arg(QString::number(points / double(M), 'f', 1));
+    } else if (points >= K) {
+        return QString("%1K points").arg(QString::number(points / double(K), 'f', 0));
+    }
+    return QString("%1 points").arg(points);
+}
+
+QString ProjectTreeModel::getImportTypeString(ImportType type) const
+{
+    switch (type) {
+        case ImportType::Copy: return "Copy";
+        case ImportType::Move: return "Move";
+        case ImportType::Link: return "Link to Source";
+        default: return "Unknown";
+    }
+}
+
+ItemState ProjectTreeModel::convertLoadedStateToItemState(LoadedState state) const
+{
+    switch (state) {
+        case LoadedState::Loaded: return ItemState::Loaded;
+        case LoadedState::Loading: return ItemState::Loading;
+        case LoadedState::Error: return ItemState::Error;
+        default: return ItemState::Unloaded;
+    }
+}
+
+ImportType ProjectTreeModel::getItemImportType(QStandardItem* item) const
+{
+    if (!item || !m_sqliteManager) {
+        return ImportType::None;
+    }
+
+    QString itemType = getItemType(item);
+    if (itemType == "scan") {
+        QString scanId = getItemId(item);
+        ScanInfo scan = m_sqliteManager->getScanById(scanId);
+        return static_cast<ImportType>(scan.importType);
+    }
+
+    return ImportType::None;
 }
