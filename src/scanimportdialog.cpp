@@ -61,12 +61,17 @@ void ScanImportDialog::setupUI()
     m_copyModeRadio = new QRadioButton("Copy to Project Folder", this);
     m_copyModeRadio->setToolTip("Files are copied to the project. Original files remain in their location.");
     m_copyModeRadio->setChecked(true); // Default to copy mode
-    
+
     m_moveModeRadio = new QRadioButton("Move to Project Folder", this);
     m_moveModeRadio->setToolTip("Files are moved to the project. Original files are removed from their location.");
-    
+
+    m_linkModeRadio = new QRadioButton("Link to Source (Keep Source)", this);
+    m_linkModeRadio->setToolTip("Files remain in their original location. The project references them directly.\n"
+                               "Warning: Project integrity depends on the original files remaining accessible.");
+
     modeLayout->addWidget(m_copyModeRadio);
     modeLayout->addWidget(m_moveModeRadio);
+    modeLayout->addWidget(m_linkModeRadio);
     
     // Dialog buttons
     auto *buttonLayout = new QHBoxLayout();
@@ -180,14 +185,42 @@ void ScanImportDialog::updateUI()
 void ScanImportDialog::setProjectPath(const QString &projectPath)
 {
     m_projectPath = projectPath;
-    
+
+    // Connect radio button signals to update target label
+    connect(m_copyModeRadio, &QRadioButton::toggled, this, [this]() {
+        if (m_copyModeRadio->isChecked()) {
+            QString scansPath = ProjectManager::getScansSubfolder(m_projectPath);
+            m_targetLabel->setText(QString("Files will be copied to: %1").arg(scansPath));
+        }
+    });
+
+    connect(m_moveModeRadio, &QRadioButton::toggled, this, [this]() {
+        if (m_moveModeRadio->isChecked()) {
+            QString scansPath = ProjectManager::getScansSubfolder(m_projectPath);
+            m_targetLabel->setText(QString("Files will be moved to: %1").arg(scansPath));
+        }
+    });
+
+    connect(m_linkModeRadio, &QRadioButton::toggled, this, [this]() {
+        if (m_linkModeRadio->isChecked()) {
+            m_targetLabel->setText("Files will remain in their original locations and be referenced by the project.");
+        }
+    });
+
+    // Set initial text
     QString scansPath = ProjectManager::getScansSubfolder(projectPath);
-    m_targetLabel->setText(QString("Files will be imported to: %1").arg(scansPath));
+    m_targetLabel->setText(QString("Files will be copied to: %1").arg(scansPath));
 }
 
 ImportMode ScanImportDialog::importMode() const
 {
-    return m_copyModeRadio->isChecked() ? ImportMode::Copy : ImportMode::Move;
+    if (m_copyModeRadio->isChecked()) {
+        return ImportMode::Copy;
+    } else if (m_moveModeRadio->isChecked()) {
+        return ImportMode::Move;
+    } else {
+        return ImportMode::Link;
+    }
 }
 
 void ScanImportDialog::accept()
@@ -227,7 +260,22 @@ bool ScanImportDialog::validateSelection()
             "This will remove the original files from their current location.\n\n"
             "Do you want to continue?",
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-            
+
+        if (reply != QMessageBox::Yes) {
+            return false;
+        }
+    }
+
+    // Warn about link operation
+    if (importMode() == ImportMode::Link) {
+        auto reply = QMessageBox::question(this, "Confirm Link Operation",
+            "You have selected to LINK to source files.\n"
+            "Files will remain in their original locations and the project will reference them directly.\n\n"
+            "Warning: If you move, rename, or delete the original files, "
+            "the project will lose access to them.\n\n"
+            "Do you want to continue?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+
         if (reply != QMessageBox::Yes) {
             return false;
         }

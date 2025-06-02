@@ -14,12 +14,25 @@ CREATE TABLE IF NOT EXISTS scans (
     scan_id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
     scan_name TEXT NOT NULL,
-    file_path_relative TEXT NOT NULL,
-    import_type TEXT NOT NULL CHECK (import_type IN ('COPIED', 'MOVED')),
+    file_path_project_relative TEXT,
+    file_path_absolute_linked TEXT,
+    import_type TEXT NOT NULL CHECK (import_type IN ('COPIED', 'MOVED', 'LINKED')),
+    original_source_path TEXT,
+    point_count_estimate INTEGER DEFAULT 0,
+    bounding_box_min_x REAL,
+    bounding_box_min_y REAL,
+    bounding_box_min_z REAL,
+    bounding_box_max_x REAL,
+    bounding_box_max_y REAL,
+    bounding_box_max_z REAL,
     date_added TEXT NOT NULL,
+    scan_file_last_modified TEXT,
     parent_cluster_id TEXT,
-    UNIQUE(file_path_relative),
-    FOREIGN KEY (parent_cluster_id) REFERENCES clusters(cluster_id) ON DELETE SET NULL
+    FOREIGN KEY (parent_cluster_id) REFERENCES clusters(cluster_id) ON DELETE SET NULL,
+    CHECK (
+        (import_type = 'LINKED' AND file_path_absolute_linked IS NOT NULL AND file_path_project_relative IS NULL) OR
+        (import_type IN ('COPIED', 'MOVED') AND file_path_project_relative IS NOT NULL AND file_path_absolute_linked IS NULL)
+    )
 )
 )";
 
@@ -188,31 +201,57 @@ bool SQLiteManager::insertScan(const ScanInfo &scan)
         qWarning() << "Database not open";
         return false;
     }
-    
+
     if (!scan.isValid()) {
         qWarning() << "Invalid scan info provided";
         return false;
     }
-    
+
     QSqlQuery query(m_database);
     query.prepare(R"(
-        INSERT INTO scans (scan_id, project_id, scan_name, file_path_relative, import_type, date_added, parent_cluster_id)
-        VALUES (:scan_id, :project_id, :scan_name, :file_path_relative, :import_type, :date_added, :parent_cluster_id)
+        INSERT INTO scans (
+            scan_id, project_id, scan_name,
+            file_path_project_relative, file_path_absolute_linked,
+            import_type, original_source_path,
+            point_count_estimate,
+            bounding_box_min_x, bounding_box_min_y, bounding_box_min_z,
+            bounding_box_max_x, bounding_box_max_y, bounding_box_max_z,
+            date_added, scan_file_last_modified, parent_cluster_id
+        )
+        VALUES (
+            :scan_id, :project_id, :scan_name,
+            :file_path_project_relative, :file_path_absolute_linked,
+            :import_type, :original_source_path,
+            :point_count_estimate,
+            :bounding_box_min_x, :bounding_box_min_y, :bounding_box_min_z,
+            :bounding_box_max_x, :bounding_box_max_y, :bounding_box_max_z,
+            :date_added, :scan_file_last_modified, :parent_cluster_id
+        )
     )");
 
     query.bindValue(":scan_id", scan.scanId);
     query.bindValue(":project_id", scan.projectId);
     query.bindValue(":scan_name", scan.scanName);
-    query.bindValue(":file_path_relative", scan.filePathRelative);
+    query.bindValue(":file_path_project_relative", scan.filePathRelative.isEmpty() ? QVariant() : scan.filePathRelative);
+    query.bindValue(":file_path_absolute_linked", scan.filePathAbsoluteLinked.isEmpty() ? QVariant() : scan.filePathAbsoluteLinked);
     query.bindValue(":import_type", scan.importType);
+    query.bindValue(":original_source_path", scan.originalSourcePath.isEmpty() ? QVariant() : scan.originalSourcePath);
+    query.bindValue(":point_count_estimate", scan.pointCountEstimate);
+    query.bindValue(":bounding_box_min_x", scan.boundingBoxMinX);
+    query.bindValue(":bounding_box_min_y", scan.boundingBoxMinY);
+    query.bindValue(":bounding_box_min_z", scan.boundingBoxMinZ);
+    query.bindValue(":bounding_box_max_x", scan.boundingBoxMaxX);
+    query.bindValue(":bounding_box_max_y", scan.boundingBoxMaxY);
+    query.bindValue(":bounding_box_max_z", scan.boundingBoxMaxZ);
     query.bindValue(":date_added", scan.dateAdded);
+    query.bindValue(":scan_file_last_modified", scan.scanFileLastModified.isEmpty() ? QVariant() : scan.scanFileLastModified);
     query.bindValue(":parent_cluster_id", scan.parentClusterId.isEmpty() ? QVariant() : scan.parentClusterId);
-    
+
     if (!query.exec()) {
         qWarning() << "Failed to insert scan:" << query.lastError().text();
         return false;
     }
-    
+
     qDebug() << "Scan inserted successfully:" << scan.scanName;
     return true;
 }
@@ -246,51 +285,71 @@ bool SQLiteManager::insertScans(const QList<ScanInfo> &scans)
 QList<ScanInfo> SQLiteManager::getAllScans()
 {
     QList<ScanInfo> scans;
-    
+
     if (!m_database.isOpen()) {
         return scans;
     }
-    
+
     QSqlQuery query("SELECT * FROM scans ORDER BY date_added", m_database);
-    
+
     while (query.next()) {
         ScanInfo scan;
         scan.scanId = query.value("scan_id").toString();
         scan.projectId = query.value("project_id").toString();
         scan.scanName = query.value("scan_name").toString();
-        scan.filePathRelative = query.value("file_path_relative").toString();
+        scan.filePathRelative = query.value("file_path_project_relative").toString();
+        scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
         scan.importType = query.value("import_type").toString();
+        scan.originalSourcePath = query.value("original_source_path").toString();
+        scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+        scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+        scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+        scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+        scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+        scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+        scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
         scan.dateAdded = query.value("date_added").toString();
+        scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
         scan.parentClusterId = query.value("parent_cluster_id").toString();
 
         scans.append(scan);
     }
-    
+
     return scans;
 }
 
 ScanInfo SQLiteManager::getScanById(const QString &scanId)
 {
     ScanInfo scan;
-    
+
     if (!m_database.isOpen()) {
         return scan;
     }
-    
+
     QSqlQuery query(m_database);
     query.prepare("SELECT * FROM scans WHERE scan_id = :scan_id");
     query.bindValue(":scan_id", scanId);
-    
+
     if (query.exec() && query.next()) {
         scan.scanId = query.value("scan_id").toString();
         scan.projectId = query.value("project_id").toString();
         scan.scanName = query.value("scan_name").toString();
-        scan.filePathRelative = query.value("file_path_relative").toString();
+        scan.filePathRelative = query.value("file_path_project_relative").toString();
+        scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
         scan.importType = query.value("import_type").toString();
+        scan.originalSourcePath = query.value("original_source_path").toString();
+        scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+        scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+        scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+        scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+        scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+        scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+        scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
         scan.dateAdded = query.value("date_added").toString();
+        scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
         scan.parentClusterId = query.value("parent_cluster_id").toString();
     }
-    
+
     return scan;
 }
 
@@ -375,9 +434,19 @@ QList<ScanInfo> SQLiteManager::getScansByCluster(const QString &clusterId)
             scan.scanId = query.value("scan_id").toString();
             scan.projectId = query.value("project_id").toString();
             scan.scanName = query.value("scan_name").toString();
-            scan.filePathRelative = query.value("file_path_relative").toString();
+            scan.filePathRelative = query.value("file_path_project_relative").toString();
+            scan.filePathAbsoluteLinked = query.value("file_path_absolute_linked").toString();
             scan.importType = query.value("import_type").toString();
+            scan.originalSourcePath = query.value("original_source_path").toString();
+            scan.pointCountEstimate = query.value("point_count_estimate").toInt();
+            scan.boundingBoxMinX = query.value("bounding_box_min_x").toDouble();
+            scan.boundingBoxMinY = query.value("bounding_box_min_y").toDouble();
+            scan.boundingBoxMinZ = query.value("bounding_box_min_z").toDouble();
+            scan.boundingBoxMaxX = query.value("bounding_box_max_x").toDouble();
+            scan.boundingBoxMaxY = query.value("bounding_box_max_y").toDouble();
+            scan.boundingBoxMaxZ = query.value("bounding_box_max_z").toDouble();
             scan.dateAdded = query.value("date_added").toString();
+            scan.scanFileLastModified = query.value("scan_file_last_modified").toString();
             scan.parentClusterId = query.value("parent_cluster_id").toString();
 
             scans.append(scan);
