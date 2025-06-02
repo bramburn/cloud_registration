@@ -45,6 +45,12 @@ signals:
     void unloadClusterRequested(const QString &clusterId);
     void viewPointCloudRequested(const QString &itemId, const QString &itemType);
 
+    // Sprint 2.3 - New signals
+    void lockClusterRequested(const QString &clusterId);
+    void unlockClusterRequested(const QString &clusterId);
+    void deleteScanRequested(const QString &scanId, bool deletePhysicalFile);
+    void deleteClusterRequested(const QString &clusterId, bool deletePhysicalFiles);
+
 protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -64,6 +70,12 @@ private slots:
     void onLoadCluster();
     void onUnloadCluster();
     void onViewPointCloud();
+
+    // Sprint 2.3 - New slots
+    void onLockCluster();
+    void onUnlockCluster();
+    void onDeleteScan();
+    void onDeleteClusterRecursive();
 
 private:
     void setupUI();
@@ -91,6 +103,12 @@ private:
     QAction *m_loadClusterAction;
     QAction *m_unloadClusterAction;
     QAction *m_viewPointCloudAction;
+
+    // Sprint 2.3 - New actions
+    QAction *m_lockClusterAction;
+    QAction *m_unlockClusterAction;
+    QAction *m_deleteScanAction;
+    QAction *m_deleteClusterRecursiveAction;
 
     // Current context item for menu actions
     QStandardItem *m_contextItem;

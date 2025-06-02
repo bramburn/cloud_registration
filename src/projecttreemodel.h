@@ -53,6 +53,11 @@ public:
     LoadedState calculateClusterLoadedState(const QString &clusterId) const;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
+    // Sprint 2.3 - Lock state management
+    void setClusterLockState(const QString &clusterId, bool isLocked);
+    bool getClusterLockState(const QString &clusterId) const;
+    void refreshClusterLockStates();
+
 private:
     void createProjectStructure();
     void loadScansFromDatabase();
@@ -80,12 +85,19 @@ private:
     QHash<QString, LoadedState> m_scanLoadedStates;
     QHash<QString, LoadedState> m_clusterLoadedStates;
 
+    // Sprint 2.3 - Lock state tracking
+    QHash<QString, bool> m_clusterLockStates;
+
     // Icons for different loaded states
     QIcon m_loadedIcon;
     QIcon m_unloadedIcon;
     QIcon m_partialIcon;
     QIcon m_loadingIcon;
     QIcon m_errorIcon;
+
+    // Sprint 2.3 - Lock state icons
+    QIcon m_lockedClusterIcon;
+    QIcon m_unlockedClusterIcon;
 
     void initializeIcons();
     void setItemLoadedState(QStandardItem *item, LoadedState state);

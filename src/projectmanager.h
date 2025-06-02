@@ -67,6 +67,7 @@ struct ClusterInfo {
     QString clusterName;
     QString parentClusterId; // NULL if top-level cluster
     QString creationDate;
+    bool isLocked = false;   // Sprint 2.3 - Lock state
 
     bool isValid() const {
         return !clusterId.isEmpty() && !clusterName.isEmpty() && !projectId.isEmpty();
@@ -114,6 +115,12 @@ public:
     bool moveScanToCluster(const QString &scanId, const QString &clusterId);
     bool moveScansToCluster(const QStringList &scanIds, const QString &clusterId);
 
+    // Sprint 2.3 - Cluster locking and enhanced deletion
+    bool setClusterLockState(const QString &clusterId, bool isLocked);
+    bool getClusterLockState(const QString &clusterId);
+    bool deleteClusterRecursive(const QString &clusterId, bool deletePhysicalFiles = false);
+    bool deleteScan(const QString &scanId, bool deletePhysicalFile = false);
+
     static QString getMetadataFilePath(const QString &projectPath);
     static bool isProjectDirectory(const QString &path);
     static QString getScansSubfolder(const QString &projectPath);
@@ -126,6 +133,11 @@ signals:
     void clusterDeleted(const QString &clusterId);
     void clusterRenamed(const QString &clusterId, const QString &newName);
     void scanMovedToCluster(const QString &scanId, const QString &clusterId);
+
+    // Sprint 2.3 - New signals
+    void clusterLockStateChanged(const QString &clusterId, bool isLocked);
+    void scanDeleted(const QString &scanId);
+    void clusterDeletedRecursive(const QString &clusterId);
 
 private:
     bool createProjectMetadata(const QString &projectPath, const QString &projectName);

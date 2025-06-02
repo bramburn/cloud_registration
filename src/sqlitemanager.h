@@ -43,6 +43,15 @@ public:
     bool deleteCluster(const QString &clusterId);
     bool updateCluster(const ClusterInfo &cluster);
     int getClusterCount();
+
+    // Sprint 2.3 - Cluster locking operations
+    bool setClusterLockState(const QString &clusterId, bool isLocked);
+    bool getClusterLockState(const QString &clusterId);
+
+    // Sprint 2.3 - Enhanced deletion operations
+    bool deleteClusterRecursive(const QString &clusterId);
+    QStringList getClusterScanPaths(const QString &clusterId, const QString &projectPath);
+    QStringList getChildClusterIds(const QString &clusterId);
     
     // Utility
     QSqlError lastError() const;
@@ -54,6 +63,11 @@ private:
     bool addParentClusterIdToScans();
     bool executeQuery(const QString &query);
     QString generateConnectionName();
+
+    // Sprint 2.3 - Schema migration
+    bool migrateToVersion3();
+    int getCurrentSchemaVersion();
+    bool updateSchemaVersion(int version);
     
     QSqlDatabase m_database;
     QString m_connectionName;
