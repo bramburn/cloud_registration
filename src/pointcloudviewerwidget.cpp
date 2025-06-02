@@ -1101,3 +1101,42 @@ void PointCloudViewerWidget::drawIdleState(QPainter &painter)
     painter.drawText(instructionRect, Qt::AlignCenter,
                     "Click 'Open File' to load E57 or LAS files");
 }
+
+// Sprint 3.2: Test simulation methods implementation
+void PointCloudViewerWidget::simulateOrbitCamera(const QPoint &start, const QPoint &end)
+{
+    QPoint delta = end - start;
+    const float sensitivity = 0.01f;
+
+    m_cameraYaw += delta.x() * sensitivity;
+    m_cameraPitch -= delta.y() * sensitivity;
+
+    // Clamp pitch to prevent flipping
+    m_cameraPitch = std::max(-static_cast<float>(M_PI)/2.0f + 0.1f,
+                            std::min(static_cast<float>(M_PI)/2.0f - 0.1f, m_cameraPitch));
+
+    updateCamera();
+}
+
+void PointCloudViewerWidget::simulatePanCamera(const QPoint &start, const QPoint &end)
+{
+    QPoint delta = end - start;
+
+    // Calculate camera right and up vectors
+    QVector3D right = QVector3D::crossProduct(m_cameraTarget - m_cameraPosition, m_cameraUp).normalized();
+    QVector3D up = QVector3D::crossProduct(right, m_cameraTarget - m_cameraPosition).normalized();
+
+    float panSpeed = m_boundingBoxSize * 0.001f;
+    QVector3D panOffset = (right * -delta.x() + up * delta.y()) * panSpeed;
+
+    m_cameraTarget += panOffset;
+    updateCamera();
+}
+
+void PointCloudViewerWidget::simulateZoomCamera(float factor)
+{
+    m_cameraDistance *= factor;
+    m_cameraDistance = std::max(0.1f, std::min(m_boundingBoxSize * 10.0f, m_cameraDistance));
+
+    updateCamera();
+}

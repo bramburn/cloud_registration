@@ -5,6 +5,7 @@
 #include "projectmanager.h"
 #include "project.h"
 #include "pointcloudviewerwidget.h"
+#include "pointcloudloadmanager.h"
 #include "e57parserlib.h"
 #include "lasparser.h"
 #include "loadingsettingsdialog.h"
@@ -40,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_viewer(nullptr)
     , m_progressDialog(nullptr)
     , m_projectManager(new ProjectManager(this))
+    , m_loadManager(new PointCloudLoadManager(this))
     , m_currentProject(nullptr)
     , m_newProjectAction(nullptr)
     , m_openProjectAction(nullptr)
@@ -90,6 +92,12 @@ MainWindow::MainWindow(QWidget *parent)
                         m_sidebar->refreshFromDatabase();
                     }
                 });
+
+        // Sprint 3.2: Connect point cloud load manager signals
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudDataReady,
+                this, &MainWindow::onPointCloudDataReady);
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudViewFailed,
+                this, &MainWindow::onPointCloudViewFailed);
 
         // Set window properties
         qDebug() << "Setting window properties...";
@@ -751,6 +759,11 @@ void MainWindow::transitionToProjectView(const QString &projectPath)
         m_sidebar->setSQLiteManager(m_projectManager->getSQLiteManager());
         m_sidebar->setProject(m_currentProject->projectName(), projectPath);
 
+        // Sprint 3.2: Set up point cloud load manager
+        m_loadManager->setSQLiteManager(m_projectManager->getSQLiteManager());
+        m_loadManager->setProjectTreeModel(m_sidebar->getModel());
+        m_sidebar->setPointCloudLoadManager(m_loadManager);
+
         // Update window title
         updateWindowTitle(m_currentProject->projectName());
 
@@ -939,4 +952,42 @@ void MainWindow::createImportGuidanceWidget()
     if (mainLayout) {
         mainLayout->addWidget(m_importGuidanceWidget);
     }
+}
+
+// Sprint 3.2: Point cloud viewing slot implementations
+void MainWindow::onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo)
+{
+    qDebug() << "MainWindow::onPointCloudDataReady - Loading point cloud data:" << sourceInfo;
+    qDebug() << "Point count:" << (points.size() / 3);
+
+    if (!points.empty()) {
+        // Hide import guidance if visible
+        showImportGuidance(false);
+
+        // Load data into viewer
+        m_viewer->loadPointCloud(points);
+
+        // Update status bar
+        setStatusLoadSuccess(sourceInfo, static_cast<int>(points.size() / 3));
+
+        qDebug() << "Successfully loaded point cloud data into viewer";
+    } else {
+        qDebug() << "Warning: Empty point cloud data received";
+        setStatusLoadFailed(sourceInfo, "No point data available");
+    }
+}
+
+void MainWindow::onPointCloudViewFailed(const QString &error)
+{
+    qDebug() << "MainWindow::onPointCloudViewFailed - Error:" << error;
+
+    // Show error message to user
+    QMessageBox::warning(this, "Point Cloud View Failed",
+                        QString("Failed to view point cloud:\n%1").arg(error));
+
+    // Update status bar
+    setStatusLoadFailed("Point Cloud", error);
+
+    // Clear viewer to prevent stale data
+    m_viewer->clearPointCloud();
 }

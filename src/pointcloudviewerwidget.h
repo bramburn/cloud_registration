@@ -37,6 +37,20 @@ public:
     // Coordinate transformation access (User Story 3)
     QVector3D getGlobalOffset() const { return m_globalOffset; }
 
+    // Sprint 3.2: Test helper methods
+    ViewerState getViewerState() const { return m_currentState; }
+    bool hasPointCloudData() const { return m_hasData; }
+    size_t getPointCount() const { return static_cast<size_t>(m_pointCount); }
+    float getCameraYaw() const { return m_cameraYaw; }
+    float getCameraPitch() const { return m_cameraPitch; }
+    QVector3D getCameraTarget() const { return m_cameraTarget; }
+    float getCameraDistance() const { return m_cameraDistance; }
+
+    // Test simulation methods
+    void simulateOrbitCamera(const QPoint &start, const QPoint &end);
+    void simulatePanCamera(const QPoint &start, const QPoint &end);
+    void simulateZoomCamera(float factor);
+
 public slots:
     // View control slots
     void setTopView();
