@@ -58,6 +58,18 @@ public:
     bool getClusterLockState(const QString &clusterId) const;
     void refreshClusterLockStates();
 
+    // Sprint 3.1 - Missing file support and data export
+    void markScanAsMissing(const QString &scanId);
+    void clearScanMissingFlag(const QString &scanId);
+    bool isScanMissing(const QString &scanId) const;
+    void updateScanFilePath(const QString &scanId, const QString &newPath);
+    void removeScan(const QString &scanId);
+
+    // Data export for persistence
+    QList<ClusterInfo> getAllClusters() const;
+    QList<ScanInfo> getAllScans() const;
+    void populateFromData(const QList<ClusterInfo> &clusters, const QList<ScanInfo> &scans);
+
 private:
     void createProjectStructure();
     void loadScansFromDatabase();
@@ -88,6 +100,9 @@ private:
     // Sprint 2.3 - Lock state tracking
     QHash<QString, bool> m_clusterLockStates;
 
+    // Sprint 3.1 - Missing file tracking
+    QSet<QString> m_missingScanIds;
+
     // Icons for different loaded states
     QIcon m_loadedIcon;
     QIcon m_unloadedIcon;
@@ -98,6 +113,18 @@ private:
     // Sprint 2.3 - Lock state icons
     QIcon m_lockedClusterIcon;
     QIcon m_unlockedClusterIcon;
+
+    // Sprint 3.1 - Missing file icons
+    QIcon m_missingFileIcon;
+
+    // Custom data roles
+    enum CustomRoles {
+        ScanIdRole = Qt::UserRole + 1,
+        ClusterIdRole,
+        IsMissingRole,
+        ImportTypeRole,
+        FilePathRole
+    };
 
     void initializeIcons();
     void setItemLoadedState(QStandardItem *item, LoadedState state);

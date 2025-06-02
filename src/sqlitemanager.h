@@ -52,7 +52,19 @@ public:
     bool deleteClusterRecursive(const QString &clusterId);
     QStringList getClusterScanPaths(const QString &clusterId, const QString &projectPath);
     QStringList getChildClusterIds(const QString &clusterId);
-    
+
+    // Sprint 3.1 - Transactional operations and integrity checks
+    bool beginTransaction();
+    bool commitTransaction();
+    bool rollbackTransaction();
+    bool saveAllClusters(const QList<ClusterInfo> &clusters);
+    bool saveAllScans(const QList<ScanInfo> &scans);
+    QList<ClusterInfo> loadAllClusters();
+    QList<ScanInfo> loadAllScans();
+    bool validateReferentialIntegrity();
+    bool updateScanFilePath(const QString &scanId, const QString &newPath);
+    bool createDatabaseBackup(const QString &backupPath);
+
     // Utility
     QSqlError lastError() const;
     bool isConnected() const;
