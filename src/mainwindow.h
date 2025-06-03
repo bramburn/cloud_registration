@@ -6,12 +6,15 @@
 #include <QSplitter>
 #include <QLabel>
 #include <QAction>
+#include <QProgressBar>
 #include <vector>
+#include "progressmanager.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
 class PointCloudViewerWidget;
 class ProjectManager;
+class PointCloudLoadManager;
 class Project;
 class E57ParserLib;
 class LasParser;
@@ -58,6 +61,18 @@ private slots:
     void onRightViewClicked();
     void onBottomViewClicked();
 
+    // Sprint 3.2: Point cloud viewing slots
+    void onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
+    void onPointCloudViewFailed(const QString &error);
+
+    // Sprint 3.3: Progress management slots
+    void onOperationStarted(const QString& operationId, const QString& name, OperationType type);
+    void onProgressUpdated(const QString& operationId, int value, int max, const QString& step, const QString& details);
+    void onOperationFinished(const QString& operationId, const QString& result);
+    void onOperationCancelled(const QString& operationId);
+    void onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd);
+    void onCancelCurrentOperation();
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -83,6 +98,14 @@ private:
                           double maxX, double maxY, double maxZ);
     void setStatusViewChanged(const QString &viewName);
 
+    // Sprint 3.2: Test helper methods
+    PointCloudViewerWidget* getPointCloudViewer() const { return m_viewer; }
+    PointCloudLoadManager* getPointCloudLoadManager() const { return m_loadManager; }
+
+    // Sprint 3.4: Memory statistics display
+    void setupMemoryDisplay();
+    void onMemoryUsageChanged(size_t totalBytes);
+
     // Main UI Components
     QStackedWidget *m_centralStack;
     ProjectHubWidget *m_projectHub;
@@ -97,6 +120,7 @@ private:
 
     // Project management
     ProjectManager *m_projectManager;
+    PointCloudLoadManager *m_loadManager;
     Project *m_currentProject;
 
     // Menu actions
@@ -132,6 +156,16 @@ private:
     QLabel *m_permanentStatusLabel;
     QString m_currentFileName;
     int m_currentPointCount;
+
+    // Sprint 3.4: Memory usage display
+    QLabel *m_memoryLabel;
+
+    // Sprint 3.3: Progress display widgets
+    QProgressBar* m_progressBar;
+    QLabel* m_progressLabel;
+    QLabel* m_timeLabel;
+    QPushButton* m_cancelButton;
+    QString m_currentOperationId;
 };
 
 #endif // MAINWINDOW_H

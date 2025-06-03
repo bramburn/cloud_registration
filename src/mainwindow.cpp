@@ -5,6 +5,7 @@
 #include "projectmanager.h"
 #include "project.h"
 #include "pointcloudviewerwidget.h"
+#include "pointcloudloadmanager.h"
 #include "e57parserlib.h"
 #include "lasparser.h"
 #include "loadingsettingsdialog.h"
@@ -40,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_viewer(nullptr)
     , m_progressDialog(nullptr)
     , m_projectManager(new ProjectManager(this))
+    , m_loadManager(new PointCloudLoadManager(this))
     , m_currentProject(nullptr)
     , m_newProjectAction(nullptr)
     , m_openProjectAction(nullptr)
@@ -90,6 +92,12 @@ MainWindow::MainWindow(QWidget *parent)
                         m_sidebar->refreshFromDatabase();
                     }
                 });
+
+        // Sprint 3.2: Connect point cloud load manager signals
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudDataReady,
+                this, &MainWindow::onPointCloudDataReady);
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudViewFailed,
+                this, &MainWindow::onPointCloudViewFailed);
 
         // Set window properties
         qDebug() << "Setting window properties...";
@@ -263,15 +271,56 @@ void MainWindow::setupStatusBar()
     m_permanentStatusLabel = new QLabel(this);
     m_permanentStatusLabel->setAlignment(Qt::AlignRight);
 
+    // Sprint 3.3: Create progress display widgets
+    m_progressLabel = new QLabel();
+    m_progressLabel->setVisible(false);
+    m_progressLabel->setMinimumWidth(200);
+
+    m_progressBar = new QProgressBar();
+    m_progressBar->setVisible(false);
+    m_progressBar->setMaximumWidth(200);
+    m_progressBar->setTextVisible(true);
+
+    m_timeLabel = new QLabel();
+    m_timeLabel->setVisible(false);
+    m_timeLabel->setStyleSheet("QLabel { color: #666; }");
+
+    m_cancelButton = new QPushButton("Cancel");
+    m_cancelButton->setVisible(false);
+    m_cancelButton->setMaximumWidth(60);
+
     // Add to status bar
     statusBar()->addWidget(m_statusLabel, 1); // Stretch factor 1
+    statusBar()->addWidget(new QLabel()); // Spacer
+    statusBar()->addPermanentWidget(m_progressLabel);
+    statusBar()->addPermanentWidget(m_progressBar);
+    statusBar()->addPermanentWidget(m_timeLabel);
+    statusBar()->addPermanentWidget(m_cancelButton);
     statusBar()->addPermanentWidget(m_permanentStatusLabel);
+
+    // Sprint 3.4: Setup memory display
+    setupMemoryDisplay();
 
     // Setup status bar style
     statusBar()->setStyleSheet(
         "QStatusBar { border-top: 1px solid #cccccc; }"
         "QStatusBar::item { border: none; }"
     );
+
+    // Sprint 3.3: Connect to ProgressManager
+    auto& progressManager = ProgressManager::instance();
+    connect(&progressManager, &ProgressManager::operationStarted,
+            this, &MainWindow::onOperationStarted);
+    connect(&progressManager, &ProgressManager::progressUpdated,
+            this, &MainWindow::onProgressUpdated);
+    connect(&progressManager, &ProgressManager::operationFinished,
+            this, &MainWindow::onOperationFinished);
+    connect(&progressManager, &ProgressManager::operationCancelled,
+            this, &MainWindow::onOperationCancelled);
+    connect(&progressManager, &ProgressManager::estimatedTimeChanged,
+            this, &MainWindow::onEstimatedTimeChanged);
+    connect(m_cancelButton, &QPushButton::clicked,
+            this, &MainWindow::onCancelCurrentOperation);
 }
 
 void MainWindow::onOpenFileClicked()
@@ -751,6 +800,11 @@ void MainWindow::transitionToProjectView(const QString &projectPath)
         m_sidebar->setSQLiteManager(m_projectManager->getSQLiteManager());
         m_sidebar->setProject(m_currentProject->projectName(), projectPath);
 
+        // Sprint 3.2: Set up point cloud load manager
+        m_loadManager->setSQLiteManager(m_projectManager->getSQLiteManager());
+        m_loadManager->setProjectTreeModel(m_sidebar->getModel());
+        m_sidebar->setPointCloudLoadManager(m_loadManager);
+
         // Update window title
         updateWindowTitle(m_currentProject->projectName());
 
@@ -938,5 +992,196 @@ void MainWindow::createImportGuidanceWidget()
     auto *mainLayout = qobject_cast<QVBoxLayout*>(m_mainContentArea->layout());
     if (mainLayout) {
         mainLayout->addWidget(m_importGuidanceWidget);
+    }
+}
+
+// Sprint 3.2: Point cloud viewing slot implementations
+void MainWindow::onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo)
+{
+    qDebug() << "MainWindow::onPointCloudDataReady - Loading point cloud data:" << sourceInfo;
+    qDebug() << "Point count:" << (points.size() / 3);
+
+    if (!points.empty()) {
+        // Hide import guidance if visible
+        showImportGuidance(false);
+
+        // Load data into viewer
+        m_viewer->loadPointCloud(points);
+
+        // Update status bar
+        setStatusLoadSuccess(sourceInfo, static_cast<int>(points.size() / 3));
+
+        qDebug() << "Successfully loaded point cloud data into viewer";
+    } else {
+        qDebug() << "Warning: Empty point cloud data received";
+        setStatusLoadFailed(sourceInfo, "No point data available");
+    }
+}
+
+void MainWindow::onPointCloudViewFailed(const QString &error)
+{
+    qDebug() << "MainWindow::onPointCloudViewFailed - Error:" << error;
+
+    // Show error message to user
+    QMessageBox::warning(this, "Point Cloud View Failed",
+                        QString("Failed to view point cloud:\n%1").arg(error));
+
+    // Update status bar
+    setStatusLoadFailed("Point Cloud", error);
+
+    // Clear viewer to prevent stale data
+    m_viewer->clearPointCloud();
+}
+
+// Sprint 3.3: Progress management slot implementations
+void MainWindow::onOperationStarted(const QString& operationId, const QString& name, OperationType type)
+{
+    m_currentOperationId = operationId;
+
+    // Set operation-specific styling
+    QString color;
+    switch (type) {
+        case OperationType::ScanImport: color = "#2196F3"; break;
+        case OperationType::ClusterLoad: color = "#4CAF50"; break;
+        case OperationType::ProjectSave: color = "#FF9800"; break;
+        case OperationType::DataExport: color = "#9C27B0"; break;
+        default: color = "#607D8B"; break;
+    }
+
+    m_progressBar->setStyleSheet(QString("QProgressBar::chunk { background-color: %1; }").arg(color));
+
+    m_progressLabel->setText(name);
+    m_progressLabel->setVisible(true);
+    m_progressBar->setVisible(true);
+    m_progressBar->setValue(0);
+
+    // Show cancel button if operation is cancellable
+    ProgressInfo info = ProgressManager::instance().getProgressInfo(operationId);
+    m_cancelButton->setVisible(info.isCancellable);
+
+    qDebug() << "Progress operation started:" << name << "ID:" << operationId;
+}
+
+void MainWindow::onProgressUpdated(const QString& operationId, int value, int max, const QString& step, const QString& details)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setMaximum(max);
+        m_progressBar->setValue(value);
+
+        QString labelText = ProgressManager::instance().getProgressInfo(operationId).operationName;
+        if (!step.isEmpty()) {
+            labelText += QString(" - %1").arg(step);
+        }
+        m_progressLabel->setText(labelText);
+
+        // Update tooltip with detailed information
+        if (!details.isEmpty()) {
+            m_progressBar->setToolTip(details);
+        }
+
+        // Update percentage display
+        if (max > 0) {
+            int percentage = (value * 100) / max;
+            m_progressBar->setFormat(QString("%1%").arg(percentage));
+        }
+    }
+}
+
+void MainWindow::onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd)
+{
+    if (operationId == m_currentOperationId) {
+        QString timeText = ProgressManager::instance().formatTimeRemaining(operationId);
+        m_timeLabel->setText(timeText);
+        m_timeLabel->setVisible(!timeText.isEmpty());
+    }
+}
+
+void MainWindow::onOperationFinished(const QString& operationId, const QString& result)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setVisible(false);
+        m_progressLabel->setVisible(false);
+        m_timeLabel->setVisible(false);
+        m_cancelButton->setVisible(false);
+        m_currentOperationId.clear();
+
+        // Show brief success message if result provided
+        if (!result.isEmpty()) {
+            statusBar()->showMessage(result, 3000);
+        }
+
+        qDebug() << "Progress operation finished:" << operationId << "Result:" << result;
+    }
+}
+
+void MainWindow::onOperationCancelled(const QString& operationId)
+{
+    if (operationId == m_currentOperationId) {
+        m_progressBar->setVisible(false);
+        m_progressLabel->setVisible(false);
+        m_timeLabel->setVisible(false);
+        m_cancelButton->setVisible(false);
+        m_currentOperationId.clear();
+
+        statusBar()->showMessage("Operation cancelled", 3000);
+        qDebug() << "Progress operation cancelled:" << operationId;
+    }
+}
+
+void MainWindow::onCancelCurrentOperation()
+{
+    if (!m_currentOperationId.isEmpty()) {
+        ProgressManager::instance().cancelOperation(m_currentOperationId);
+    }
+}
+
+// Sprint 3.4: Memory statistics display implementation
+void MainWindow::setupMemoryDisplay()
+{
+    m_memoryLabel = new QLabel(this);
+    m_memoryLabel->setText("Memory: 0 MB");
+    m_memoryLabel->setMinimumWidth(100);
+    m_memoryLabel->setAlignment(Qt::AlignCenter);
+    m_memoryLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    // Add to status bar before the permanent status label
+    statusBar()->addPermanentWidget(m_memoryLabel);
+
+    // Connect to load manager memory usage signal
+    if (m_loadManager) {
+        connect(m_loadManager, &PointCloudLoadManager::memoryUsageChanged,
+                this, &MainWindow::onMemoryUsageChanged);
+    }
+
+    qDebug() << "Memory display setup completed";
+}
+
+void MainWindow::onMemoryUsageChanged(size_t totalBytes)
+{
+    if (m_memoryLabel) {
+        double megabytes = totalBytes / (1024.0 * 1024.0);
+        QString text;
+
+        if (megabytes >= 1024.0) {
+            // Display in GB if >= 1GB
+            double gigabytes = megabytes / 1024.0;
+            text = QString("Memory: %1 GB").arg(gigabytes, 0, 'f', 1);
+        } else {
+            // Display in MB
+            text = QString("Memory: %1 MB").arg(megabytes, 0, 'f', 1);
+        }
+
+        m_memoryLabel->setText(text);
+
+        // Change color based on usage level (assuming 2GB default limit)
+        if (megabytes > 1536) { // > 1.5GB (75% of 2GB)
+            m_memoryLabel->setStyleSheet("QLabel { color: #d32f2f; margin: 0 5px; font-weight: bold; }");
+        } else if (megabytes > 1024) { // > 1GB (50% of 2GB)
+            m_memoryLabel->setStyleSheet("QLabel { color: #f57c00; margin: 0 5px; }");
+        } else {
+            m_memoryLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+        }
+
+        qDebug() << "Memory usage updated:" << text;
     }
 }

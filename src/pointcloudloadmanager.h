@@ -7,6 +7,10 @@
 #include <QUuid>
 #include <QTimer>
 #include <QMutex>
+#include <QRandomGenerator>
+#include <QDateTime>
+#include <QFuture>
+#include <QtConcurrent>
 #include <memory>
 #include <vector>
 
@@ -25,15 +29,30 @@ struct PointCloudData {
     QString filePath;
     QDateTime loadTime;
     size_t memoryUsage = 0; // in bytes
-    
+
+    // Sprint 3.4: LOD support
+    bool lodActive = false;
+    std::vector<float> lodPoints;
+    size_t lodPointCount = 0;
+    float lodSubsampleRate = 0.5f;
+
     bool isValid() const {
         return !points.empty() && pointCount > 0;
     }
-    
+
     void clear() {
         points.clear();
         pointCount = 0;
         memoryUsage = 0;
+        // Clear LOD data
+        lodPoints.clear();
+        lodPointCount = 0;
+        lodActive = false;
+    }
+
+    // Sprint 3.4: Calculate total memory usage including LOD
+    size_t getTotalMemoryUsage() const {
+        return memoryUsage + (lodPoints.size() * sizeof(float));
     }
 };
 
@@ -94,13 +113,31 @@ public:
     bool unloadCluster(const QString &clusterId);
     QStringList getClusterScanIds(const QString &clusterId) const;
     
-    // View operations (placeholder for Sprint 2.1)
+    // Sprint 3.2: Enhanced view operations for point cloud rendering
     bool viewPointCloud(const QString &itemId, const QString &itemType);
-    
+    bool viewScan(const QString &scanId);
+    bool viewCluster(const QString &clusterId);
+
+    // Get aggregated point cloud data for rendering
+    std::vector<float> getAggregatedPointCloudData(const QStringList &scanIds);
+    std::vector<float> getScanPointCloudData(const QString &scanId);
+
+    // Sprint 3.4: LOD functionality
+    QFuture<bool> loadScanWithLOD(const QString &scanId, float subsampleRate = 0.5f);
+    std::vector<float> subsamplePointCloud(const std::vector<float> &points, float rate);
+    void generateLODForScan(const QString &scanId, float subsampleRate = 0.5f);
+    bool isLODActive(const QString &scanId) const;
+    void setLODActive(const QString &scanId, bool active);
+    std::vector<float> getLODPointCloudData(const QString &scanId);
+
     // Memory management
     size_t getTotalMemoryUsage() const;
     void enforceMemoryLimit();
     void setMemoryLimit(size_t limitMB);
+
+    // Sprint 3.4: Enhanced memory tracking
+    size_t getScanMemoryUsage(const QString &scanId) const;
+    size_t getClusterMemoryUsage(const QString &clusterId) const;
     
     // State queries
     bool isScanLoaded(const QString &scanId) const;
@@ -124,6 +161,16 @@ signals:
     void clusterUnloaded(const QString &clusterId);
     void memoryLimitExceeded(size_t currentUsage, size_t limit);
     void loadingProgress(const QString &scanId, int percentage);
+
+    // Sprint 3.2: Point cloud viewing signals
+    void pointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
+    void pointCloudViewFailed(const QString &error);
+
+    // Sprint 3.4: Memory usage and LOD signals
+    void memoryUsageChanged(size_t totalBytes);
+    void lodGenerationStarted(const QString &scanId);
+    void lodGenerationFinished(const QString &scanId, bool success);
+    void lodStateChanged(const QString &scanId, bool active);
 
 private slots:
     void onMemoryCheckTimer();

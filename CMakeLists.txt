@@ -86,7 +86,7 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
 endif()
 
 # Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql)
+find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
 
 # Find E57Format library for enhanced E57 parsing (Sprint 1.2)
 find_package(E57Format CONFIG REQUIRED)
@@ -137,6 +137,9 @@ set(SOURCES
     # Sprint 3.1: Robust Data Persistence & Error Handling
     src/errordialog.cpp
     src/relinkfiledialog.cpp
+    # Sprint 3.3: UI/UX Refinements & Progress Management
+    src/iconmanager.cpp
+    src/progressmanager.cpp
 )
 
 # Header files
@@ -171,6 +174,9 @@ set(HEADERS
     # Sprint 3.1: Robust Data Persistence & Error Handling
     src/errordialog.h
     src/relinkfiledialog.h
+    # Sprint 3.3: UI/UX Refinements & Progress Management
+    src/iconmanager.h
+    src/progressmanager.h
 )
 
 # Shader files
@@ -179,8 +185,13 @@ set(SHADERS
     shaders/point.frag
 )
 
+# Resource files
+set(RESOURCES
+    resources.qrc
+)
+
 # Create the executable
-add_executable(CloudRegistration ${SOURCES} ${HEADERS})
+add_executable(CloudRegistration ${SOURCES} ${HEADERS} ${RESOURCES})
 
 # Link Qt6 libraries and E57Format
 target_link_libraries(CloudRegistration
@@ -190,6 +201,7 @@ target_link_libraries(CloudRegistration
     Qt6::OpenGLWidgets
     Qt6::Xml
     Qt6::Sql
+    Qt6::Concurrent
     E57Format
 )
 
@@ -420,6 +432,30 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(Sprint2SimpleTest PRIVATE src)
 
+    # Sprint 3.4 Demo Program
+    add_executable(Sprint34Demo
+        tests/demos/test_sprint3_4_demo.cpp
+        src/pointcloudloadmanager.cpp
+        src/pointcloudviewerwidget.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/projecttreemodel.cpp
+    )
+
+    target_link_libraries(Sprint34Demo
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
+        Qt6::OpenGLWidgets
+        Qt6::Sql
+        Qt6::Concurrent
+    )
+
+    target_include_directories(Sprint34Demo PRIVATE src)
+
     # libE57Format Linkage Test (Sprint 1)
     add_executable(LibE57LinkageTest
         tests/test_libe57_linkage.cpp
@@ -564,6 +600,30 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(Sprint12CompressedVectorTests PRIVATE src)
     add_test(NAME Sprint12CompressedVectorTests COMMAND Sprint12CompressedVectorTests)
+
+    # Sprint 3.4: Advanced Memory Management & Registration Data Storage Tests
+    add_executable(Sprint34Tests
+        tests/test_sprint3_4.cpp
+        src/pointcloudloadmanager.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/projecttreemodel.cpp
+    )
+
+    target_link_libraries(Sprint34Tests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Sql
+        Qt6::Concurrent
+        Qt6::Test
+    )
+
+    target_include_directories(Sprint34Tests PRIVATE src)
+    add_test(NAME Sprint34Tests COMMAND Sprint34Tests)
 
     # Sprint 3.1: Robust Data Persistence & Error Handling Tests
     add_executable(Sprint31PersistenceTests
@@ -724,11 +784,39 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
+    # Sprint 3.3: UI/UX Refinements Tests
+    add_executable(Sprint33UIRefinementsTests
+        tests/test_sprint3_3_ui_refinements.cpp
+        src/iconmanager.cpp
+        src/progressmanager.cpp
+        src/projecttreemodel.cpp
+        src/sqlitemanager.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/confirmationdialog.cpp
+        src/errordialog.cpp
+        src/relinkfiledialog.cpp
+        ${RESOURCES}
+    )
+
+    target_link_libraries(Sprint33UIRefinementsTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+        Qt6::Sql
+    )
+
+    target_include_directories(Sprint33UIRefinementsTests PRIVATE src)
+    add_test(NAME Sprint33UIRefinementsTests COMMAND Sprint33UIRefinementsTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests
-        COMMENT "Running all unit tests including Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests
+        COMMENT "Running all unit tests including Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1: E57ParserLib testing targets
@@ -750,6 +838,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint24.*"
         DEPENDS Sprint24AdvancedTests
         COMMENT "Running Sprint 2.4 advanced testing suite"
+    )
+
+    # Sprint 3.3: UI/UX Refinements testing targets
+    add_custom_target(run_sprint33_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint33.*"
+        DEPENDS Sprint33UIRefinementsTests
+        COMMENT "Running Sprint 3.3 UI/UX refinements tests"
     )
 
     add_custom_target(generate_complex_test_files

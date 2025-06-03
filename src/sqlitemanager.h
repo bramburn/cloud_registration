@@ -80,6 +80,10 @@ private:
     bool migrateToVersion3();
     int getCurrentSchemaVersion();
     bool updateSchemaVersion(int version);
+
+    // Sprint 3.4 - Registration data tables
+    bool createRegistrationTables();
+    bool migrateToVersion4();
     
     QSqlDatabase m_database;
     QString m_connectionName;
@@ -87,6 +91,10 @@ private:
     
     static const QString SCANS_TABLE_SCHEMA;
     static const QString CLUSTERS_TABLE_SCHEMA;
+
+    // Sprint 3.4 - Registration data table schemas
+    static const QString REGISTRATION_STATUS_TABLE_SCHEMA;
+    static const QString TRANSFORMATION_MATRICES_TABLE_SCHEMA;
 };
 
 #endif // SQLITEMANAGER_H
