@@ -381,7 +381,8 @@ TEST_F(E57WriterLibTest, WriteLargeDatasetBlockWise) {
     }
 
     // Write points
-    EXPECT_TRUE(writer->writePoints(testPoints)) << "Failed to write large dataset: " << writer->getLastError().toStdString();
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write large dataset: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
     // Verify point count
@@ -432,7 +433,8 @@ TEST_F(E57WriterLibTest, WriteZeroPoints) {
 
     // Write empty point set
     std::vector<E57WriterLib::Point3D> emptyPoints;
-    EXPECT_TRUE(writer->writePoints(emptyPoints)) << "Failed to write empty points: " << writer->getLastError().toStdString();
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_TRUE(writer->writePoints(emptyPoints, xyzOnlyOptions)) << "Failed to write empty points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
     // Verify empty scan
@@ -494,7 +496,8 @@ TEST_F(E57WriterLibTest, CartesianBoundsWithNegativeCoordinates) {
     };
 
     // Write points
-    EXPECT_TRUE(writer->writePoints(testPoints)) << "Failed to write points: " << writer->getLastError().toStdString();
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
     // Verify bounds with negative values
