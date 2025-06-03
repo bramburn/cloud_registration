@@ -5,6 +5,8 @@
 #include <QDir>
 #include <QDateTime>
 #include <cfloat>
+#include <limits>
+#include <algorithm>
 
 E57WriterLib::E57WriterLib(QObject *parent)
     : QObject(parent)
@@ -206,7 +208,8 @@ QString E57WriterLib::generateGUID() const
     return uuid.toString(); // Returns format like "{12345678-1234-1234-1234-123456789abc}"
 }
 
-bool E57WriterLib::defineXYZPrototype()
+// Sprint W3: Enhanced prototype definition with optional intensity and color
+bool E57WriterLib::definePointPrototype(const ExportOptions& options)
 {
     if (!m_fileOpen) {
         setError("No file is currently open for writing");
@@ -219,10 +222,10 @@ bool E57WriterLib::defineXYZPrototype()
     }
 
     try {
-        // Task W1.3.2: Create a StructureNode to serve as the prototype
+        // Task W3.1.1 & W3.2.1: Create a StructureNode to serve as the prototype
         e57::StructureNode prototypeStructure(*m_imageFile);
 
-        // Task W1.3.3: Add three FloatNode children for XYZ coordinates
+        // Task W1.3.3: Add three FloatNode children for XYZ coordinates (always required)
         e57::FloatNode xNode(*m_imageFile, 0.0, e57::PrecisionDouble, -DBL_MAX, DBL_MAX);
         prototypeStructure.set("cartesianX", xNode);
 
@@ -232,30 +235,242 @@ bool E57WriterLib::defineXYZPrototype()
         e57::FloatNode zNode(*m_imageFile, 0.0, e57::PrecisionDouble, -DBL_MAX, DBL_MAX);
         prototypeStructure.set("cartesianZ", zNode);
 
+        // Task W3.1.2: Add intensity field if requested
+        if (options.includeIntensity) {
+            // Using FloatNode for normalized intensity values (0.0-1.0)
+            e57::FloatNode intensityNode(*m_imageFile, 0.0, e57::PrecisionSingle, 0.0, 1.0);
+            prototypeStructure.set("intensity", intensityNode);
+            qDebug() << "E57WriterLib: Added intensity field to prototype (FloatNode, 0.0-1.0)";
+        }
+
+        // Task W3.2.2: Add color fields if requested
+        if (options.includeColor) {
+            // Using IntegerNode for 8-bit color channels (0-255)
+            e57::IntegerNode redNode(*m_imageFile, 0, 0, 255);
+            prototypeStructure.set("colorRed", redNode);
+
+            e57::IntegerNode greenNode(*m_imageFile, 0, 0, 255);
+            prototypeStructure.set("colorGreen", greenNode);
+
+            e57::IntegerNode blueNode(*m_imageFile, 0, 0, 255);
+            prototypeStructure.set("colorBlue", blueNode);
+            qDebug() << "E57WriterLib: Added color fields to prototype (IntegerNode, 0-255)";
+        }
+
         // Task W1.3.1: Create the required 'codecs' VectorNode for the CompressedVectorNode
-        // Even if empty for uncompressed data, it's often expected by the E57 standard
         e57::VectorNode codecsNode(*m_imageFile, true); // allowHeterogeneousChildren = true for codecs
 
         // Task W1.3.1: Create a proper CompressedVectorNode with the prototype and codecs
-        // This is required for libE57Format to recognize the file as valid and write to disk
         e57::CompressedVectorNode pointsNode(*m_imageFile, prototypeStructure, codecsNode);
 
         // Add the points CompressedVectorNode to the scan
         m_currentScanNode->set("points", pointsNode);
 
-        qDebug() << "E57WriterLib: Successfully defined XYZ prototype and created CompressedVectorNode for current scan";
+        qDebug() << "E57WriterLib: Successfully defined point prototype with"
+                 << "XYZ=" << "true"
+                 << "intensity=" << options.includeIntensity
+                 << "color=" << options.includeColor;
         return true;
 
     } catch (const e57::E57Exception& ex) {
-        handleE57Exception(ex, "defineXYZPrototype");
+        handleE57Exception(ex, "definePointPrototype");
         return false;
     } catch (const std::exception& ex) {
-        setError(QString("Standard exception in defineXYZPrototype: %1").arg(ex.what()));
+        setError(QString("Standard exception in definePointPrototype: %1").arg(ex.what()));
         return false;
     }
 }
 
+bool E57WriterLib::defineXYZPrototype()
+{
+    // Sprint W3: Use the new enhanced method with XYZ-only options for backward compatibility
+    ExportOptions xyzOnlyOptions(false, false); // No intensity, no color
+    return definePointPrototype(xyzOnlyOptions);
+}
 
+// Sprint W3: Enhanced point writing implementation with export options
+bool E57WriterLib::writePoints(const std::vector<Point3D>& points, const ExportOptions& options)
+{
+    if (!m_fileOpen) {
+        setError("Cannot write points: No file is open");
+        return false;
+    }
+
+    if (!m_currentScanNode) {
+        setError("Cannot write points: No current scan available. Call addScan() first");
+        return false;
+    }
+
+    return writePointsToScan(*m_currentScanNode, points, options);
+}
+
+bool E57WriterLib::writePoints(int scanIndex, const std::vector<Point3D>& points, const ExportOptions& options)
+{
+    if (!m_fileOpen) {
+        setError("Cannot write points: No file is open");
+        return false;
+    }
+
+    e57::StructureNode* scanNode = getScanNode(scanIndex);
+    if (!scanNode) {
+        setError(QString("Cannot write points: Invalid scan index %1").arg(scanIndex));
+        return false;
+    }
+
+    return writePointsToScan(*scanNode, points, options);
+}
+
+// Sprint W2: Legacy point writing implementation for backward compatibility
+bool E57WriterLib::writePoints(const std::vector<Point3D>& points)
+{
+    // Use the enhanced method with XYZ-only options for backward compatibility
+    ExportOptions xyzOnlyOptions(false, false); // No intensity, no color
+    return writePoints(points, xyzOnlyOptions);
+}
+
+bool E57WriterLib::writePoints(int scanIndex, const std::vector<Point3D>& points)
+{
+    // Use the enhanced method with XYZ-only options for backward compatibility
+    ExportOptions xyzOnlyOptions(false, false); // No intensity, no color
+    return writePoints(scanIndex, points, xyzOnlyOptions);
+}
+
+// Sprint W2: Legacy writePointsToScan for backward compatibility
+bool E57WriterLib::writePointsToScan(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    // Use the enhanced method with XYZ-only options for backward compatibility
+    ExportOptions xyzOnlyOptions(false, false); // No intensity, no color
+    return writePointsToScan(scanNode, points, xyzOnlyOptions);
+}
+
+// Sprint W3: Enhanced writePointsToScan with intensity and color support
+bool E57WriterLib::writePointsToScan(e57::StructureNode& scanNode, const std::vector<Point3D>& points, const ExportOptions& options)
+{
+    try {
+        // Task W2.1.2: Retrieve the points CompressedVectorNode for the scan
+        if (!scanNode.isDefined("points")) {
+            setError("Scan does not have a points CompressedVectorNode. Call definePointPrototype() first");
+            return false;
+        }
+
+        e57::CompressedVectorNode pointsNode(scanNode.get("points"));
+
+        // Task W2.2.1: Calculate cartesian bounds before writing points
+        if (!calculateAndWriteCartesianBounds(scanNode, points)) {
+            return false; // Error already set
+        }
+
+        // Task W3.4.1 & W3.4.2: Calculate and write intensity/color limits if enabled
+        if (options.includeIntensity && hasValidIntensityData(points)) {
+            if (!calculateAndWriteIntensityLimits(scanNode, points)) {
+                return false; // Error already set
+            }
+        }
+
+        if (options.includeColor && hasValidColorData(points)) {
+            if (!calculateAndWriteColorLimits(scanNode, points)) {
+                return false; // Error already set
+            }
+        }
+
+        // Handle empty point set
+        if (points.empty()) {
+            qDebug() << "E57WriterLib: Writing 0 points to scan";
+            return true;
+        }
+
+        // Task W3.3.2: Prepare SourceDestBuffer for all enabled attributes
+        const int64_t POINTS_PER_WRITE_BLOCK = 10000; // Block size for memory management
+
+        // XYZ buffers (always required)
+        std::vector<double> xAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+        std::vector<double> yAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+        std::vector<double> zAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+
+        // Optional intensity buffer
+        std::vector<float> intensityAppBlockBuffer;
+        if (options.includeIntensity) {
+            intensityAppBlockBuffer.resize(POINTS_PER_WRITE_BLOCK);
+        }
+
+        // Optional color buffers
+        std::vector<uint8_t> redAppBlockBuffer, greenAppBlockBuffer, blueAppBlockBuffer;
+        if (options.includeColor) {
+            redAppBlockBuffer.resize(POINTS_PER_WRITE_BLOCK);
+            greenAppBlockBuffer.resize(POINTS_PER_WRITE_BLOCK);
+            blueAppBlockBuffer.resize(POINTS_PER_WRITE_BLOCK);
+        }
+
+        // Build SourceDestBuffer vector
+        std::vector<e57::SourceDestBuffer> sdbufs;
+        sdbufs.emplace_back(*m_imageFile, "cartesianX", xAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+        sdbufs.emplace_back(*m_imageFile, "cartesianY", yAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+        sdbufs.emplace_back(*m_imageFile, "cartesianZ", zAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+
+        if (options.includeIntensity) {
+            sdbufs.emplace_back(*m_imageFile, "intensity", intensityAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(float));
+        }
+
+        if (options.includeColor) {
+            sdbufs.emplace_back(*m_imageFile, "colorRed", redAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(uint8_t));
+            sdbufs.emplace_back(*m_imageFile, "colorGreen", greenAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(uint8_t));
+            sdbufs.emplace_back(*m_imageFile, "colorBlue", blueAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(uint8_t));
+        }
+
+        // Task W2.1.4: Create CompressedVectorWriter
+        e57::CompressedVectorWriter writer = pointsNode.writer(sdbufs);
+
+        // Task W3.3.3: Write points in blocks with all enabled attributes
+        size_t totalPoints = points.size();
+        size_t pointsWritten = 0;
+
+        while (pointsWritten < totalPoints) {
+            // Determine points in current block
+            size_t pointsInBlock = std::min(static_cast<size_t>(POINTS_PER_WRITE_BLOCK), totalPoints - pointsWritten);
+
+            // Copy data to block buffers
+            for (size_t i = 0; i < pointsInBlock; ++i) {
+                const Point3D& point = points[pointsWritten + i];
+
+                // XYZ coordinates (always required)
+                xAppBlockBuffer[i] = point.x;
+                yAppBlockBuffer[i] = point.y;
+                zAppBlockBuffer[i] = point.z;
+
+                // Optional intensity
+                if (options.includeIntensity) {
+                    intensityAppBlockBuffer[i] = point.hasIntensity ? point.intensity : 0.0f;
+                }
+
+                // Optional color
+                if (options.includeColor) {
+                    redAppBlockBuffer[i] = point.hasColor ? point.colorRed : 0;
+                    greenAppBlockBuffer[i] = point.hasColor ? point.colorGreen : 0;
+                    blueAppBlockBuffer[i] = point.hasColor ? point.colorBlue : 0;
+                }
+            }
+
+            // Write current block
+            writer.write(pointsInBlock);
+            pointsWritten += pointsInBlock;
+        }
+
+        // Task W2.1.6: Close writer to finalize
+        writer.close();
+
+        qDebug() << "E57WriterLib: Successfully wrote" << totalPoints << "points to scan with"
+                 << "intensity=" << options.includeIntensity
+                 << "color=" << options.includeColor;
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writePointsToScan");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in writePointsToScan: %1").arg(ex.what()));
+        return false;
+    }
+}
 
 bool E57WriterLib::closeFile()
 {
@@ -316,4 +531,204 @@ void E57WriterLib::handleE57Exception(const std::exception& ex, const QString& c
 {
     QString errorMsg = QString("E57 Exception in %1: %2").arg(context, ex.what());
     setError(errorMsg);
+}
+
+// Sprint W2: Helper method implementations
+bool E57WriterLib::calculateAndWriteCartesianBounds(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    try {
+        // Task W2.2.1: Calculate min/max values for X, Y, Z coordinates
+        double minX = std::numeric_limits<double>::infinity();
+        double maxX = -std::numeric_limits<double>::infinity();
+        double minY = std::numeric_limits<double>::infinity();
+        double maxY = -std::numeric_limits<double>::infinity();
+        double minZ = std::numeric_limits<double>::infinity();
+        double maxZ = -std::numeric_limits<double>::infinity();
+
+        // Handle empty point set - Task W2.2.5
+        if (points.empty()) {
+            minX = maxX = minY = maxY = minZ = maxZ = 0.0;
+        } else {
+            for (const Point3D& point : points) {
+                minX = std::min(minX, point.x);
+                maxX = std::max(maxX, point.x);
+                minY = std::min(minY, point.y);
+                maxY = std::max(maxY, point.y);
+                minZ = std::min(minZ, point.z);
+                maxZ = std::max(maxZ, point.z);
+            }
+        }
+
+        // Task W2.2.3: Create cartesianBounds StructureNode
+        e57::StructureNode cartesianBoundsNode(*m_imageFile);
+        scanNode.set("cartesianBounds", cartesianBoundsNode);
+
+        // Task W2.2.4: Populate with six FloatNode children
+        cartesianBoundsNode.set("xMinimum", e57::FloatNode(*m_imageFile, minX, e57::PrecisionDouble));
+        cartesianBoundsNode.set("xMaximum", e57::FloatNode(*m_imageFile, maxX, e57::PrecisionDouble));
+        cartesianBoundsNode.set("yMinimum", e57::FloatNode(*m_imageFile, minY, e57::PrecisionDouble));
+        cartesianBoundsNode.set("yMaximum", e57::FloatNode(*m_imageFile, maxY, e57::PrecisionDouble));
+        cartesianBoundsNode.set("zMinimum", e57::FloatNode(*m_imageFile, minZ, e57::PrecisionDouble));
+        cartesianBoundsNode.set("zMaximum", e57::FloatNode(*m_imageFile, maxZ, e57::PrecisionDouble));
+
+        qDebug() << "E57WriterLib: Calculated cartesian bounds:"
+                 << "X[" << minX << "," << maxX << "]"
+                 << "Y[" << minY << "," << maxY << "]"
+                 << "Z[" << minZ << "," << maxZ << "]";
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "calculateAndWriteCartesianBounds");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in calculateAndWriteCartesianBounds: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+e57::StructureNode* E57WriterLib::getScanNode(int scanIndex)
+{
+    try {
+        if (!m_data3DNode) {
+            setError("Data3D vector not available");
+            return nullptr;
+        }
+
+        if (scanIndex < 0 || scanIndex >= static_cast<int>(m_data3DNode->childCount())) {
+            setError(QString("Scan index %1 out of range [0, %2]").arg(scanIndex).arg(m_data3DNode->childCount() - 1));
+            return nullptr;
+        }
+
+        // Create a static shared_ptr to manage the lifetime properly
+        static std::shared_ptr<e57::StructureNode> scanNodePtr;
+        scanNodePtr = std::make_shared<e57::StructureNode>(e57::StructureNode(m_data3DNode->get(scanIndex)));
+        return scanNodePtr.get();
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "getScanNode");
+        return nullptr;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in getScanNode: %1").arg(ex.what()));
+        return nullptr;
+    }
+}
+
+// Sprint W3: Helper method implementations for intensity and color support
+
+bool E57WriterLib::calculateAndWriteIntensityLimits(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    try {
+        // Task W3.4.1: Calculate min/max intensity values from actual point data
+        float minIntensity = std::numeric_limits<float>::infinity();
+        float maxIntensity = -std::numeric_limits<float>::infinity();
+        bool hasAnyIntensity = false;
+
+        for (const Point3D& point : points) {
+            if (point.hasIntensity) {
+                minIntensity = std::min(minIntensity, point.intensity);
+                maxIntensity = std::max(maxIntensity, point.intensity);
+                hasAnyIntensity = true;
+            }
+        }
+
+        // Task W3.4.6: Handle case where no valid intensity data exists
+        if (!hasAnyIntensity) {
+            minIntensity = maxIntensity = 0.0f;
+        }
+
+        // Task W3.4.4: Create intensityLimits StructureNode
+        e57::StructureNode intensityLimitsNode(*m_imageFile);
+        scanNode.set("intensityLimits", intensityLimitsNode);
+
+        // Populate with FloatNode children for normalized intensity (0.0-1.0)
+        intensityLimitsNode.set("intensityMinimum", e57::FloatNode(*m_imageFile, minIntensity, e57::PrecisionSingle));
+        intensityLimitsNode.set("intensityMaximum", e57::FloatNode(*m_imageFile, maxIntensity, e57::PrecisionSingle));
+
+        qDebug() << "E57WriterLib: Calculated intensity limits:"
+                 << "min=" << minIntensity << "max=" << maxIntensity;
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "calculateAndWriteIntensityLimits");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in calculateAndWriteIntensityLimits: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+bool E57WriterLib::calculateAndWriteColorLimits(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    try {
+        // Task W3.4.2: Calculate min/max color values from actual point data
+        uint8_t minRed = 255, maxRed = 0;
+        uint8_t minGreen = 255, maxGreen = 0;
+        uint8_t minBlue = 255, maxBlue = 0;
+        bool hasAnyColor = false;
+
+        for (const Point3D& point : points) {
+            if (point.hasColor) {
+                minRed = std::min(minRed, point.colorRed);
+                maxRed = std::max(maxRed, point.colorRed);
+                minGreen = std::min(minGreen, point.colorGreen);
+                maxGreen = std::max(maxGreen, point.colorGreen);
+                minBlue = std::min(minBlue, point.colorBlue);
+                maxBlue = std::max(maxBlue, point.colorBlue);
+                hasAnyColor = true;
+            }
+        }
+
+        // Task W3.4.6: Handle case where no valid color data exists
+        if (!hasAnyColor) {
+            minRed = maxRed = minGreen = maxGreen = minBlue = maxBlue = 0;
+        }
+
+        // Task W3.4.5: Create colorLimits StructureNode
+        e57::StructureNode colorLimitsNode(*m_imageFile);
+        scanNode.set("colorLimits", colorLimitsNode);
+
+        // Populate with IntegerNode children for 8-bit color (0-255)
+        colorLimitsNode.set("colorRedMinimum", e57::IntegerNode(*m_imageFile, minRed, 0, 255));
+        colorLimitsNode.set("colorRedMaximum", e57::IntegerNode(*m_imageFile, maxRed, 0, 255));
+        colorLimitsNode.set("colorGreenMinimum", e57::IntegerNode(*m_imageFile, minGreen, 0, 255));
+        colorLimitsNode.set("colorGreenMaximum", e57::IntegerNode(*m_imageFile, maxGreen, 0, 255));
+        colorLimitsNode.set("colorBlueMinimum", e57::IntegerNode(*m_imageFile, minBlue, 0, 255));
+        colorLimitsNode.set("colorBlueMaximum", e57::IntegerNode(*m_imageFile, maxBlue, 0, 255));
+
+        qDebug() << "E57WriterLib: Calculated color limits:"
+                 << "R[" << minRed << "," << maxRed << "]"
+                 << "G[" << minGreen << "," << maxGreen << "]"
+                 << "B[" << minBlue << "," << maxBlue << "]";
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "calculateAndWriteColorLimits");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in calculateAndWriteColorLimits: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+bool E57WriterLib::hasValidIntensityData(const std::vector<Point3D>& points) const
+{
+    for (const Point3D& point : points) {
+        if (point.hasIntensity) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool E57WriterLib::hasValidColorData(const std::vector<Point3D>& points) const
+{
+    for (const Point3D& point : points) {
+        if (point.hasColor) {
+            return true;
+        }
+    }
+    return false;
 }

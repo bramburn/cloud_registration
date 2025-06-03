@@ -3,6 +3,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 // Forward declarations to avoid including E57Format.h in header
 namespace e57 {
@@ -21,6 +22,14 @@ namespace e57 {
  */
 class E57WriterLibNoQt {
 public:
+    // Sprint W2: Point data structure for writing XYZ coordinates
+    struct Point3D {
+        double x, y, z;
+
+        Point3D() : x(0.0), y(0.0), z(0.0) {}
+        Point3D(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
+    };
+
     explicit E57WriterLibNoQt();
     ~E57WriterLibNoQt();
 
@@ -54,6 +63,27 @@ public:
     bool defineXYZPrototype();
 
     /**
+     * @brief Write XYZ point data to the current scan's CompressedVectorNode
+     * @param points Vector of Point3D structures containing XYZ coordinates
+     * @return true if points written successfully, false otherwise
+     *
+     * User Story W2.1: Write XYZ Point Data to E57 CompressedVectorNode
+     * Writes point data in blocks using CompressedVectorWriter and calculates cartesian bounds
+     */
+    bool writePoints(const std::vector<Point3D>& points);
+
+    /**
+     * @brief Write XYZ point data to a specific scan's CompressedVectorNode
+     * @param scanIndex Index of the scan to write points to (0-based)
+     * @param points Vector of Point3D structures containing XYZ coordinates
+     * @return true if points written successfully, false otherwise
+     *
+     * User Story W2.1: Write XYZ Point Data to E57 CompressedVectorNode
+     * Writes point data in blocks using CompressedVectorWriter and calculates cartesian bounds
+     */
+    bool writePoints(int scanIndex, const std::vector<Point3D>& points);
+
+    /**
      * @brief Close the E57 file and finalize writing
      * @return true if file closed successfully, false otherwise
      */
@@ -83,6 +113,11 @@ private:
     bool createData3DVectorNode();
     bool createScanStructureNode(const std::string& scanName);
     std::string generateGUID() const;
+
+    // Sprint W2: Point writing and bounds calculation helpers
+    bool writePointsToScan(e57::StructureNode& scanNode, const std::vector<Point3D>& points);
+    bool calculateAndWriteCartesianBounds(e57::StructureNode& scanNode, const std::vector<Point3D>& points);
+    e57::StructureNode* getScanNode(int scanIndex);
 
     // Error handling
     void setError(const std::string& errorMessage);

@@ -6,6 +6,8 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <limits>
+#include <algorithm>
 
 E57WriterLibNoQt::E57WriterLibNoQt()
     : m_fileOpen(false)
@@ -265,6 +267,110 @@ bool E57WriterLibNoQt::defineXYZPrototype()
     }
 }
 
+// Sprint W2: Point writing implementation
+bool E57WriterLibNoQt::writePoints(const std::vector<Point3D>& points)
+{
+    if (!m_fileOpen) {
+        setError("Cannot write points: No file is open");
+        return false;
+    }
+
+    if (!m_currentScanNode) {
+        setError("Cannot write points: No current scan available. Call addScan() first");
+        return false;
+    }
+
+    return writePointsToScan(*m_currentScanNode, points);
+}
+
+bool E57WriterLibNoQt::writePoints(int scanIndex, const std::vector<Point3D>& points)
+{
+    if (!m_fileOpen) {
+        setError("Cannot write points: No file is open");
+        return false;
+    }
+
+    e57::StructureNode* scanNode = getScanNode(scanIndex);
+    if (!scanNode) {
+        setError("Cannot write points: Invalid scan index " + std::to_string(scanIndex));
+        return false;
+    }
+
+    return writePointsToScan(*scanNode, points);
+}
+
+bool E57WriterLibNoQt::writePointsToScan(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    try {
+        // Task W2.1.2: Retrieve the points CompressedVectorNode for the scan
+        if (!scanNode.isDefined("points")) {
+            setError("Scan does not have a points CompressedVectorNode. Call defineXYZPrototype() first");
+            return false;
+        }
+
+        e57::CompressedVectorNode pointsNode(scanNode.get("points"));
+
+        // Task W2.2.1: Calculate cartesian bounds before writing points
+        if (!calculateAndWriteCartesianBounds(scanNode, points)) {
+            return false; // Error already set
+        }
+
+        // Handle empty point set
+        if (points.empty()) {
+            std::cout << "E57WriterLibNoQt: Writing 0 points to scan" << std::endl;
+            return true;
+        }
+
+        // Task W2.1.3: Prepare SourceDestBuffer for XYZ coordinates
+        const int64_t POINTS_PER_WRITE_BLOCK = 10000; // Block size for memory management
+        std::vector<double> xAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+        std::vector<double> yAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+        std::vector<double> zAppBlockBuffer(POINTS_PER_WRITE_BLOCK);
+
+        std::vector<e57::SourceDestBuffer> sdbufs;
+        sdbufs.emplace_back(m_imageFile.get(), "cartesianX", xAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+        sdbufs.emplace_back(m_imageFile.get(), "cartesianY", yAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+        sdbufs.emplace_back(m_imageFile.get(), "cartesianZ", zAppBlockBuffer.data(), POINTS_PER_WRITE_BLOCK, true, false, sizeof(double));
+
+        // Task W2.1.4: Create CompressedVectorWriter
+        e57::CompressedVectorWriter writer = pointsNode.writer(sdbufs);
+
+        // Task W2.1.5: Write points in blocks
+        size_t totalPoints = points.size();
+        size_t pointsWritten = 0;
+
+        while (pointsWritten < totalPoints) {
+            // Determine points in current block
+            size_t pointsInBlock = std::min(static_cast<size_t>(POINTS_PER_WRITE_BLOCK), totalPoints - pointsWritten);
+
+            // Copy data to block buffers
+            for (size_t i = 0; i < pointsInBlock; ++i) {
+                const Point3D& point = points[pointsWritten + i];
+                xAppBlockBuffer[i] = point.x;
+                yAppBlockBuffer[i] = point.y;
+                zAppBlockBuffer[i] = point.z;
+            }
+
+            // Write current block
+            writer.write(pointsInBlock);
+            pointsWritten += pointsInBlock;
+        }
+
+        // Task W2.1.6: Close writer to finalize
+        writer.close();
+
+        std::cout << "E57WriterLibNoQt: Successfully wrote " << totalPoints << " points to scan" << std::endl;
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writePointsToScan");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(std::string("Standard exception in writePointsToScan: ") + ex.what());
+        return false;
+    }
+}
+
 bool E57WriterLibNoQt::closeFile()
 {
     if (!m_fileOpen) {
@@ -319,4 +425,85 @@ void E57WriterLibNoQt::handleE57Exception(const std::exception& ex, const std::s
 {
     std::string errorMsg = "E57 Exception in " + context + ": " + ex.what();
     setError(errorMsg);
+}
+
+// Sprint W2: Helper method implementations
+bool E57WriterLibNoQt::calculateAndWriteCartesianBounds(e57::StructureNode& scanNode, const std::vector<Point3D>& points)
+{
+    try {
+        // Task W2.2.1: Calculate min/max values for X, Y, Z coordinates
+        double minX = std::numeric_limits<double>::infinity();
+        double maxX = -std::numeric_limits<double>::infinity();
+        double minY = std::numeric_limits<double>::infinity();
+        double maxY = -std::numeric_limits<double>::infinity();
+        double minZ = std::numeric_limits<double>::infinity();
+        double maxZ = -std::numeric_limits<double>::infinity();
+
+        // Handle empty point set - Task W2.2.5
+        if (points.empty()) {
+            minX = maxX = minY = maxY = minZ = maxZ = 0.0;
+        } else {
+            for (const Point3D& point : points) {
+                minX = std::min(minX, point.x);
+                maxX = std::max(maxX, point.x);
+                minY = std::min(minY, point.y);
+                maxY = std::max(maxY, point.y);
+                minZ = std::min(minZ, point.z);
+                maxZ = std::max(maxZ, point.z);
+            }
+        }
+
+        // Task W2.2.3: Create cartesianBounds StructureNode
+        e57::StructureNode cartesianBoundsNode(*m_imageFile);
+        scanNode.set("cartesianBounds", cartesianBoundsNode);
+
+        // Task W2.2.4: Populate with six FloatNode children
+        cartesianBoundsNode.set("xMinimum", e57::FloatNode(*m_imageFile, minX, e57::PrecisionDouble));
+        cartesianBoundsNode.set("xMaximum", e57::FloatNode(*m_imageFile, maxX, e57::PrecisionDouble));
+        cartesianBoundsNode.set("yMinimum", e57::FloatNode(*m_imageFile, minY, e57::PrecisionDouble));
+        cartesianBoundsNode.set("yMaximum", e57::FloatNode(*m_imageFile, maxY, e57::PrecisionDouble));
+        cartesianBoundsNode.set("zMinimum", e57::FloatNode(*m_imageFile, minZ, e57::PrecisionDouble));
+        cartesianBoundsNode.set("zMaximum", e57::FloatNode(*m_imageFile, maxZ, e57::PrecisionDouble));
+
+        std::cout << "E57WriterLibNoQt: Calculated cartesian bounds: "
+                  << "X[" << minX << "," << maxX << "] "
+                  << "Y[" << minY << "," << maxY << "] "
+                  << "Z[" << minZ << "," << maxZ << "]" << std::endl;
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "calculateAndWriteCartesianBounds");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(std::string("Standard exception in calculateAndWriteCartesianBounds: ") + ex.what());
+        return false;
+    }
+}
+
+e57::StructureNode* E57WriterLibNoQt::getScanNode(int scanIndex)
+{
+    try {
+        if (!m_data3DNode) {
+            setError("Data3D vector not available");
+            return nullptr;
+        }
+
+        if (scanIndex < 0 || scanIndex >= static_cast<int>(m_data3DNode->childCount())) {
+            setError("Scan index " + std::to_string(scanIndex) + " out of range [0, " + std::to_string(m_data3DNode->childCount() - 1) + "]");
+            return nullptr;
+        }
+
+        // Return pointer to scan node - caller must handle lifetime
+        static e57::StructureNode scanNode;
+        scanNode = e57::StructureNode(m_data3DNode->get(scanIndex));
+        return &scanNode;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "getScanNode");
+        return nullptr;
+    } catch (const std::exception& ex) {
+        setError(std::string("Standard exception in getScanNode: ") + ex.what());
+        return nullptr;
+    }
 }
