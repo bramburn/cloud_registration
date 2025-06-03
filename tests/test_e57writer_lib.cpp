@@ -562,7 +562,8 @@ TEST_F(E57WriterLibTest, CartesianBoundsWithSinglePoint) {
     };
 
     // Write points
-    EXPECT_TRUE(writer->writePoints(testPoints)) << "Failed to write points: " << writer->getLastError().toStdString();
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
     // Verify bounds for single point
@@ -621,7 +622,8 @@ TEST_F(E57WriterLibTest, ErrorHandlingWritePointsWithoutPrototype) {
 
     // Try to write points without defining prototype first
     std::vector<E57WriterLib::Point3D> testPoints = {{1.0, 2.0, 3.0}};
-    EXPECT_FALSE(writer->writePoints(testPoints)) << "writePoints should fail without prototype";
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_FALSE(writer->writePoints(testPoints, xyzOnlyOptions)) << "writePoints should fail without prototype";
     EXPECT_FALSE(writer->getLastError().isEmpty()) << "Error message should be set";
 }
 
@@ -636,7 +638,8 @@ TEST_F(E57WriterLibTest, ErrorHandlingWritePointsInvalidScanIndex) {
 
     // Try to write to invalid scan index
     std::vector<E57WriterLib::Point3D> testPoints = {{1.0, 2.0, 3.0}};
-    EXPECT_FALSE(writer->writePoints(1, testPoints)) << "writePoints should fail for invalid scan index";
+    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    EXPECT_FALSE(writer->writePoints(1, testPoints, xyzOnlyOptions)) << "writePoints should fail for invalid scan index";
     EXPECT_FALSE(writer->getLastError().isEmpty()) << "Error message should be set";
 }
 
