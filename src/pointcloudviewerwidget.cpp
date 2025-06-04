@@ -41,9 +41,18 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_loadingAngle(0)
     , m_lodEnabled(false)  // Sprint 3.4: Initialize LOD state
     , m_lodSubsampleRate(0.5f)
+    , m_octree(std::make_unique<Octree>())  // Sprint R1: Initialize octree
+    , m_lodDistance1(50.0f)  // Sprint R1: Close LOD distance
+    , m_lodDistance2(200.0f)  // Sprint R1: Far LOD distance
+    , m_fps(0.0f)
+    , m_frameCount(0)
+    , m_visiblePointCount(0)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
+
+    // Initialize performance monitoring
+    m_lastFrameTime = std::chrono::high_resolution_clock::now();
 
     // Initialize matrices
     m_modelMatrix.setToIdentity();
@@ -174,63 +183,68 @@ void PointCloudViewerWidget::paintGL()
 
     // Sprint 2.3: Handle state-based rendering
     if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
-        // Render point cloud data
-        qDebug() << "paintGL: Rendering" << m_pointCount << "points";
+        // Sprint R1: Use octree-based rendering if LOD is enabled
+        if (m_lodEnabled && m_octree && m_octree->root) {
+            renderOctree();
+        } else {
+            // Fallback: traditional rendering
+            qDebug() << "paintGL: Rendering" << m_pointCount << "points (traditional)";
 
-        // Use shader program with error checking
-        if (!m_shaderProgram->bind()) {
-            qWarning() << "Failed to bind shader program";
-            paintOverlayGL(); // Still show overlay even if shader fails
-            return;
+            // Use shader program with error checking
+            if (!m_shaderProgram->bind()) {
+                qWarning() << "Failed to bind shader program";
+                paintOverlayGL(); // Still show overlay even if shader fails
+                return;
+            }
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            // Calculate MVP matrix
+            QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+
+            // Set uniforms with error checking
+            m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            // Bind VAO and draw points with error checking
+            m_vertexArrayObject.bind();
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            glDrawArrays(GL_POINTS, 0, m_pointCount);
+            error = glGetError();
+            if (error != GL_NO_ERROR) {
+                qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
+            }
+
+            m_vertexArrayObject.release();
+            m_shaderProgram->release();
         }
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        // Calculate MVP matrix
-        QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
-
-        // Set uniforms with error checking
-        m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        qDebug() << "paintGL: Point size set to:" << m_pointSize;
-
-        // Bind VAO and draw points with error checking
-        m_vertexArrayObject.bind();
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        qDebug() << "paintGL: Drawing" << m_pointCount << "points with glDrawArrays(GL_POINTS, 0," << m_pointCount << ")";
-        glDrawArrays(GL_POINTS, 0, m_pointCount);
-        error = glGetError();
-        if (error != GL_NO_ERROR) {
-            qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
-        }
-
-        m_vertexArrayObject.release();
-        m_shaderProgram->release();
 
         // Draw UCS indicator
         drawUCS();
+
+        // Update FPS counter
+        updateFPS();
     } else if (m_showErrorState || !m_hasData) {
         // Sprint 1.3: Handle legacy error state rendering (Task 1.3.3.2)
         renderErrorState();
@@ -460,6 +474,15 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 
     m_hasData = true;
     qDebug() << "m_hasData set to true";
+
+    // Sprint R1: Build octree for LOD system
+    if (m_lodEnabled) {
+        qDebug() << "Building octree for LOD system...";
+        m_octree->buildFromFloatArray(m_pointData, 8, 100);
+        qDebug() << "Octree built - Total points:" << m_octree->getTotalPointCount()
+                 << "Max depth:" << m_octree->getMaxDepth()
+                 << "Node count:" << m_octree->getNodeCount();
+    }
 
     // Sprint 1.3: Clear error state when data is successfully loaded
     m_showErrorState = false;
@@ -1161,5 +1184,138 @@ void PointCloudViewerWidget::setLODSubsampleRate(float rate)
     // If LOD is currently enabled, trigger repaint
     if (m_lodEnabled) {
         update();
+    }
+}
+
+// Sprint R1: Advanced LOD system implementation
+void PointCloudViewerWidget::setLODEnabled(bool enabled)
+{
+    m_lodEnabled = enabled;
+    qDebug() << "Advanced LOD system:" << (enabled ? "enabled" : "disabled");
+
+    // Sprint R1: Build octree when LOD is enabled
+    if (enabled && m_hasData && !m_pointData.empty()) {
+        qDebug() << "Building octree for LOD system...";
+        m_octree->buildFromFloatArray(m_pointData, 8, 100);
+        qDebug() << "Octree built - Total points:" << m_octree->getTotalPointCount()
+                 << "Max depth:" << m_octree->getMaxDepth()
+                 << "Node count:" << m_octree->getNodeCount();
+    }
+
+    update(); // Trigger repaint
+}
+
+void PointCloudViewerWidget::setLODDistances(float distance1, float distance2)
+{
+    m_lodDistance1 = distance1;
+    m_lodDistance2 = distance2;
+    qDebug() << "LOD distances set - Close:" << distance1 << "Far:" << distance2;
+    update();
+}
+
+void PointCloudViewerWidget::getLODDistances(float& distance1, float& distance2) const
+{
+    distance1 = m_lodDistance1;
+    distance2 = m_lodDistance2;
+}
+
+size_t PointCloudViewerWidget::getOctreeNodeCount() const
+{
+    return m_octree ? m_octree->getNodeCount() : 0;
+}
+
+void PointCloudViewerWidget::renderOctree()
+{
+    if (!m_octree || !m_octree->root) {
+        return;
+    }
+
+    // Extract frustum planes from view-projection matrix
+    QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+    auto frustumPlanes = extractFrustumPlanes(viewProjection);
+
+    // Clear previous visible points
+    m_visiblePoints.clear();
+
+    // Collect visible points using octree traversal
+    m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition,
+                              m_lodDistance1, m_lodDistance2, m_visiblePoints);
+
+    m_visiblePointCount = m_visiblePoints.size();
+
+    if (m_visiblePoints.empty()) {
+        return;
+    }
+
+    qDebug() << "Octree rendering - Visible points:" << m_visiblePointCount
+             << "out of" << m_octree->getTotalPointCount();
+
+    // Convert PointFullData to flat float array for OpenGL
+    std::vector<float> renderData;
+    renderData.reserve(m_visiblePoints.size() * 3);
+
+    for (const auto& point : m_visiblePoints) {
+        renderData.push_back(point.x);
+        renderData.push_back(point.y);
+        renderData.push_back(point.z);
+    }
+
+    // Use shader program with error checking
+    if (!m_shaderProgram->bind()) {
+        qWarning() << "Failed to bind shader program in octree rendering";
+        return;
+    }
+
+    // Set uniforms
+    m_shaderProgram->setUniformValue(m_mvpMatrixLocation, viewProjection);
+    m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+    m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+
+    // Create temporary VBO for visible points
+    QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
+    if (!tempBuffer.create()) {
+        qWarning() << "Failed to create temporary VBO for octree rendering";
+        m_shaderProgram->release();
+        return;
+    }
+
+    tempBuffer.bind();
+    tempBuffer.allocate(renderData.data(), static_cast<int>(renderData.size() * sizeof(float)));
+
+    // Set vertex attribute
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+
+    // Draw points
+    glDrawArrays(GL_POINTS, 0, static_cast<int>(m_visiblePoints.size()));
+
+    // Cleanup
+    glDisableVertexAttribArray(0);
+    tempBuffer.release();
+    m_shaderProgram->release();
+}
+
+std::array<QVector4D, 6> PointCloudViewerWidget::extractFrustumPlanes(const QMatrix4x4& viewProjection) const
+{
+    return FrustumUtils::extractFrustumPlanes(viewProjection);
+}
+
+void PointCloudViewerWidget::updateFPS()
+{
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto deltaTime = std::chrono::duration_cast<std::chrono::microseconds>(currentTime - m_lastFrameTime);
+
+    m_frameCount++;
+    if (deltaTime.count() >= 1000000) { // Update every second
+        m_fps = m_frameCount * 1000000.0f / deltaTime.count();
+        m_frameCount = 0;
+        m_lastFrameTime = currentTime;
+
+        // Debug output for performance monitoring
+        if (m_lodEnabled && m_octree && m_octree->root) {
+            qDebug() << "FPS:" << QString::number(m_fps, 'f', 1)
+                     << "Visible points:" << m_visiblePointCount
+                     << "Total points:" << m_octree->getTotalPointCount();
+        }
     }
 }
