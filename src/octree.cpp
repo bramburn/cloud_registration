@@ -1,6 +1,8 @@
 #include "octree.h"
+#include "screenspaceerror.h"
 #include <QDebug>
 #include <algorithm>
+#include <random>
 #include <cmath>
 
 void OctreeNode::insert(const PointFullData& point, int maxDepth, int maxPointsPerNode) {
@@ -366,5 +368,108 @@ namespace FrustumUtils {
             }
         }
         return true;
+    }
+}
+
+// Sprint R2: Point sampling methods implementation
+std::vector<PointFullData> OctreeNode::getSampledPoints(int maxPoints) const {
+    if (points.empty()) {
+        return {};
+    }
+
+    if (static_cast<int>(points.size()) <= maxPoints) {
+        return points;
+    }
+
+    std::vector<PointFullData> sampledPoints;
+    sampledPoints.reserve(maxPoints);
+
+    // Use deterministic sampling based on point index for consistency
+    int step = static_cast<int>(points.size()) / maxPoints;
+    for (int i = 0; i < maxPoints && i * step < static_cast<int>(points.size()); ++i) {
+        sampledPoints.push_back(points[i * step]);
+    }
+
+    return sampledPoints;
+}
+
+std::vector<PointFullData> OctreeNode::getSampledPointsByPercentage(float percentage) const {
+    int maxPoints = static_cast<int>(points.size() * percentage);
+    return getSampledPoints(maxPoints);
+}
+
+std::vector<PointFullData> OctreeNode::getRepresentativePoints() const {
+    if (!m_representativePointsCalculated) {
+        calculateRepresentativePoints();
+        m_representativePointsCalculated = true;
+    }
+    return m_representativePoints;
+}
+
+void OctreeNode::calculateRepresentativePoints() const {
+    if (isLeaf) {
+        // For leaf nodes, use a subset of points
+        m_representativePoints = getSampledPoints(std::min(100, static_cast<int>(points.size())));
+    } else {
+        // For internal nodes, collect representative points from children
+        m_representativePoints.clear();
+        for (const auto& child : children) {
+            if (child) {
+                auto childRepPoints = child->getRepresentativePoints();
+                m_representativePoints.insert(m_representativePoints.end(),
+                                            childRepPoints.begin(), childRepPoints.end());
+            }
+        }
+
+        // Limit total representative points for internal nodes
+        if (m_representativePoints.size() > 200) {
+            m_representativePoints.resize(200);
+        }
+    }
+}
+
+void OctreeNode::collectVisiblePointsWithScreenSpaceError(
+    const std::array<QVector4D, 6>& frustumPlanes,
+    const QMatrix4x4& mvpMatrix,
+    const ViewportInfo& viewport,
+    float primaryThreshold,
+    float cullThreshold,
+    std::vector<PointFullData>& visiblePoints) const {
+
+    // Check frustum culling first
+    if (!intersectsFrustum(frustumPlanes)) {
+        return;
+    }
+
+    // Calculate screen-space error
+    float screenSpaceError = ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(
+        bounds, mvpMatrix, viewport);
+
+    // Cull if error is too small
+    if (ScreenSpaceErrorCalculator::shouldCullNode(screenSpaceError, cullThreshold)) {
+        return;
+    }
+
+    // Stop recursion if error is below primary threshold
+    if (ScreenSpaceErrorCalculator::shouldStopRecursion(screenSpaceError, primaryThreshold)) {
+        // Render representative points for this coarse LOD level
+        auto representativePoints = getRepresentativePoints();
+        visiblePoints.insert(visiblePoints.end(),
+                           representativePoints.begin(), representativePoints.end());
+        return;
+    }
+
+    if (isLeaf) {
+        // Leaf node: add all points
+        visiblePoints.insert(visiblePoints.end(), points.begin(), points.end());
+    } else {
+        // Internal node: recurse to children
+        for (const auto& child : children) {
+            if (child) {
+                child->collectVisiblePointsWithScreenSpaceError(
+                    frustumPlanes, mvpMatrix, viewport,
+                    primaryThreshold, cullThreshold, visiblePoints);
+            }
+        }
     }
 }

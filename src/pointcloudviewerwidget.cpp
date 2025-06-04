@@ -44,6 +44,8 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_octree(std::make_unique<Octree>())  // Sprint R1: Initialize octree
     , m_lodDistance1(50.0f)  // Sprint R1: Close LOD distance
     , m_lodDistance2(200.0f)  // Sprint R1: Far LOD distance
+    , m_primaryScreenSpaceErrorThreshold(50.0f)  // Sprint R2: Primary threshold (pixels)
+    , m_cullScreenSpaceErrorThreshold(2.0f)      // Sprint R2: Cull threshold (pixels)
     , m_fps(0.0f)
     , m_frameCount(0)
     , m_visiblePointCount(0)
@@ -183,9 +185,9 @@ void PointCloudViewerWidget::paintGL()
 
     // Sprint 2.3: Handle state-based rendering
     if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
-        // Sprint R1: Use octree-based rendering if LOD is enabled
+        // Sprint R2: Use screen-space error LOD if enabled, otherwise fall back to R1 or traditional
         if (m_lodEnabled && m_octree && m_octree->root) {
-            renderOctree();
+            renderWithScreenSpaceErrorLOD();
         } else {
             // Fallback: traditional rendering
             qDebug() << "paintGL: Rendering" << m_pointCount << "points (traditional)";
@@ -1224,6 +1226,28 @@ size_t PointCloudViewerWidget::getOctreeNodeCount() const
     return m_octree ? m_octree->getNodeCount() : 0;
 }
 
+// Sprint R2: Screen-space error LOD control slot implementations
+void PointCloudViewerWidget::setScreenSpaceErrorThreshold(float threshold)
+{
+    m_primaryScreenSpaceErrorThreshold = threshold;
+    qDebug() << "Screen-space error threshold set to:" << threshold;
+    update();
+}
+
+void PointCloudViewerWidget::setPrimaryScreenSpaceErrorThreshold(float threshold)
+{
+    m_primaryScreenSpaceErrorThreshold = threshold;
+    qDebug() << "Primary screen-space error threshold set to:" << threshold;
+    update();
+}
+
+void PointCloudViewerWidget::setCullScreenSpaceErrorThreshold(float threshold)
+{
+    m_cullScreenSpaceErrorThreshold = threshold;
+    qDebug() << "Cull screen-space error threshold set to:" << threshold;
+    update();
+}
+
 void PointCloudViewerWidget::renderOctree()
 {
     if (!m_octree || !m_octree->root) {
@@ -1317,5 +1341,106 @@ void PointCloudViewerWidget::updateFPS()
                      << "Visible points:" << m_visiblePointCount
                      << "Total points:" << m_octree->getTotalPointCount();
         }
+    }
+}
+
+// Sprint R2: Enhanced rendering methods implementation
+void PointCloudViewerWidget::renderWithScreenSpaceErrorLOD()
+{
+    if (!m_octree || !m_octree->root) {
+        return;
+    }
+
+    updateViewportInfo();
+
+    // Extract frustum planes from view-projection matrix
+    QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+    auto frustumPlanes = extractFrustumPlanes(viewProjection);
+
+    // Clear previous visible points
+    m_visiblePoints.clear();
+
+    // Collect visible points using screen-space error LOD
+    m_octree->root->collectVisiblePointsWithScreenSpaceError(
+        frustumPlanes, viewProjection, m_viewportInfo,
+        m_primaryScreenSpaceErrorThreshold,
+        m_cullScreenSpaceErrorThreshold,
+        m_visiblePoints
+    );
+
+    m_visiblePointCount = m_visiblePoints.size();
+
+    if (m_visiblePoints.empty()) {
+        return;
+    }
+
+    // Log statistics for debugging
+    logLODStatistics(m_visiblePoints);
+
+    // Convert PointFullData to flat float array for OpenGL
+    std::vector<float> renderData;
+    renderData.reserve(m_visiblePoints.size() * 3);
+
+    for (const auto& point : m_visiblePoints) {
+        renderData.push_back(point.x);
+        renderData.push_back(point.y);
+        renderData.push_back(point.z);
+    }
+
+    // Use shader program with error checking
+    if (!m_shaderProgram->bind()) {
+        qWarning() << "Failed to bind shader program in screen-space error LOD rendering";
+        return;
+    }
+
+    // Set uniforms
+    m_shaderProgram->setUniformValue(m_mvpMatrixLocation, viewProjection);
+    m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
+    m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+
+    // Create temporary VBO for visible points
+    QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
+    if (!tempBuffer.create()) {
+        qWarning() << "Failed to create temporary VBO for screen-space error LOD rendering";
+        m_shaderProgram->release();
+        return;
+    }
+
+    tempBuffer.bind();
+    tempBuffer.allocate(renderData.data(), static_cast<int>(renderData.size() * sizeof(float)));
+
+    // Set vertex attribute
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+
+    // Draw points
+    glDrawArrays(GL_POINTS, 0, static_cast<int>(m_visiblePoints.size()));
+
+    // Cleanup
+    glDisableVertexAttribArray(0);
+    tempBuffer.release();
+    m_shaderProgram->release();
+}
+
+void PointCloudViewerWidget::updateViewportInfo()
+{
+    m_viewportInfo.width = width();
+    m_viewportInfo.height = height();
+    m_viewportInfo.nearPlane = 0.1f;  // Should match your projection matrix
+    m_viewportInfo.farPlane = 1000.0f; // Should match your projection matrix
+}
+
+void PointCloudViewerWidget::logLODStatistics(const std::vector<PointFullData>& visiblePoints)
+{
+    static int frameCount = 0;
+    frameCount++;
+
+    if (frameCount % 60 == 0) { // Log every 60 frames
+        qDebug() << "Sprint R2 LOD Statistics:"
+                 << "Visible points:" << visiblePoints.size()
+                 << "Total points:" << (m_octree ? m_octree->getTotalPointCount() : 0)
+                 << "Primary threshold:" << m_primaryScreenSpaceErrorThreshold
+                 << "Cull threshold:" << m_cullScreenSpaceErrorThreshold
+                 << "FPS:" << QString::number(m_fps, 'f', 1);
     }
 }

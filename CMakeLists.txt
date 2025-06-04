@@ -142,6 +142,8 @@ set(SOURCES
     src/progressmanager.cpp
     # Sprint R1: Advanced Rendering - LOD System
     src/octree.cpp
+    # Sprint R2: Screen-Space Error LOD Enhancements
+    src/screenspaceerror.cpp
 )
 
 # Header files
@@ -181,6 +183,8 @@ set(HEADERS
     src/progressmanager.h
     # Sprint R1: Advanced Rendering - LOD System
     src/octree.h
+    # Sprint R2: Screen-Space Error LOD Enhancements
+    src/screenspaceerror.h
 )
 
 # Shader files
@@ -485,6 +489,24 @@ if(TARGET GTest::gtest_main)
     )
 
     target_include_directories(Sprint34Demo PRIVATE src)
+
+    # Sprint R2 Demo Program
+    add_executable(SprintR2Demo
+        tests/demos/test_sprint_r2_demo.cpp
+        src/pointcloudviewerwidget.cpp
+        src/octree.cpp
+        src/screenspaceerror.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(SprintR2Demo
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
+        Qt6::OpenGLWidgets
+    )
+
+    target_include_directories(SprintR2Demo PRIVATE src)
 
     # libE57Format Linkage Test (Sprint 1)
     add_executable(LibE57LinkageTest
@@ -861,11 +883,31 @@ if(TARGET GTest::gtest_main)
     target_include_directories(SprintR1LODTests PRIVATE src)
     add_test(NAME SprintR1LODTests COMMAND SprintR1LODTests)
 
+    # Sprint R2: Screen-Space Error LOD Enhancement Tests
+    add_executable(SprintR2LODTests
+        tests/test_pointcloudviewerwidget_lod_r2.cpp
+        src/octree.cpp
+        src/screenspaceerror.cpp
+        src/pointcloudviewerwidget.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(SprintR2LODTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::OpenGLWidgets
+        Qt6::Test
+    )
+
+    target_include_directories(SprintR2LODTests PRIVATE src)
+    add_test(NAME SprintR2LODTests COMMAND SprintR2LODTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests
-        COMMENT "Running all unit tests including Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
+        COMMENT "Running all unit tests including Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1: E57ParserLib testing targets
@@ -901,6 +943,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*SprintR1.*"
         DEPENDS SprintR1LODTests
         COMMENT "Running Sprint R1 LOD system tests"
+    )
+
+    # Sprint R2: Screen-Space Error LOD Enhancement testing targets
+    add_custom_target(run_sprintr2_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*SprintR2.*"
+        DEPENDS SprintR2LODTests
+        COMMENT "Running Sprint R2 screen-space error LOD enhancement tests"
     )
 
     add_custom_target(generate_complex_test_files

@@ -16,6 +16,7 @@
 #include <memory>
 #include <chrono>
 #include "octree.h"
+#include "screenspaceerror.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -82,6 +83,11 @@ public slots:
     void toggleLOD(bool enabled);
     void setLODSubsampleRate(float rate);
 
+    // Sprint R2: Screen-space error LOD control slots
+    void setScreenSpaceErrorThreshold(float threshold);
+    void setPrimaryScreenSpaceErrorThreshold(float threshold);
+    void setCullScreenSpaceErrorThreshold(float threshold);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -118,6 +124,11 @@ private:
     void renderOctree();
     void updateFPS();
     std::array<QVector4D, 6> extractFrustumPlanes(const QMatrix4x4& viewProjection) const;
+
+    // Sprint R2: Enhanced rendering methods
+    void renderWithScreenSpaceErrorLOD();
+    void updateViewportInfo();
+    void logLODStatistics(const std::vector<PointFullData>& visiblePoints);
 
 private slots:
     void updateLoadingAnimation();
@@ -207,6 +218,11 @@ private:
     float m_lodDistance1;
     float m_lodDistance2;
     std::vector<PointFullData> m_visiblePoints;
+
+    // Sprint R2: Screen-space error LOD system
+    float m_primaryScreenSpaceErrorThreshold;  // Stop recursion threshold (pixels)
+    float m_cullScreenSpaceErrorThreshold;     // Cull completely threshold (pixels)
+    ViewportInfo m_viewportInfo;
 
     // Performance monitoring
     std::chrono::high_resolution_clock::time_point m_lastFrameTime;
