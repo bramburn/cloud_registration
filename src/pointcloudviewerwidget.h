@@ -13,6 +13,9 @@
 #include <QTimer>
 #include <QFont>
 #include <vector>
+#include <memory>
+#include <chrono>
+#include "octree.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -50,6 +53,17 @@ public:
     void simulateOrbitCamera(const QPoint &start, const QPoint &end);
     void simulatePanCamera(const QPoint &start, const QPoint &end);
     void simulateZoomCamera(float factor);
+
+    // Sprint R1: LOD system controls
+    void setLODEnabled(bool enabled);
+    bool isLODEnabled() const { return m_lodEnabled; }
+    void setLODDistances(float distance1, float distance2);
+    void getLODDistances(float& distance1, float& distance2) const;
+
+    // Performance monitoring
+    float getCurrentFPS() const { return m_fps; }
+    size_t getVisiblePointCount() const { return m_visiblePointCount; }
+    size_t getOctreeNodeCount() const;
 
 public slots:
     // View control slots
@@ -99,6 +113,11 @@ private:
     void drawLoadingState(QPainter &painter);
     void drawLoadFailedState(QPainter &painter);
     void drawIdleState(QPainter &painter);
+
+    // Sprint R1: LOD rendering methods
+    void renderOctree();
+    void updateFPS();
+    std::array<QVector4D, 6> extractFrustumPlanes(const QMatrix4x4& viewProjection) const;
 
 private slots:
     void updateLoadingAnimation();
@@ -179,9 +198,21 @@ private:
     QFont m_overlayFont;
     QFont m_detailFont;
 
-    // Sprint 3.4: LOD state
+    // Sprint 3.4: LOD state (legacy)
     bool m_lodEnabled;
     float m_lodSubsampleRate;
+
+    // Sprint R1: Advanced LOD system
+    std::unique_ptr<Octree> m_octree;
+    float m_lodDistance1;
+    float m_lodDistance2;
+    std::vector<PointFullData> m_visiblePoints;
+
+    // Performance monitoring
+    std::chrono::high_resolution_clock::time_point m_lastFrameTime;
+    float m_fps;
+    int m_frameCount;
+    size_t m_visiblePointCount;
 };
 
 #endif // POINTCLOUDVIEWERWIDGET_H
