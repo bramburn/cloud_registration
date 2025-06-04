@@ -46,6 +46,12 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_lodDistance2(200.0f)  // Sprint R1: Far LOD distance
     , m_primaryScreenSpaceErrorThreshold(50.0f)  // Sprint R2: Primary threshold (pixels)
     , m_cullScreenSpaceErrorThreshold(2.0f)      // Sprint R2: Cull threshold (pixels)
+    , m_renderWithColor(false)                   // Sprint R3: Initialize attribute rendering
+    , m_renderWithIntensity(false)
+    , m_pointSizeAttenuationEnabled(false)
+    , m_minPointSize(1.0f)
+    , m_maxPointSize(10.0f)
+    , m_attenuationFactor(0.1f)
     , m_fps(0.0f)
     , m_frameCount(0)
     , m_visiblePointCount(0)
@@ -185,8 +191,12 @@ void PointCloudViewerWidget::paintGL()
 
     // Sprint 2.3: Handle state-based rendering
     if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
+        // Sprint R3: Use enhanced attribute rendering if color/intensity features are enabled
+        if (m_renderWithColor || m_renderWithIntensity || m_pointSizeAttenuationEnabled) {
+            renderWithAttributes();
+        }
         // Sprint R2: Use screen-space error LOD if enabled, otherwise fall back to R1 or traditional
-        if (m_lodEnabled && m_octree && m_octree->root) {
+        else if (m_lodEnabled && m_octree && m_octree->root) {
             renderWithScreenSpaceErrorLOD();
         } else {
             // Fallback: traditional rendering
@@ -260,32 +270,91 @@ void PointCloudViewerWidget::setupShaders()
 {
     m_shaderProgram = new QOpenGLShaderProgram(this);
 
-    // Vertex shader source (embedded for simplicity)
+    // Sprint R3: Enhanced vertex shader with attribute support (Tasks R3.1.2, R3.2.2, R3.3.1)
     const char* vertexShaderSource = R"(
         #version 330 core
 
+        // Vertex attributes as specified in backlog Task R3.1.2, R3.2.2
         layout (location = 0) in vec3 position;
+        layout (location = 1) in vec3 vertexColor;
+        layout (location = 2) in float vertexIntensity;
 
+        // Uniforms for transformation
         uniform mat4 mvpMatrix;
-        uniform float pointSize;
 
-        void main()
-        {
+        // Uniforms for point size attenuation as specified in Task R3.3.1
+        uniform vec3 cameraPosition_worldSpace;
+        uniform float minPointSize;
+        uniform float maxPointSize;
+        uniform float attenuationFactor;
+        uniform bool pointSizeAttenuationEnabled;
+        uniform float basePointSize;
+
+        // Outputs to fragment shader
+        out vec3 fragVertexColor;
+        out float fragVertexIntensity;
+
+        void main() {
             gl_Position = mvpMatrix * vec4(position, 1.0);
-            gl_PointSize = pointSize;
+
+            // Pass attributes to fragment shader
+            fragVertexColor = vertexColor;
+            fragVertexIntensity = vertexIntensity;
+
+            // Point size attenuation calculation as specified in Task R3.3.1
+            if (pointSizeAttenuationEnabled) {
+                float distance = length(cameraPosition_worldSpace - position);
+                float attenuatedSize = basePointSize / (1.0 + distance * attenuationFactor);
+                gl_PointSize = clamp(attenuatedSize, minPointSize, maxPointSize);
+            } else {
+                gl_PointSize = basePointSize;
+            }
         }
     )";
 
-    // Fragment shader source (embedded for simplicity)
+    // Sprint R3: Enhanced fragment shader with attribute rendering (Tasks R3.1.3, R3.2.3)
     const char* fragmentShaderSource = R"(
         #version 330 core
 
-        uniform vec3 color;
+        // Inputs from vertex shader
+        in vec3 fragVertexColor;
+        in float fragVertexIntensity;
+
+        // Uniforms for rendering control
+        uniform bool renderWithColor;
+        uniform bool renderWithIntensity;
+        uniform vec3 uniformColor;
+
         out vec4 fragColor;
 
-        void main()
-        {
-            fragColor = vec4(color, 1.0);
+        void main() {
+            vec3 finalColor = uniformColor;
+
+            // Color rendering logic as specified in Task R3.1.3
+            if (renderWithColor) {
+                finalColor = fragVertexColor;
+            }
+
+            // Intensity rendering logic as specified in Task R3.2.3
+            if (renderWithIntensity) {
+                if (renderWithColor) {
+                    // Modulate color with intensity
+                    finalColor = fragVertexColor * fragVertexIntensity;
+                } else {
+                    // Grayscale intensity mapping
+                    finalColor = vec3(fragVertexIntensity);
+                }
+            }
+
+            // Create circular point shape with smooth edges
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            float distance = length(coord);
+            if (distance > 0.5) {
+                discard;
+            }
+
+            float alpha = 1.0 - smoothstep(0.3, 0.5, distance);
+            fragColor = vec4(finalColor, alpha);
         }
     )";
 
@@ -350,7 +419,41 @@ void PointCloudViewerWidget::setupBuffers()
         return;
     }
 
+    // Sprint R3: Setup enhanced vertex array object for attribute rendering (Task R3.1.4)
+    setupEnhancedVertexArrayObject();
+
     qDebug() << "OpenGL buffers created successfully";
+}
+
+// Sprint R3: Enhanced vertex array object setup (as per backlog Task R3.1.4)
+void PointCloudViewerWidget::setupEnhancedVertexArrayObject()
+{
+    m_vertexArrayObject.bind();
+    m_vertexBuffer.bind();
+
+    if (m_shaderProgram) {
+        m_shaderProgram->bind();
+
+        // Position attribute (location 0) - XYZ
+        m_shaderProgram->enableAttributeArray(0);
+        m_shaderProgram->setAttributeBuffer(0, GL_FLOAT,
+            offsetof(VertexData, position), 3, sizeof(VertexData));
+
+        // Color attribute (location 1) - RGB
+        m_shaderProgram->enableAttributeArray(1);
+        m_shaderProgram->setAttributeBuffer(1, GL_FLOAT,
+            offsetof(VertexData, color), 3, sizeof(VertexData));
+
+        // Intensity attribute (location 2) - I
+        m_shaderProgram->enableAttributeArray(2);
+        m_shaderProgram->setAttributeBuffer(2, GL_FLOAT,
+            offsetof(VertexData, intensity), 1, sizeof(VertexData));
+
+        m_shaderProgram->release();
+    }
+
+    m_vertexBuffer.release();
+    m_vertexArrayObject.release();
 }
 
 void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
@@ -1443,4 +1546,106 @@ void PointCloudViewerWidget::logLODStatistics(const std::vector<PointFullData>& 
                  << "Cull threshold:" << m_cullScreenSpaceErrorThreshold
                  << "FPS:" << QString::number(m_fps, 'f', 1);
     }
+}
+
+// Sprint R3: Enhanced rendering methods implementation (as per backlog Tasks R3.1.4, R3.1.5)
+void PointCloudViewerWidget::renderWithAttributes()
+{
+    if (!m_shaderProgram || m_vertexData.empty()) return;
+
+    // Collect visible points using LOD system (integrating with R1/R2 as specified in backlog)
+    QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+    auto frustumPlanes = extractFrustumPlanes(viewProjection);
+
+    m_visiblePoints.clear();
+    if (m_octree && m_octree->root) {
+        m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition,
+                                  m_lodDistance1, m_lodDistance2, m_visiblePoints);
+    }
+
+    if (m_visiblePoints.empty()) return;
+
+    // Prepare vertex data for visible points
+    prepareVertexData(m_visiblePoints);
+
+    // Bind shader and set uniforms as specified in Task R3.1.5, R3.3.2
+    if (!m_shaderProgram->bind()) {
+        qWarning() << "Failed to bind enhanced shader program";
+        return;
+    }
+
+    // Set transformation uniforms
+    m_shaderProgram->setUniformValue("mvpMatrix", viewProjection);
+
+    // Set camera position for point size attenuation (Task R3.3.2)
+    m_shaderProgram->setUniformValue("cameraPosition_worldSpace", m_cameraPosition);
+
+    // Set rendering mode flags (Tasks R3.1.6, R3.2.5)
+    m_shaderProgram->setUniformValue("renderWithColor", m_renderWithColor);
+    m_shaderProgram->setUniformValue("renderWithIntensity", m_renderWithIntensity);
+
+    // Set point size attenuation parameters (Task R3.3.3)
+    m_shaderProgram->setUniformValue("pointSizeAttenuationEnabled", m_pointSizeAttenuationEnabled);
+    m_shaderProgram->setUniformValue("basePointSize", m_pointSize);
+    m_shaderProgram->setUniformValue("minPointSize", m_minPointSize);
+    m_shaderProgram->setUniformValue("maxPointSize", m_maxPointSize);
+    m_shaderProgram->setUniformValue("attenuationFactor", m_attenuationFactor);
+
+    // Set uniform color for fallback
+    m_shaderProgram->setUniformValue("uniformColor", m_pointColor);
+
+    // Render points
+    m_vertexArrayObject.bind();
+    glDrawArrays(GL_POINTS, 0, static_cast<int>(m_vertexData.size()));
+    m_vertexArrayObject.release();
+
+    m_shaderProgram->release();
+}
+
+void PointCloudViewerWidget::prepareVertexData(const std::vector<PointFullData>& points)
+{
+    m_vertexData.clear();
+    m_vertexData.reserve(points.size());
+
+    for (const auto& point : points) {
+        m_vertexData.emplace_back(point);
+    }
+
+    // Update VBO with new vertex data (interleaved X,Y,Z,R,G,B,I as per backlog Task R3.1.4)
+    m_vertexBuffer.bind();
+    m_vertexBuffer.allocate(m_vertexData.data(),
+                           static_cast<int>(m_vertexData.size() * sizeof(VertexData)));
+    m_vertexBuffer.release();
+}
+
+// Sprint R3: Attribute rendering and point size attenuation slot implementations (as per backlog)
+void PointCloudViewerWidget::setRenderWithColor(bool enabled)
+{
+    m_renderWithColor = enabled;
+    qDebug() << "Color rendering:" << (enabled ? "enabled" : "disabled");
+    update();
+}
+
+void PointCloudViewerWidget::setRenderWithIntensity(bool enabled)
+{
+    m_renderWithIntensity = enabled;
+    qDebug() << "Intensity rendering:" << (enabled ? "enabled" : "disabled");
+    update();
+}
+
+void PointCloudViewerWidget::setPointSizeAttenuationEnabled(bool enabled)
+{
+    m_pointSizeAttenuationEnabled = enabled;
+    qDebug() << "Point size attenuation:" << (enabled ? "enabled" : "disabled");
+    update();
+}
+
+void PointCloudViewerWidget::setPointSizeAttenuationParams(float minSize, float maxSize, float factor)
+{
+    m_minPointSize = minSize;
+    m_maxPointSize = maxSize;
+    m_attenuationFactor = factor;
+    qDebug() << "Point size attenuation params - Min:" << minSize
+             << "Max:" << maxSize << "Factor:" << factor;
+    update();
 }

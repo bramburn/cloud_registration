@@ -22,6 +22,8 @@ class ScanImportDialog;
 class SQLiteManager;
 class QProgressDialog;
 class QPushButton;
+class QCheckBox;
+class QSlider;
 struct LasHeaderMetadata;
 struct ScanInfo;
 
@@ -73,10 +75,17 @@ private slots:
     void onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd);
     void onCancelCurrentOperation();
 
+    // Sprint R3: Attribute rendering and point size attenuation slots (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
+    void onColorRenderToggled(bool enabled);
+    void onIntensityRenderToggled(bool enabled);
+    void onAttenuationToggled(bool enabled);
+    void onAttenuationParamsChanged();
+
 private:
     void setupUI();
     void setupMenuBar();
     void setupStatusBar();
+    void setupSprintR3Controls(QVBoxLayout* parentLayout);
     void transitionToProjectView(const QString &projectPath);
     void updateWindowTitle(const QString &projectName = QString());
 
@@ -166,6 +175,17 @@ private:
     QLabel* m_timeLabel;
     QPushButton* m_cancelButton;
     QString m_currentOperationId;
+
+    // Sprint R3: Attribute rendering and point size controls (as per backlog member variables)
+    QCheckBox* m_colorRenderCheckbox;
+    QCheckBox* m_intensityRenderCheckbox;
+    QCheckBox* m_attenuationCheckbox;
+    QSlider* m_minSizeSlider;
+    QSlider* m_maxSizeSlider;
+    QSlider* m_attenuationFactorSlider;
+    QLabel* m_minSizeLabel;
+    QLabel* m_maxSizeLabel;
+    QLabel* m_attenuationFactorLabel;
 };
 
 #endif // MAINWINDOW_H

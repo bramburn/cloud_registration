@@ -17,6 +17,7 @@
 #include <chrono>
 #include "octree.h"
 #include "screenspaceerror.h"
+#include "pointdata.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -88,6 +89,12 @@ public slots:
     void setPrimaryScreenSpaceErrorThreshold(float threshold);
     void setCullScreenSpaceErrorThreshold(float threshold);
 
+    // Sprint R3: Attribute rendering and point size attenuation slots (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
+    void setRenderWithColor(bool enabled);
+    void setRenderWithIntensity(bool enabled);
+    void setPointSizeAttenuationEnabled(bool enabled);
+    void setPointSizeAttenuationParams(float minSize, float maxSize, float factor);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -129,6 +136,12 @@ private:
     void renderWithScreenSpaceErrorLOD();
     void updateViewportInfo();
     void logLODStatistics(const std::vector<PointFullData>& visiblePoints);
+
+    // Sprint R3: Enhanced rendering methods (as per backlog Tasks R3.1.4, R3.1.5)
+    void renderWithAttributes();
+    void prepareVertexData(const std::vector<PointFullData>& points);
+    void setupEnhancedShaders();
+    void setupEnhancedVertexArrayObject();
 
 private slots:
     void updateLoadingAnimation();
@@ -223,6 +236,15 @@ private:
     float m_primaryScreenSpaceErrorThreshold;  // Stop recursion threshold (pixels)
     float m_cullScreenSpaceErrorThreshold;     // Cull completely threshold (pixels)
     ViewportInfo m_viewportInfo;
+
+    // Sprint R3: Attribute rendering and point size attenuation (as per backlog member variables)
+    bool m_renderWithColor;
+    bool m_renderWithIntensity;
+    bool m_pointSizeAttenuationEnabled;
+    float m_minPointSize;
+    float m_maxPointSize;
+    float m_attenuationFactor;
+    std::vector<VertexData> m_vertexData;
 
     // Performance monitoring
     std::chrono::high_resolution_clock::time_point m_lastFrameTime;
