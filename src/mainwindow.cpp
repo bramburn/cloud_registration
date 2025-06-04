@@ -29,6 +29,9 @@
 #include <QFileDialog>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QGroupBox>
+#include <QCheckBox>
+#include <QSlider>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -62,6 +65,15 @@ MainWindow::MainWindow(QWidget *parent)
     , m_statusLabel(nullptr)
     , m_permanentStatusLabel(nullptr)
     , m_currentPointCount(0)
+    , m_colorRenderCheckbox(nullptr)
+    , m_intensityRenderCheckbox(nullptr)
+    , m_attenuationCheckbox(nullptr)
+    , m_minSizeSlider(nullptr)
+    , m_maxSizeSlider(nullptr)
+    , m_attenuationFactorSlider(nullptr)
+    , m_minSizeLabel(nullptr)
+    , m_maxSizeLabel(nullptr)
+    , m_attenuationFactorLabel(nullptr)
 {
     qDebug() << "MainWindow constructor started";
 
@@ -152,6 +164,9 @@ void MainWindow::setupUI()
     // Create legacy point cloud viewer
     m_viewer = new PointCloudViewerWidget(this);
     contentLayout->addWidget(m_viewer);
+
+    // Sprint R3: Setup attribute rendering controls
+    setupSprintR3Controls(contentLayout);
 
     // Setup splitter
     m_projectSplitter->addWidget(m_sidebar);
@@ -1183,5 +1198,132 @@ void MainWindow::onMemoryUsageChanged(size_t totalBytes)
         }
 
         qDebug() << "Memory usage updated:" << text;
+    }
+}
+
+// Sprint R3: Setup attribute rendering controls (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
+void MainWindow::setupSprintR3Controls(QVBoxLayout* parentLayout)
+{
+    // Create controls widget
+    QWidget* controlsWidget = new QWidget();
+    controlsWidget->setMaximumHeight(120);
+    controlsWidget->setStyleSheet("QWidget { background-color: #f5f5f5; border: 1px solid #ddd; }");
+
+    QHBoxLayout* controlsLayout = new QHBoxLayout(controlsWidget);
+    controlsLayout->setContentsMargins(10, 5, 10, 5);
+
+    // Attribute rendering checkboxes
+    QGroupBox* attributeGroup = new QGroupBox("Attribute Rendering");
+    QHBoxLayout* attributeLayout = new QHBoxLayout(attributeGroup);
+
+    m_colorRenderCheckbox = new QCheckBox("Color");
+    m_intensityRenderCheckbox = new QCheckBox("Intensity");
+
+    attributeLayout->addWidget(m_colorRenderCheckbox);
+    attributeLayout->addWidget(m_intensityRenderCheckbox);
+
+    // Point size attenuation controls
+    QGroupBox* attenuationGroup = new QGroupBox("Point Size Attenuation");
+    QVBoxLayout* attenuationLayout = new QVBoxLayout(attenuationGroup);
+
+    m_attenuationCheckbox = new QCheckBox("Enable Attenuation");
+    attenuationLayout->addWidget(m_attenuationCheckbox);
+
+    // Attenuation parameter sliders
+    QHBoxLayout* slidersLayout = new QHBoxLayout();
+
+    // Min size slider
+    QVBoxLayout* minSizeLayout = new QVBoxLayout();
+    m_minSizeLabel = new QLabel("Min Size: 1.0");
+    m_minSizeSlider = new QSlider(Qt::Horizontal);
+    m_minSizeSlider->setRange(1, 20);
+    m_minSizeSlider->setValue(10);
+    minSizeLayout->addWidget(m_minSizeLabel);
+    minSizeLayout->addWidget(m_minSizeSlider);
+
+    // Max size slider
+    QVBoxLayout* maxSizeLayout = new QVBoxLayout();
+    m_maxSizeLabel = new QLabel("Max Size: 10.0");
+    m_maxSizeSlider = new QSlider(Qt::Horizontal);
+    m_maxSizeSlider->setRange(10, 100);
+    m_maxSizeSlider->setValue(100);
+    maxSizeLayout->addWidget(m_maxSizeLabel);
+    maxSizeLayout->addWidget(m_maxSizeSlider);
+
+    // Attenuation factor slider
+    QVBoxLayout* factorLayout = new QVBoxLayout();
+    m_attenuationFactorLabel = new QLabel("Factor: 0.1");
+    m_attenuationFactorSlider = new QSlider(Qt::Horizontal);
+    m_attenuationFactorSlider->setRange(1, 100);
+    m_attenuationFactorSlider->setValue(10);
+    factorLayout->addWidget(m_attenuationFactorLabel);
+    factorLayout->addWidget(m_attenuationFactorSlider);
+
+    slidersLayout->addLayout(minSizeLayout);
+    slidersLayout->addLayout(maxSizeLayout);
+    slidersLayout->addLayout(factorLayout);
+    attenuationLayout->addLayout(slidersLayout);
+
+    // Add groups to main layout
+    controlsLayout->addWidget(attributeGroup);
+    controlsLayout->addWidget(attenuationGroup);
+    controlsLayout->addStretch();
+
+    // Add controls widget to parent layout
+    parentLayout->addWidget(controlsWidget);
+
+    // Connect signals
+    connect(m_colorRenderCheckbox, &QCheckBox::toggled, this, &MainWindow::onColorRenderToggled);
+    connect(m_intensityRenderCheckbox, &QCheckBox::toggled, this, &MainWindow::onIntensityRenderToggled);
+    connect(m_attenuationCheckbox, &QCheckBox::toggled, this, &MainWindow::onAttenuationToggled);
+    connect(m_minSizeSlider, &QSlider::valueChanged, this, &MainWindow::onAttenuationParamsChanged);
+    connect(m_maxSizeSlider, &QSlider::valueChanged, this, &MainWindow::onAttenuationParamsChanged);
+    connect(m_attenuationFactorSlider, &QSlider::valueChanged, this, &MainWindow::onAttenuationParamsChanged);
+}
+
+// Sprint R3: Attribute rendering and point size attenuation slot implementations
+void MainWindow::onColorRenderToggled(bool enabled)
+{
+    if (m_viewer) {
+        m_viewer->setRenderWithColor(enabled);
+    }
+    qDebug() << "Color rendering toggled:" << enabled;
+}
+
+void MainWindow::onIntensityRenderToggled(bool enabled)
+{
+    if (m_viewer) {
+        m_viewer->setRenderWithIntensity(enabled);
+    }
+    qDebug() << "Intensity rendering toggled:" << enabled;
+}
+
+void MainWindow::onAttenuationToggled(bool enabled)
+{
+    if (m_viewer) {
+        m_viewer->setPointSizeAttenuationEnabled(enabled);
+    }
+
+    // Enable/disable sliders based on checkbox state
+    m_minSizeSlider->setEnabled(enabled);
+    m_maxSizeSlider->setEnabled(enabled);
+    m_attenuationFactorSlider->setEnabled(enabled);
+
+    qDebug() << "Point size attenuation toggled:" << enabled;
+}
+
+void MainWindow::onAttenuationParamsChanged()
+{
+    if (m_viewer) {
+        float minSize = m_minSizeSlider->value() / 10.0f;
+        float maxSize = m_maxSizeSlider->value() / 10.0f;
+        float factor = m_attenuationFactorSlider->value() / 100.0f;
+
+        m_viewer->setPointSizeAttenuationParams(minSize, maxSize, factor);
+
+        // Update labels
+        m_minSizeLabel->setText(QString("Min Size: %1").arg(minSize, 0, 'f', 1));
+        m_maxSizeLabel->setText(QString("Max Size: %1").arg(maxSize, 0, 'f', 1));
+        m_attenuationFactorLabel->setText(QString("Factor: %1").arg(factor, 0, 'f', 2));
     }
 }

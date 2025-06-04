@@ -8,23 +8,48 @@
 #include <vector>
 #include <array>
 #include <chrono>
+#include <optional>
 
 // Forward declarations
 struct ViewportInfo;
 
-// Point data structure compatible with existing PointCloudViewerWidget
+// Enhanced Point data structure for Sprint R3 - supports optional attributes
 struct PointFullData {
+    // Position coordinates (required)
     float x, y, z;
-    float r, g, b;  // Color (0-1 range)
-    float intensity;
-    
-    PointFullData(float x = 0, float y = 0, float z = 0, 
-                  float r = 1, float g = 1, float b = 1, float intensity = 1.0f)
+
+    // Color attributes (optional, 0-255 range as specified in backlog)
+    std::optional<uint8_t> r, g, b;
+
+    // Intensity attribute (optional, normalized 0-1 range as specified in backlog)
+    std::optional<float> intensity;
+
+    // Default constructor (XYZ only)
+    PointFullData(float x = 0, float y = 0, float z = 0)
+        : x(x), y(y), z(z) {}
+
+    // Constructor with color (uint8_t as per backlog Task R3.1.1)
+    PointFullData(float x, float y, float z, uint8_t r, uint8_t g, uint8_t b)
+        : x(x), y(y), z(z), r(r), g(g), b(b) {}
+
+    // Constructor with intensity (float 0-1 as per backlog Task R3.2.1)
+    PointFullData(float x, float y, float z, float intensity)
+        : x(x), y(y), z(z), intensity(intensity) {}
+
+    // Constructor with both color and intensity
+    PointFullData(float x, float y, float z, uint8_t r, uint8_t g, uint8_t b, float intensity)
         : x(x), y(y), z(z), r(r), g(g), b(b), intensity(intensity) {}
-    
-    // Constructor from existing point data format (XYZ only)
-    PointFullData(float x, float y, float z)
-        : x(x), y(y), z(z), r(1.0f), g(1.0f), b(1.0f), intensity(1.0f) {}
+
+    // Utility methods as required by backlog
+    bool hasColor() const { return r.has_value() && g.has_value() && b.has_value(); }
+    bool hasIntensity() const { return intensity.has_value(); }
+
+    // Get normalized color for shader (0-1 range)
+    void getNormalizedColor(float& nr, float& ng, float& nb) const {
+        nr = hasColor() ? r.value() / 255.0f : 1.0f;
+        ng = hasColor() ? g.value() / 255.0f : 1.0f;
+        nb = hasColor() ? b.value() / 255.0f : 1.0f;
+    }
 };
 
 // Axis-Aligned Bounding Box for spatial subdivision
