@@ -333,12 +333,25 @@ if(TARGET GTest::gtest_main)
     target_link_libraries(E57WriterLibTests
         GTest::gtest_main
         Qt6::Core
+        Qt6::Gui
         Qt6::Test
         E57Format
     )
 
     target_include_directories(E57WriterLibTests PRIVATE src)
     add_test(NAME E57WriterLibTests COMMAND E57WriterLibTests)
+
+    # Sprint W4: Simple E57 Writer Test (for debugging W4 features)
+    add_executable(E57WriterW4SimpleTest
+        test_w4_simple.cpp
+        src/e57writer_lib.cpp
+    )
+    target_link_libraries(E57WriterW4SimpleTest
+        E57Format
+        Qt6::Core
+        Qt6::Gui
+    )
+    target_include_directories(E57WriterW4SimpleTest PRIVATE src)
 
     # Sprint W3: E57 Writer Sprint W3 Test
     add_executable(TestSprintW3

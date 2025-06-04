@@ -1091,3 +1091,348 @@ TEST_F(E57WriterLibTest, ExportConfigurationFlags) {
         FAIL() << "Standard exception when verifying configuration flags: " << ex.what();
     }
 }
+
+// Sprint W4 Tests: Pose Metadata, Multi-Scan Support, and Enhanced Metadata
+
+/**
+ * Test Case W4.1.1: Write scanner pose metadata to E57 Data3D header
+ * Expected Result: Pose information correctly written and readable
+ */
+TEST_F(E57WriterLibTest, WriteScannerPoseMetadata) {
+    // Create scan metadata with pose information
+    E57WriterLib::ScanPose pose;
+    pose.translation = QVector3D(10.5f, 20.3f, 5.7f);
+    pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(0, 0, 1), 45.0f); // 45 degree rotation around Z-axis
+    pose.acquisitionTime = QDateTime::currentDateTime();
+
+    E57WriterLib::ScanMetadata metadata;
+    metadata.name = "Pose Test Scan";
+    metadata.description = "Test scan with pose metadata";
+    metadata.sensorModel = "Test Scanner v1.0";
+    metadata.pose = pose;
+    metadata.acquisitionStart = QDateTime::currentDateTime();
+
+    // Create file and add scan with metadata
+    EXPECT_TRUE(writer->createFile(testFilePath)) << "Failed to create E57 file";
+    EXPECT_TRUE(writer->addScan(metadata)) << "Failed to add scan with metadata";
+    EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
+
+    // Verify pose metadata by reading back
+    try {
+        e57::ImageFile testFile(testFilePath.toStdString(), "r");
+        e57::StructureNode root = testFile.root();
+
+        if (root.isDefined("data3D")) {
+            e57::VectorNode data3D(root.get("data3D"));
+            EXPECT_EQ(data3D.childCount(), 1) << "Should have one scan";
+
+            if (data3D.childCount() > 0) {
+                e57::StructureNode scan(data3D.get(0));
+
+                // Verify pose structure exists
+                EXPECT_TRUE(scan.isDefined("pose")) << "Scan should have pose metadata";
+
+                if (scan.isDefined("pose")) {
+                    e57::StructureNode poseNode(scan.get("pose"));
+
+                    // Verify translation
+                    EXPECT_TRUE(poseNode.isDefined("translation")) << "Pose should have translation";
+                    if (poseNode.isDefined("translation")) {
+                        e57::StructureNode translation(poseNode.get("translation"));
+                        EXPECT_TRUE(translation.isDefined("x")) << "Translation should have x";
+                        EXPECT_TRUE(translation.isDefined("y")) << "Translation should have y";
+                        EXPECT_TRUE(translation.isDefined("z")) << "Translation should have z";
+
+                        if (translation.isDefined("x") && translation.isDefined("y") && translation.isDefined("z")) {
+                            e57::FloatNode xNode(translation.get("x"));
+                            e57::FloatNode yNode(translation.get("y"));
+                            e57::FloatNode zNode(translation.get("z"));
+
+                            EXPECT_DOUBLE_EQ(xNode.value(), 10.5) << "Translation X should match";
+                            EXPECT_DOUBLE_EQ(yNode.value(), 20.3) << "Translation Y should match";
+                            EXPECT_DOUBLE_EQ(zNode.value(), 5.7) << "Translation Z should match";
+                        }
+                    }
+
+                    // Verify rotation (quaternion)
+                    EXPECT_TRUE(poseNode.isDefined("rotation")) << "Pose should have rotation";
+                    if (poseNode.isDefined("rotation")) {
+                        e57::StructureNode rotation(poseNode.get("rotation"));
+                        EXPECT_TRUE(rotation.isDefined("w")) << "Rotation should have w";
+                        EXPECT_TRUE(rotation.isDefined("x")) << "Rotation should have x";
+                        EXPECT_TRUE(rotation.isDefined("y")) << "Rotation should have y";
+                        EXPECT_TRUE(rotation.isDefined("z")) << "Rotation should have z";
+
+                        if (rotation.isDefined("w") && rotation.isDefined("x") &&
+                            rotation.isDefined("y") && rotation.isDefined("z")) {
+                            e57::FloatNode wNode(rotation.get("w"));
+                            e57::FloatNode xNode(rotation.get("x"));
+                            e57::FloatNode yNode(rotation.get("y"));
+                            e57::FloatNode zNode(rotation.get("z"));
+
+                            // Verify quaternion is normalized and matches expected values
+                            QQuaternion readQuaternion(wNode.value(), xNode.value(), yNode.value(), zNode.value());
+                            QQuaternion expectedQuaternion = pose.rotation.normalized();
+
+                            EXPECT_NEAR(readQuaternion.scalar(), expectedQuaternion.scalar(), 1e-10) << "Quaternion W should match";
+                            EXPECT_NEAR(readQuaternion.x(), expectedQuaternion.x(), 1e-10) << "Quaternion X should match";
+                            EXPECT_NEAR(readQuaternion.y(), expectedQuaternion.y(), 1e-10) << "Quaternion Y should match";
+                            EXPECT_NEAR(readQuaternion.z(), expectedQuaternion.z(), 1e-10) << "Quaternion Z should match";
+                        }
+                    }
+                }
+
+                // Verify other metadata fields
+                EXPECT_TRUE(scan.isDefined("description")) << "Scan should have description";
+                EXPECT_TRUE(scan.isDefined("sensorModel")) << "Scan should have sensorModel";
+                EXPECT_TRUE(scan.isDefined("acquisitionStart")) << "Scan should have acquisitionStart";
+
+                if (scan.isDefined("description")) {
+                    e57::StringNode descNode(scan.get("description"));
+                    EXPECT_EQ(descNode.value(), "Test scan with pose metadata") << "Description should match";
+                }
+
+                if (scan.isDefined("sensorModel")) {
+                    e57::StringNode sensorNode(scan.get("sensorModel"));
+                    EXPECT_EQ(sensorNode.value(), "Test Scanner v1.0") << "Sensor model should match";
+                }
+            }
+        }
+
+        testFile.close();
+    } catch (const e57::E57Exception& ex) {
+        FAIL() << "E57 Exception when verifying pose metadata: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying pose metadata: " << ex.what();
+    }
+}
+
+/**
+ * Test Case W4.2.1: Support multiple scans in single E57 file
+ * Expected Result: Multiple scans with different poses and metadata correctly written
+ */
+TEST_F(E57WriterLibTest, WriteMultipleScansWithMetadata) {
+    // Create multiple scan data with different poses
+    std::vector<E57WriterLib::ScanData> scansData;
+
+    // Scan 1
+    E57WriterLib::ScanMetadata metadata1;
+    metadata1.name = "Scan 001";
+    metadata1.description = "First scan position";
+    metadata1.sensorModel = "FARO Focus S350";
+    metadata1.pose.translation = QVector3D(0.0f, 0.0f, 0.0f);
+    metadata1.pose.rotation = QQuaternion(); // Identity rotation
+    metadata1.acquisitionStart = QDateTime::currentDateTime().addSecs(-3600); // 1 hour ago
+
+    std::vector<E57WriterLib::Point3D> points1 = {
+        {1.0, 2.0, 3.0, 0.5f, 255, 128, 64},
+        {4.0, 5.0, 6.0, 0.7f, 128, 255, 32}
+    };
+
+    E57WriterLib::ExportOptions options1(true, true); // Include intensity and color
+    scansData.emplace_back(metadata1, points1, options1);
+
+    // Scan 2
+    E57WriterLib::ScanMetadata metadata2;
+    metadata2.name = "Scan 002";
+    metadata2.description = "Second scan position";
+    metadata2.sensorModel = "FARO Focus S350";
+    metadata2.pose.translation = QVector3D(10.0f, 5.0f, 2.0f);
+    metadata2.pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(0, 0, 1), 90.0f); // 90 degree rotation
+    metadata2.acquisitionStart = QDateTime::currentDateTime().addSecs(-1800); // 30 minutes ago
+
+    std::vector<E57WriterLib::Point3D> points2 = {
+        {7.0, 8.0, 9.0, 0.3f},  // XYZ + intensity only
+        {10.0, 11.0, 12.0, 0.9f}
+    };
+
+    E57WriterLib::ExportOptions options2(true, false); // Include intensity only
+    scansData.emplace_back(metadata2, points2, options2);
+
+    // Scan 3 - XYZ only
+    E57WriterLib::ScanMetadata metadata3;
+    metadata3.name = "Scan 003";
+    metadata3.description = "Third scan position - XYZ only";
+    metadata3.sensorModel = "Leica BLK360";
+    metadata3.pose.translation = QVector3D(-5.0f, 10.0f, 1.0f);
+    metadata3.pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(1, 0, 0), 30.0f); // 30 degree rotation around X
+    metadata3.acquisitionStart = QDateTime::currentDateTime();
+
+    std::vector<E57WriterLib::Point3D> points3 = {
+        {13.0, 14.0, 15.0},
+        {16.0, 17.0, 18.0},
+        {19.0, 20.0, 21.0}
+    };
+
+    E57WriterLib::ExportOptions options3(false, false); // XYZ only
+    scansData.emplace_back(metadata3, points3, options3);
+
+    // Write multiple scans
+    EXPECT_TRUE(writer->createFile(testFilePath)) << "Failed to create E57 file";
+    EXPECT_TRUE(writer->writeMultipleScans(scansData)) << "Failed to write multiple scans: " << writer->getLastError().toStdString();
+    EXPECT_EQ(writer->getScanCount(), 3) << "Should have 3 scans";
+    EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
+
+    // Verify multiple scans by reading back
+    try {
+        e57::ImageFile testFile(testFilePath.toStdString(), "r");
+        e57::StructureNode root = testFile.root();
+
+        if (root.isDefined("data3D")) {
+            e57::VectorNode data3D(root.get("data3D"));
+            EXPECT_EQ(data3D.childCount(), 3) << "Should have 3 scans";
+
+            // Verify each scan
+            for (int i = 0; i < 3; ++i) {
+                e57::StructureNode scan(data3D.get(i));
+
+                // Verify scan name
+                EXPECT_TRUE(scan.isDefined("name")) << "Scan " << i << " should have name";
+                if (scan.isDefined("name")) {
+                    e57::StringNode nameNode(scan.get("name"));
+                    QString expectedName = QString("Scan %1").arg(i + 1, 3, 10, QChar('0'));
+                    EXPECT_EQ(nameNode.value(), expectedName.toStdString()) << "Scan " << i << " name should match";
+                }
+
+                // Verify pose exists
+                EXPECT_TRUE(scan.isDefined("pose")) << "Scan " << i << " should have pose";
+
+                // Verify points exist
+                EXPECT_TRUE(scan.isDefined("points")) << "Scan " << i << " should have points";
+                if (scan.isDefined("points")) {
+                    e57::CompressedVectorNode pointsNode(scan.get("points"));
+                    EXPECT_EQ(pointsNode.childCount(), scansData[i].points.size()) << "Scan " << i << " point count should match";
+
+                    // Verify prototype based on options
+                    e57::StructureNode prototype(pointsNode.prototype());
+                    EXPECT_TRUE(prototype.isDefined("cartesianX")) << "Scan " << i << " should have cartesianX";
+                    EXPECT_TRUE(prototype.isDefined("cartesianY")) << "Scan " << i << " should have cartesianY";
+                    EXPECT_TRUE(prototype.isDefined("cartesianZ")) << "Scan " << i << " should have cartesianZ";
+
+                    if (scansData[i].options.includeIntensity) {
+                        EXPECT_TRUE(prototype.isDefined("intensity")) << "Scan " << i << " should have intensity";
+                        EXPECT_TRUE(scan.isDefined("intensityLimits")) << "Scan " << i << " should have intensity limits";
+                    } else {
+                        EXPECT_FALSE(prototype.isDefined("intensity")) << "Scan " << i << " should not have intensity";
+                        EXPECT_FALSE(scan.isDefined("intensityLimits")) << "Scan " << i << " should not have intensity limits";
+                    }
+
+                    if (scansData[i].options.includeColor) {
+                        EXPECT_TRUE(prototype.isDefined("colorRed")) << "Scan " << i << " should have colorRed";
+                        EXPECT_TRUE(prototype.isDefined("colorGreen")) << "Scan " << i << " should have colorGreen";
+                        EXPECT_TRUE(prototype.isDefined("colorBlue")) << "Scan " << i << " should have colorBlue";
+                        EXPECT_TRUE(scan.isDefined("colorLimits")) << "Scan " << i << " should have color limits";
+                    } else {
+                        EXPECT_FALSE(prototype.isDefined("colorRed")) << "Scan " << i << " should not have colorRed";
+                        EXPECT_FALSE(scan.isDefined("colorLimits")) << "Scan " << i << " should not have color limits";
+                    }
+                }
+            }
+        }
+
+        testFile.close();
+    } catch (const e57::E57Exception& ex) {
+        FAIL() << "E57 Exception when verifying multiple scans: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying multiple scans: " << ex.what();
+    }
+}
+
+/**
+ * Test Case W4.3.1: Test ScanPose matrix conversion utilities
+ * Expected Result: Pose conversion between matrix and quaternion/translation works correctly
+ */
+TEST_F(E57WriterLibTest, ScanPoseMatrixConversion) {
+    // Create a test transformation matrix
+    QMatrix4x4 originalMatrix;
+    originalMatrix.setToIdentity();
+    originalMatrix.translate(5.0f, 10.0f, 15.0f);
+    originalMatrix.rotate(45.0f, 0.0f, 0.0f, 1.0f); // 45 degrees around Z-axis
+
+    // Convert matrix to pose
+    E57WriterLib::ScanPose pose = E57WriterLib::ScanPose::fromMatrix(originalMatrix);
+
+    // Verify translation
+    EXPECT_NEAR(pose.translation.x(), 5.0f, 1e-6) << "Translation X should match";
+    EXPECT_NEAR(pose.translation.y(), 10.0f, 1e-6) << "Translation Y should match";
+    EXPECT_NEAR(pose.translation.z(), 15.0f, 1e-6) << "Translation Z should match";
+
+    // Verify quaternion is normalized
+    float quaternionLength = sqrt(pose.rotation.scalar() * pose.rotation.scalar() +
+                                 pose.rotation.x() * pose.rotation.x() +
+                                 pose.rotation.y() * pose.rotation.y() +
+                                 pose.rotation.z() * pose.rotation.z());
+    EXPECT_NEAR(quaternionLength, 1.0, 1e-6) << "Quaternion should be normalized";
+
+    // Convert pose back to matrix
+    QMatrix4x4 convertedMatrix = pose.toMatrix();
+
+    // Verify round-trip conversion accuracy
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            EXPECT_NEAR(originalMatrix(row, col), convertedMatrix(row, col), 1e-5)
+                << "Matrix element (" << row << "," << col << ") should match after round-trip conversion";
+        }
+    }
+
+    // Test with the pose in an actual E57 file
+    E57WriterLib::ScanMetadata metadata;
+    metadata.name = "Matrix Conversion Test";
+    metadata.pose = pose;
+
+    EXPECT_TRUE(writer->createFile(testFilePath)) << "Failed to create E57 file";
+    EXPECT_TRUE(writer->addScan(metadata)) << "Failed to add scan with pose";
+    EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
+
+    // Verify the pose was written correctly
+    try {
+        e57::ImageFile testFile(testFilePath.toStdString(), "r");
+        e57::StructureNode root = testFile.root();
+
+        if (root.isDefined("data3D")) {
+            e57::VectorNode data3D(root.get("data3D"));
+            if (data3D.childCount() > 0) {
+                e57::StructureNode scan(data3D.get(0));
+                if (scan.isDefined("pose")) {
+                    e57::StructureNode poseNode(scan.get("pose"));
+
+                    // Read back translation
+                    if (poseNode.isDefined("translation")) {
+                        e57::StructureNode translation(poseNode.get("translation"));
+                        e57::FloatNode xNode(translation.get("x"));
+                        e57::FloatNode yNode(translation.get("y"));
+                        e57::FloatNode zNode(translation.get("z"));
+
+                        EXPECT_NEAR(xNode.value(), 5.0, 1e-6) << "Stored translation X should match";
+                        EXPECT_NEAR(yNode.value(), 10.0, 1e-6) << "Stored translation Y should match";
+                        EXPECT_NEAR(zNode.value(), 15.0, 1e-6) << "Stored translation Z should match";
+                    }
+
+                    // Read back rotation and verify normalization
+                    if (poseNode.isDefined("rotation")) {
+                        e57::StructureNode rotation(poseNode.get("rotation"));
+                        e57::FloatNode wNode(rotation.get("w"));
+                        e57::FloatNode xNode(rotation.get("x"));
+                        e57::FloatNode yNode(rotation.get("y"));
+                        e57::FloatNode zNode(rotation.get("z"));
+
+                        double storedLength = sqrt(wNode.value() * wNode.value() +
+                                                  xNode.value() * xNode.value() +
+                                                  yNode.value() * yNode.value() +
+                                                  zNode.value() * zNode.value());
+                        EXPECT_NEAR(storedLength, 1.0, 1e-10) << "Stored quaternion should be normalized";
+                    }
+                }
+            }
+        }
+
+        testFile.close();
+    } catch (const e57::E57Exception& ex) {
+        FAIL() << "E57 Exception when verifying matrix conversion: " << ex.what()
+               << " (Error code: " << ex.errorCode() << ")";
+    } catch (const std::exception& ex) {
+        FAIL() << "Standard exception when verifying matrix conversion: " << ex.what();
+    }
+}

@@ -7,6 +7,11 @@
 #include <QObject>
 #include <QString>
 #include <QUuid>
+#include <QDateTime>
+#include <QtGui/QVector3D>
+#include <QtGui/QQuaternion>
+#include <QtGui/QMatrix4x4>
+#include <QtGui/QMatrix3x3>
 #include <cstdint>
 
 // Forward declarations to avoid including E57Format.h in header
@@ -28,6 +33,43 @@ class E57WriterLib : public QObject {
     Q_OBJECT
 
 public:
+    // Sprint W4: Scanner pose metadata structure
+    struct ScanPose {
+        QVector3D translation;      // Scanner position in world coordinates
+        QQuaternion rotation;       // Scanner orientation as normalized quaternion
+        QDateTime acquisitionTime;  // Time when scan was acquired
+
+        ScanPose() : translation(0, 0, 0), rotation(1, 0, 0, 0) {}
+        ScanPose(const QVector3D& trans, const QQuaternion& rot)
+            : translation(trans), rotation(rot.normalized()) {}
+        ScanPose(const QVector3D& trans, const QQuaternion& rot, const QDateTime& time)
+            : translation(trans), rotation(rot.normalized()), acquisitionTime(time) {}
+
+        // Convert from 4x4 transformation matrix
+        static ScanPose fromMatrix(const QMatrix4x4& matrix);
+        QMatrix4x4 toMatrix() const;
+    };
+
+    // Sprint W4: Comprehensive scan metadata structure
+    struct ScanMetadata {
+        QString name;               // Scan name
+        QString guid;               // Unique identifier (auto-generated if empty)
+        QString description;        // Optional scan description
+        QString sensorModel;        // Scanner model/type
+        ScanPose pose;             // Scanner pose information
+        QDateTime acquisitionStart; // Scan start time
+        QDateTime acquisitionEnd;   // Scan end time (optional)
+
+        // Optional metadata
+        QString originalGuids;      // For multi-source data
+        QString associatedData3DGuids; // Related scans
+
+        ScanMetadata() {}
+        ScanMetadata(const QString& scanName) : name(scanName) {}
+        ScanMetadata(const QString& scanName, const ScanPose& scanPose)
+            : name(scanName), pose(scanPose) {}
+    };
+
     // Sprint W3: Enhanced point data structure with optional intensity and color
     struct Point3D {
         double x, y, z;
@@ -82,11 +124,21 @@ public:
      * @brief Add a scan to the E57 file with basic header information
      * @param scanName Name for the scan (default: "Default Scan 001")
      * @return true if scan added successfully, false otherwise
-     * 
+     *
      * User Story W1.2: Define Core E57 XML Structure for a Single Scan
      * Creates /data3D VectorNode and adds a Data3D StructureNode with basic metadata
      */
     bool addScan(const QString& scanName = "Default Scan 001");
+
+    /**
+     * @brief Add a scan to the E57 file with comprehensive metadata
+     * @param metadata Complete scan metadata including pose, timestamps, and scanner info
+     * @return true if scan added successfully, false otherwise
+     *
+     * User Story W4.1: Write Scanner Pose Metadata to E57 Data3D Header
+     * Creates /data3D VectorNode and adds a Data3D StructureNode with full metadata including pose
+     */
+    bool addScan(const ScanMetadata& metadata);
 
     /**
      * @brief Define point prototype for the current scan with optional intensity and color
@@ -175,6 +227,33 @@ public:
      */
     QString getCurrentFilePath() const;
 
+    /**
+     * @brief Get the number of scans currently in the file
+     * @return Number of scans added to the file
+     */
+    int getScanCount() const;
+
+    /**
+     * @brief Write multiple scans to E57 file in a single operation
+     * @param scansData Vector of scan data with metadata and points
+     * @param options Export options for all scans
+     * @return true if all scans written successfully, false otherwise
+     *
+     * User Story W4.2: Support Multiple Scans in Single E57 File
+     * Efficiently writes multiple scans with their respective metadata and point data
+     */
+    struct ScanData {
+        ScanMetadata metadata;
+        std::vector<Point3D> points;
+        ExportOptions options;
+
+        ScanData() {}
+        ScanData(const ScanMetadata& meta, const std::vector<Point3D>& pts, const ExportOptions& opts = ExportOptions())
+            : metadata(meta), points(pts), options(opts) {}
+    };
+
+    bool writeMultipleScans(const std::vector<ScanData>& scansData);
+
 signals:
     /**
      * @brief Emitted when file creation is completed
@@ -201,7 +280,13 @@ private:
     bool initializeE57Root();
     bool createData3DVectorNode();
     bool createScanStructureNode(const QString& scanName);
+    bool createScanStructureNode(const ScanMetadata& metadata);
     QString generateGUID() const;
+
+    // Sprint W4: Pose and metadata writing helpers
+    bool writePoseMetadata(e57::StructureNode& scanNode, const ScanPose& pose);
+    bool writeAcquisitionMetadata(e57::StructureNode& scanNode, const ScanMetadata& metadata);
+    bool writeE57RootMetadata();
 
     // Sprint W2: Point writing and bounds calculation helpers
     bool writePointsToScan(e57::StructureNode& scanNode, const std::vector<Point3D>& points);

@@ -3,10 +3,47 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
+#include <QUuid>
 #include <QDateTime>
 #include <cfloat>
 #include <limits>
 #include <algorithm>
+
+// Sprint W4: ScanPose static methods implementation
+E57WriterLib::ScanPose E57WriterLib::ScanPose::fromMatrix(const QMatrix4x4& matrix)
+{
+    ScanPose pose;
+
+    // Extract translation from the last column
+    pose.translation = QVector3D(matrix(0, 3), matrix(1, 3), matrix(2, 3));
+
+    // Extract rotation matrix (upper-left 3x3) and convert to quaternion
+    QMatrix3x3 rotMatrix = matrix.normalMatrix();
+    pose.rotation = QQuaternion::fromRotationMatrix(rotMatrix).normalized();
+
+    return pose;
+}
+
+QMatrix4x4 E57WriterLib::ScanPose::toMatrix() const
+{
+    QMatrix4x4 matrix;
+    matrix.setToIdentity();
+
+    // Set rotation part
+    QMatrix3x3 rotMatrix = rotation.toRotationMatrix();
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            matrix(i, j) = rotMatrix(i, j);
+        }
+    }
+
+    // Set translation part
+    matrix(0, 3) = translation.x();
+    matrix(1, 3) = translation.y();
+    matrix(2, 3) = translation.z();
+
+    return matrix;
+}
 
 E57WriterLib::E57WriterLib(QObject *parent)
     : QObject(parent)
@@ -56,6 +93,12 @@ bool E57WriterLib::createFile(const QString& filePath)
             return false;
         }
 
+        // Task W4.3.1: Write enhanced E57Root metadata
+        if (!writeE57RootMetadata()) {
+            closeFile();
+            return false;
+        }
+
         qDebug() << "E57WriterLib: Successfully created E57 file:" << filePath;
         emit fileCreated(true, filePath);
         return true;
@@ -89,10 +132,7 @@ bool E57WriterLib::initializeE57Root()
         e57::IntegerNode versionMinorNode(*m_imageFile, 0, 0, 255);
         rootNode.set("versionMinor", versionMinorNode);
 
-        // Add creation date/time
-        QString creationDateTime = QDateTime::currentDateTime().toString(Qt::ISODate);
-        e57::StringNode dateTimeNode(*m_imageFile, creationDateTime.toStdString());
-        rootNode.set("creationDateTime", dateTimeNode);
+        // Note: creationDateTime will be set properly in writeE57RootMetadata() as a DateTime structure
 
         // Add coordinate metadata (required for proper E57 structure)
         e57::StringNode coordinateMetadataNode(*m_imageFile, "");
@@ -148,6 +188,42 @@ bool E57WriterLib::addScan(const QString& scanName)
     }
 }
 
+// Sprint W4: Enhanced addScan with comprehensive metadata
+bool E57WriterLib::addScan(const ScanMetadata& metadata)
+{
+    if (!m_fileOpen) {
+        setError("No file is currently open for writing");
+        return false;
+    }
+
+    try {
+        // Task W4.1.1: Get the E57Root node
+        e57::StructureNode rootNode = m_imageFile->root();
+
+        // Task W4.1.2: Create /data3D VectorNode if it doesn't exist
+        if (!createData3DVectorNode()) {
+            return false;
+        }
+
+        // Task W4.1.3: Create a new StructureNode for this scan with full metadata
+        if (!createScanStructureNode(metadata)) {
+            return false;
+        }
+
+        m_scanCount++;
+        qDebug() << "E57WriterLib: Successfully added scan with metadata:" << metadata.name;
+        emit scanAdded(true, metadata.name);
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "addScan(metadata)");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in addScan(metadata): %1").arg(ex.what()));
+        return false;
+    }
+}
+
 bool E57WriterLib::createData3DVectorNode()
 {
     try {
@@ -197,6 +273,64 @@ bool E57WriterLib::createScanStructureNode(const QString& scanName)
 
     } catch (const e57::E57Exception& ex) {
         handleE57Exception(ex, "createScanStructureNode");
+        return false;
+    }
+}
+
+// Sprint W4: Enhanced createScanStructureNode with comprehensive metadata
+bool E57WriterLib::createScanStructureNode(const ScanMetadata& metadata)
+{
+    try {
+        // Task W4.1.3: Create a new StructureNode for the scan header
+        e57::StructureNode scanHeaderNode(*m_imageFile);
+
+        // Task W4.1.4: Populate the Data3D StructureNode with comprehensive metadata
+
+        // GUID - use provided or generate new one
+        QString guid = metadata.guid.isEmpty() ? generateGUID() : metadata.guid;
+        e57::StringNode guidNode(*m_imageFile, guid.toStdString());
+        scanHeaderNode.set("guid", guidNode);
+
+        // Name - required field
+        e57::StringNode nameNode(*m_imageFile, metadata.name.toStdString());
+        scanHeaderNode.set("name", nameNode);
+
+        // Description - optional field
+        if (!metadata.description.isEmpty()) {
+            e57::StringNode descriptionNode(*m_imageFile, metadata.description.toStdString());
+            scanHeaderNode.set("description", descriptionNode);
+        }
+
+        // Sensor model - optional field
+        if (!metadata.sensorModel.isEmpty()) {
+            e57::StringNode sensorModelNode(*m_imageFile, metadata.sensorModel.toStdString());
+            scanHeaderNode.set("sensorModel", sensorModelNode);
+        }
+
+        // Task W4.1.5: Write pose metadata if available
+        if (!writePoseMetadata(scanHeaderNode, metadata.pose)) {
+            return false; // Error already set
+        }
+
+        // Task W4.1.6: Write acquisition metadata if available
+        if (!writeAcquisitionMetadata(scanHeaderNode, metadata)) {
+            return false; // Error already set
+        }
+
+        // Add the scan to the /data3D vector
+        m_data3DNode->append(scanHeaderNode);
+
+        // Store reference for later use (e.g., adding points)
+        m_currentScanNode = std::make_shared<e57::StructureNode>(scanHeaderNode);
+
+        qDebug() << "E57WriterLib: Created scan structure node with comprehensive metadata:" << metadata.name;
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "createScanStructureNode(metadata)");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in createScanStructureNode(metadata): %1").arg(ex.what()));
         return false;
     }
 }
@@ -731,4 +865,184 @@ bool E57WriterLib::hasValidColorData(const std::vector<Point3D>& points) const
         }
     }
     return false;
+}
+
+// Sprint W4: New helper methods for pose and metadata writing
+
+bool E57WriterLib::writePoseMetadata(e57::StructureNode& scanNode, const ScanPose& pose)
+{
+    try {
+        // Task W4.1.5: Create pose StructureNode
+        e57::StructureNode poseNode(*m_imageFile);
+
+        // Task W4.1.7: Create translation StructureNode
+        e57::StructureNode translationNode(*m_imageFile);
+        translationNode.set("x", e57::FloatNode(*m_imageFile, pose.translation.x(), e57::PrecisionDouble));
+        translationNode.set("y", e57::FloatNode(*m_imageFile, pose.translation.y(), e57::PrecisionDouble));
+        translationNode.set("z", e57::FloatNode(*m_imageFile, pose.translation.z(), e57::PrecisionDouble));
+        poseNode.set("translation", translationNode);
+
+        // Task W4.1.8: Create rotation StructureNode (quaternion with normalization)
+        QQuaternion normalizedRotation = pose.rotation.normalized();
+        e57::StructureNode rotationNode(*m_imageFile);
+        rotationNode.set("w", e57::FloatNode(*m_imageFile, normalizedRotation.scalar(), e57::PrecisionDouble));
+        rotationNode.set("x", e57::FloatNode(*m_imageFile, normalizedRotation.x(), e57::PrecisionDouble));
+        rotationNode.set("y", e57::FloatNode(*m_imageFile, normalizedRotation.y(), e57::PrecisionDouble));
+        rotationNode.set("z", e57::FloatNode(*m_imageFile, normalizedRotation.z(), e57::PrecisionDouble));
+        poseNode.set("rotation", rotationNode);
+
+        // Add pose to scan node
+        scanNode.set("pose", poseNode);
+
+        qDebug() << "E57WriterLib: Written pose metadata - translation:"
+                 << pose.translation.x() << pose.translation.y() << pose.translation.z()
+                 << "rotation(w,x,y,z):"
+                 << normalizedRotation.scalar() << normalizedRotation.x()
+                 << normalizedRotation.y() << normalizedRotation.z();
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writePoseMetadata");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in writePoseMetadata: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+bool E57WriterLib::writeAcquisitionMetadata(e57::StructureNode& scanNode, const ScanMetadata& metadata)
+{
+    try {
+        // Task W4.1.6: Write acquisition start time if available
+        if (metadata.acquisitionStart.isValid()) {
+            // Convert QDateTime to E57 GPS time format (seconds since GPS epoch: January 6, 1980)
+            // GPS epoch is 315964800 seconds after Unix epoch (January 1, 1970)
+            qint64 unixTime = metadata.acquisitionStart.toSecsSinceEpoch();
+            double gpsTime = static_cast<double>(unixTime - 315964800);
+            scanNode.set("acquisitionStart", e57::FloatNode(*m_imageFile, gpsTime, e57::PrecisionDouble));
+            qDebug() << "E57WriterLib: Written acquisitionStart GPS time:" << gpsTime << "for" << metadata.acquisitionStart.toString();
+        }
+
+        // Write acquisition end time if available
+        if (metadata.acquisitionEnd.isValid()) {
+            // Convert QDateTime to E57 GPS time format (seconds since GPS epoch: January 6, 1980)
+            qint64 unixTime = metadata.acquisitionEnd.toSecsSinceEpoch();
+            double gpsTime = static_cast<double>(unixTime - 315964800);
+            scanNode.set("acquisitionEnd", e57::FloatNode(*m_imageFile, gpsTime, e57::PrecisionDouble));
+            qDebug() << "E57WriterLib: Written acquisitionEnd GPS time:" << gpsTime << "for" << metadata.acquisitionEnd.toString();
+        }
+
+        // Write original GUIDs if available
+        if (!metadata.originalGuids.isEmpty()) {
+            scanNode.set("originalGuids", e57::StringNode(*m_imageFile, metadata.originalGuids.toStdString()));
+        }
+
+        // Write associated Data3D GUIDs if available
+        if (!metadata.associatedData3DGuids.isEmpty()) {
+            scanNode.set("associatedData3DGuids", e57::StringNode(*m_imageFile, metadata.associatedData3DGuids.toStdString()));
+        }
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writeAcquisitionMetadata");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in writeAcquisitionMetadata: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+bool E57WriterLib::writeE57RootMetadata()
+{
+    try {
+        // Task W4.3.1: Write enhanced E57Root metadata
+        e57::StructureNode rootNode = m_imageFile->root();
+
+        // Write creation date/time as proper DateTime structure (per ASTM E2807)
+        // Note: creationDateTime was already set as StringNode in initializeE57Root()
+        // We need to replace it with proper DateTime structure
+        QDateTime now = QDateTime::currentDateTime();
+
+        // Convert to GPS time (seconds since GPS epoch: January 6, 1980)
+        // GPS epoch is 315964800 seconds after Unix epoch (January 1, 1970)
+        qint64 unixTime = now.toSecsSinceEpoch();
+        double gpsTime = static_cast<double>(unixTime - 315964800);
+
+        // Create proper DateTime structure
+        e57::StructureNode creationDateTimeNode(*m_imageFile);
+        creationDateTimeNode.set("dateTimeValue", e57::FloatNode(*m_imageFile, gpsTime, e57::PrecisionDouble));
+        creationDateTimeNode.set("isAtomicClockReferenced", e57::IntegerNode(*m_imageFile, 0)); // 0 = false
+
+        // Replace the existing creationDateTime with proper structure
+        rootNode.set("creationDateTime", creationDateTimeNode);
+
+        // Write library version information
+        QString libraryVersion = QString("CloudRegistration E57WriterLib v1.0 (libE57Format 3.x)");
+        rootNode.set("e57LibraryVersion", e57::StringNode(*m_imageFile, libraryVersion.toStdString()));
+
+        qDebug() << "E57WriterLib: Written E57Root metadata - creationDateTime GPS time:" << gpsTime
+                 << "libraryVersion:" << libraryVersion;
+
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writeE57RootMetadata");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in writeE57RootMetadata: %1").arg(ex.what()));
+        return false;
+    }
+}
+
+int E57WriterLib::getScanCount() const
+{
+    return m_scanCount;
+}
+
+bool E57WriterLib::writeMultipleScans(const std::vector<ScanData>& scansData)
+{
+    if (!m_fileOpen) {
+        setError("No file is currently open for writing");
+        return false;
+    }
+
+    try {
+        // Task W4.2.1: Write multiple scans efficiently
+        for (size_t i = 0; i < scansData.size(); ++i) {
+            const ScanData& scanData = scansData[i];
+
+            qDebug() << "E57WriterLib: Writing scan" << (i + 1) << "of" << scansData.size()
+                     << ":" << scanData.metadata.name;
+
+            // Add scan with metadata
+            if (!addScan(scanData.metadata)) {
+                setError(QString("Failed to add scan %1: %2").arg(i + 1).arg(getLastError()));
+                return false;
+            }
+
+            // Define prototype based on scan options
+            if (!definePointPrototype(scanData.options)) {
+                setError(QString("Failed to define prototype for scan %1: %2").arg(i + 1).arg(getLastError()));
+                return false;
+            }
+
+            // Write points
+            if (!writePoints(scanData.points, scanData.options)) {
+                setError(QString("Failed to write points for scan %1: %2").arg(i + 1).arg(getLastError()));
+                return false;
+            }
+        }
+
+        qDebug() << "E57WriterLib: Successfully wrote" << scansData.size() << "scans to E57 file";
+        return true;
+
+    } catch (const e57::E57Exception& ex) {
+        handleE57Exception(ex, "writeMultipleScans");
+        return false;
+    } catch (const std::exception& ex) {
+        setError(QString("Standard exception in writeMultipleScans: %1").arg(ex.what()));
+        return false;
+    }
 }
