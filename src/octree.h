@@ -9,6 +9,9 @@
 #include <array>
 #include <chrono>
 
+// Forward declarations
+struct ViewportInfo;
+
 // Point data structure compatible with existing PointCloudViewerWidget
 struct PointFullData {
     float x, y, z;
@@ -85,10 +88,31 @@ public:
                              const QVector3D& cameraPos,
                              float lodDistance1, float lodDistance2,
                              std::vector<PointFullData>& visiblePoints) const;
-    
+
+    // Sprint R2: Point sampling methods for refined LOD
+    std::vector<PointFullData> getSampledPoints(int maxPoints) const;
+    std::vector<PointFullData> getSampledPointsByPercentage(float percentage) const;
+    std::vector<PointFullData> getRepresentativePoints() const;
+
+    // Sprint R2: Screen-space error based traversal
+    void collectVisiblePointsWithScreenSpaceError(
+        const std::array<QVector4D, 6>& frustumPlanes,
+        const QMatrix4x4& mvpMatrix,
+        const ViewportInfo& viewport,
+        float primaryThreshold,
+        float cullThreshold,
+        std::vector<PointFullData>& visiblePoints
+    ) const;
+
 private:
     // Test if this node's bounding box intersects with the view frustum
     bool intersectsFrustum(const std::array<QVector4D, 6>& frustumPlanes) const;
+
+    // Sprint R2: Pre-calculated representative points for coarse LOD
+    mutable std::vector<PointFullData> m_representativePoints;
+    mutable bool m_representativePointsCalculated = false;
+
+    void calculateRepresentativePoints() const;
 };
 
 // Main octree class for managing the spatial data structure
