@@ -140,6 +140,8 @@ set(SOURCES
     # Sprint 3.3: UI/UX Refinements & Progress Management
     src/iconmanager.cpp
     src/progressmanager.cpp
+    # Sprint R1: Advanced Rendering - LOD System
+    src/octree.cpp
 )
 
 # Header files
@@ -177,6 +179,8 @@ set(HEADERS
     # Sprint 3.3: UI/UX Refinements & Progress Management
     src/iconmanager.h
     src/progressmanager.h
+    # Sprint R1: Advanced Rendering - LOD System
+    src/octree.h
 )
 
 # Shader files
@@ -838,11 +842,30 @@ if(TARGET GTest::gtest_main)
     target_include_directories(Sprint33UIRefinementsTests PRIVATE src)
     add_test(NAME Sprint33UIRefinementsTests COMMAND Sprint33UIRefinementsTests)
 
+    # Sprint R1: LOD System Tests
+    add_executable(SprintR1LODTests
+        tests/test_pointcloudviewerwidget_lod.cpp
+        src/octree.cpp
+        src/pointcloudviewerwidget.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(SprintR1LODTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::OpenGLWidgets
+        Qt6::Test
+    )
+
+    target_include_directories(SprintR1LODTests PRIVATE src)
+    add_test(NAME SprintR1LODTests COMMAND SprintR1LODTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests
-        COMMENT "Running all unit tests including Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests
+        COMMENT "Running all unit tests including Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1: E57ParserLib testing targets
@@ -871,6 +894,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint33.*"
         DEPENDS Sprint33UIRefinementsTests
         COMMENT "Running Sprint 3.3 UI/UX refinements tests"
+    )
+
+    # Sprint R1: LOD System testing targets
+    add_custom_target(run_sprintr1_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*SprintR1.*"
+        DEPENDS SprintR1LODTests
+        COMMENT "Running Sprint R1 LOD system tests"
     )
 
     add_custom_target(generate_complex_test_files
