@@ -4,6 +4,8 @@
 #include <QDir>
 #include <QCoreApplication>
 #include <QPainter>
+#include <QRadialGradient>
+#include <QBrush>
 #include <cmath>
 
 PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
@@ -52,6 +54,15 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_minPointSize(1.0f)
     , m_maxPointSize(10.0f)
     , m_attenuationFactor(0.1f)
+    , m_splattingEnabled(true)                    // Sprint R4: Initialize splatting and lighting
+    , m_lightingEnabled(false)
+    , m_lightDirection(0, 0, -1)
+    , m_lightColor(Qt::white)
+    , m_ambientIntensity(0.3f)
+    , m_splatThreshold(10.0f)
+    , m_pointShaderProgram(nullptr)
+    , m_splatShaderProgram(nullptr)
+    , m_splatTexture(nullptr)
     , m_fps(0.0f)
     , m_frameCount(0)
     , m_visiblePointCount(0)
@@ -99,6 +110,19 @@ PointCloudViewerWidget::~PointCloudViewerWidget()
         delete m_ucsShaderProgram;
     }
 
+    // Sprint R4: Clean up splatting and lighting resources
+    if (m_pointShaderProgram) {
+        delete m_pointShaderProgram;
+    }
+
+    if (m_splatShaderProgram) {
+        delete m_splatShaderProgram;
+    }
+
+    if (m_splatTexture) {
+        delete m_splatTexture;
+    }
+
     doneCurrent();
 }
 
@@ -138,6 +162,14 @@ void PointCloudViewerWidget::initializeGL()
         if (error != GL_NO_ERROR) {
             qCritical() << "OpenGL Error after glEnable(GL_PROGRAM_POINT_SIZE):" << QString("0x%1").arg(error, 0, 16);
         }
+
+        // Sprint R4: Enable blending for splat rendering
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            qCritical() << "OpenGL Error after enabling blending:" << QString("0x%1").arg(error, 0, 16);
+        }
         qDebug() << "OpenGL state configured";
 
         // Setup shaders
@@ -157,6 +189,19 @@ void PointCloudViewerWidget::initializeGL()
         qDebug() << "Setting up UCS buffers...";
         setupUCSBuffers();
         qDebug() << "UCS buffers setup completed";
+
+        // Sprint R4: Setup splatting and lighting shaders and resources
+        qDebug() << "Setting up Sprint R4 splatting shaders...";
+        setupSplatShaders();
+        qDebug() << "Sprint R4 splatting shaders setup completed";
+
+        qDebug() << "Setting up Sprint R4 splat texture...";
+        setupSplatTexture();
+        qDebug() << "Sprint R4 splat texture setup completed";
+
+        qDebug() << "Setting up Sprint R4 splat VAOs...";
+        setupSplatVertexArrayObject();
+        qDebug() << "Sprint R4 splat VAOs setup completed";
 
         qDebug() << "OpenGL initialized successfully";
     } catch (const std::exception& e) {
@@ -191,8 +236,12 @@ void PointCloudViewerWidget::paintGL()
 
     // Sprint 2.3: Handle state-based rendering
     if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
+        // Sprint R4: Use new scene rendering with splatting and lighting
+        if (m_splattingEnabled || m_lightingEnabled) {
+            renderScene();
+        }
         // Sprint R3: Use enhanced attribute rendering if color/intensity features are enabled
-        if (m_renderWithColor || m_renderWithIntensity || m_pointSizeAttenuationEnabled) {
+        else if (m_renderWithColor || m_renderWithIntensity || m_pointSizeAttenuationEnabled) {
             renderWithAttributes();
         }
         // Sprint R2: Use screen-space error LOD if enabled, otherwise fall back to R1 or traditional
@@ -1618,6 +1667,552 @@ void PointCloudViewerWidget::prepareVertexData(const std::vector<PointFullData>&
     m_vertexBuffer.release();
 }
 
+// Sprint R4: Splatting and lighting rendering methods implementation (Task R4.1.3, R4.1.4, R4.1.5)
+void PointCloudViewerWidget::renderScene()
+{
+    if (!m_octree || !m_octree->root) return;
+
+    // Collect visible points and splats (Task R4.1.4)
+    QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+    auto frustumPlanes = extractFrustumPlanes(viewProjection);
+
+    ViewportInfo viewport{width(), height(), 0.1f, 1000.0f};
+
+    m_visiblePoints.clear();
+    m_visibleSplats.clear();
+
+    m_octree->root->collectRenderData(
+        frustumPlanes, viewProjection, viewport,
+        m_splatThreshold, m_splattingEnabled,
+        m_visiblePoints, m_visibleSplats
+    );
+
+    // Render individual points
+    if (!m_visiblePoints.empty()) {
+        renderPoints(m_visiblePoints);
+    }
+
+    // Render splats
+    if (!m_visibleSplats.empty() && m_splattingEnabled) {
+        renderSplats(m_visibleSplats);
+    }
+}
+
+void PointCloudViewerWidget::renderPoints(const std::vector<PointFullData>& points)
+{
+    if (!m_pointShaderProgram || points.empty()) return;
+
+    // Prepare vertex data
+    prepareVertexData(points);
+
+    m_pointShaderProgram->bind();
+
+    // Set transformation matrices
+    QMatrix4x4 modelMatrix;
+    modelMatrix.setToIdentity();
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * modelMatrix;
+    QMatrix3x3 normalMatrix = (m_viewMatrix * modelMatrix).normalMatrix();
+
+    m_pointShaderProgram->setUniformValue("mvpMatrix", mvpMatrix);
+    m_pointShaderProgram->setUniformValue("viewMatrix", m_viewMatrix);
+    m_pointShaderProgram->setUniformValue("modelMatrix", modelMatrix);
+    m_pointShaderProgram->setUniformValue("normalMatrix", normalMatrix);
+    m_pointShaderProgram->setUniformValue("cameraPosition_worldSpace", m_cameraPosition);
+
+    // Set rendering parameters
+    m_pointShaderProgram->setUniformValue("renderWithColor", m_renderWithColor);
+    m_pointShaderProgram->setUniformValue("renderWithIntensity", m_renderWithIntensity);
+    m_pointShaderProgram->setUniformValue("uniformColor", QVector3D(1.0f, 1.0f, 1.0f));
+
+    // Set point size parameters
+    m_pointShaderProgram->setUniformValue("pointSizeAttenuationEnabled", m_pointSizeAttenuationEnabled);
+    m_pointShaderProgram->setUniformValue("basePointSize", 3.0f);
+    m_pointShaderProgram->setUniformValue("minPointSize", m_minPointSize);
+    m_pointShaderProgram->setUniformValue("maxPointSize", m_maxPointSize);
+    m_pointShaderProgram->setUniformValue("attenuationFactor", m_attenuationFactor);
+
+    // Set lighting parameters (Task R4.2.3)
+    m_pointShaderProgram->setUniformValue("lightingEnabled", m_lightingEnabled);
+    if (m_lightingEnabled) {
+        QVector3D lightDir_viewSpace = m_viewMatrix.mapVector(m_lightDirection).normalized();
+        m_pointShaderProgram->setUniformValue("lightDirection_viewSpace", lightDir_viewSpace);
+        m_pointShaderProgram->setUniformValue("lightColor",
+            QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
+        m_pointShaderProgram->setUniformValue("ambientIntensity", m_ambientIntensity);
+    }
+
+    // Render
+    m_pointVAO.bind();
+    glDrawArrays(GL_POINTS, 0, static_cast<int>(m_pointVertexData.size()));
+    m_pointVAO.release();
+
+    m_pointShaderProgram->release();
+}
+
+void PointCloudViewerWidget::renderSplats(const std::vector<AggregateNodeData>& splats)
+{
+    if (!m_splatShaderProgram || splats.empty()) return;
+
+    prepareSplatVertexData(splats);
+
+    m_splatShaderProgram->bind();
+
+    // Set transformation matrices
+    QMatrix4x4 modelMatrix;
+    modelMatrix.setToIdentity();
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * modelMatrix;
+    QMatrix3x3 normalMatrix = (m_viewMatrix * modelMatrix).normalMatrix();
+
+    m_splatShaderProgram->setUniformValue("mvpMatrix", mvpMatrix);
+    m_splatShaderProgram->setUniformValue("viewMatrix", m_viewMatrix);
+    m_splatShaderProgram->setUniformValue("modelMatrix", modelMatrix);
+    m_splatShaderProgram->setUniformValue("normalMatrix", normalMatrix);
+    m_splatShaderProgram->setUniformValue("projectionMatrix", m_projectionMatrix);
+    m_splatShaderProgram->setUniformValue("cameraPosition_worldSpace", m_cameraPosition);
+    m_splatShaderProgram->setUniformValue("viewportSize", QVector2D(width(), height()));
+
+    // Set rendering parameters
+    m_splatShaderProgram->setUniformValue("renderWithColor", m_renderWithColor);
+    m_splatShaderProgram->setUniformValue("renderWithIntensity", m_renderWithIntensity);
+    m_splatShaderProgram->setUniformValue("uniformColor", QVector3D(1.0f, 1.0f, 1.0f));
+
+    // Set lighting parameters
+    m_splatShaderProgram->setUniformValue("lightingEnabled", m_lightingEnabled);
+    if (m_lightingEnabled) {
+        QVector3D lightDir_viewSpace = m_viewMatrix.mapVector(m_lightDirection).normalized();
+        m_splatShaderProgram->setUniformValue("lightDirection_viewSpace", lightDir_viewSpace);
+        m_splatShaderProgram->setUniformValue("lightColor",
+            QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
+        m_splatShaderProgram->setUniformValue("ambientIntensity", m_ambientIntensity);
+    }
+
+    // Bind splat texture
+    if (m_splatTexture) {
+        m_splatTexture->bind(0);
+        m_splatShaderProgram->setUniformValue("splatTexture", 0);
+    }
+
+    // Render
+    m_splatVAO.bind();
+    glDrawArrays(GL_POINTS, 0, static_cast<int>(m_splatVertexData.size()));
+    m_splatVAO.release();
+
+    m_splatShaderProgram->release();
+}
+
+void PointCloudViewerWidget::prepareSplatVertexData(const std::vector<AggregateNodeData>& splats)
+{
+    m_splatVertexData.clear();
+    m_splatVertexData.reserve(splats.size());
+
+    for (const auto& splat : splats) {
+        m_splatVertexData.emplace_back(splat);
+    }
+
+    // Update VBO with new splat vertex data
+    m_splatVertexBuffer.bind();
+    m_splatVertexBuffer.allocate(m_splatVertexData.data(),
+                                static_cast<int>(m_splatVertexData.size() * sizeof(SplatVertex)));
+    m_splatVertexBuffer.release();
+}
+
+// Sprint R4: Shader setup methods (Task R4.1.3)
+void PointCloudViewerWidget::setupSplatShaders()
+{
+    // Point rendering shader with lighting
+    m_pointShaderProgram = new QOpenGLShaderProgram(this);
+
+    // Vertex shader for points with lighting support
+    const char* pointVertexShader = R"(
+        #version 330 core
+
+        layout (location = 0) in vec3 position;
+        layout (location = 1) in vec3 color;
+        layout (location = 2) in float intensity;
+        layout (location = 3) in vec3 normal;
+
+        uniform mat4 mvpMatrix;
+        uniform mat4 viewMatrix;
+        uniform mat4 modelMatrix;
+        uniform mat3 normalMatrix;
+        uniform vec3 cameraPosition_worldSpace;
+
+        // Point size attenuation
+        uniform bool pointSizeAttenuationEnabled;
+        uniform float basePointSize;
+        uniform float minPointSize;
+        uniform float maxPointSize;
+        uniform float attenuationFactor;
+
+        // Outputs to fragment shader
+        out vec3 fragColor;
+        out float fragIntensity;
+        out vec3 fragNormal_viewSpace;
+        out vec3 fragPosition_viewSpace;
+
+        void main() {
+            gl_Position = mvpMatrix * vec4(position, 1.0);
+
+            // Transform normal to view space for lighting
+            fragNormal_viewSpace = normalMatrix * normal;
+
+            // Transform position to view space
+            vec4 position_viewSpace = viewMatrix * modelMatrix * vec4(position, 1.0);
+            fragPosition_viewSpace = position_viewSpace.xyz;
+
+            // Pass attributes
+            fragColor = color;
+            fragIntensity = intensity;
+
+            // Point size attenuation
+            if (pointSizeAttenuationEnabled) {
+                float distance = length(cameraPosition_worldSpace - position);
+                float attenuatedSize = basePointSize / (1.0 + distance * attenuationFactor);
+                gl_PointSize = clamp(attenuatedSize, minPointSize, maxPointSize);
+            } else {
+                gl_PointSize = basePointSize;
+            }
+        }
+    )";
+
+    // Fragment shader for points with lighting
+    const char* pointFragmentShader = R"(
+        #version 330 core
+
+        in vec3 fragColor;
+        in float fragIntensity;
+        in vec3 fragNormal_viewSpace;
+        in vec3 fragPosition_viewSpace;
+
+        // Rendering control uniforms
+        uniform bool renderWithColor;
+        uniform bool renderWithIntensity;
+        uniform vec3 uniformColor;
+
+        // Lighting uniforms (Task R4.2.2)
+        uniform bool lightingEnabled;
+        uniform vec3 lightDirection_viewSpace;
+        uniform vec3 lightColor;
+        uniform float ambientIntensity;
+
+        out vec4 finalColor;
+
+        void main() {
+            vec3 baseColor = uniformColor;
+
+            // Apply color/intensity rendering logic
+            if (renderWithColor) {
+                baseColor = fragColor;
+            }
+
+            if (renderWithIntensity) {
+                if (renderWithColor) {
+                    baseColor = fragColor * fragIntensity;
+                } else {
+                    baseColor = vec3(fragIntensity);
+                }
+            }
+
+            // Apply lighting if enabled
+            vec3 litColor = baseColor;
+            if (lightingEnabled) {
+                vec3 normal = normalize(fragNormal_viewSpace);
+                vec3 lightDir = normalize(-lightDirection_viewSpace);
+
+                // Lambertian diffuse lighting
+                float diffuse = max(dot(normal, lightDir), 0.0);
+
+                // Combine ambient and diffuse
+                vec3 ambient = baseColor * ambientIntensity;
+                vec3 diffuseComponent = baseColor * lightColor * diffuse;
+
+                litColor = ambient + diffuseComponent;
+            }
+
+            // Create circular point shape
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            float distance = length(coord);
+            if (distance > 0.5) {
+                discard;
+            }
+
+            float alpha = 1.0 - smoothstep(0.3, 0.5, distance);
+            finalColor = vec4(litColor, alpha);
+        }
+    )";
+
+    // Compile point shaders
+    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, pointVertexShader)) {
+        qCritical() << "Failed to compile point vertex shader:" << m_pointShaderProgram->log();
+        return;
+    }
+
+    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, pointFragmentShader)) {
+        qCritical() << "Failed to compile point fragment shader:" << m_pointShaderProgram->log();
+        return;
+    }
+
+    if (!m_pointShaderProgram->link()) {
+        qCritical() << "Failed to link point shader program:" << m_pointShaderProgram->log();
+        return;
+    }
+
+    qDebug() << "Point shader program compiled and linked successfully";
+
+    // Splat rendering shader
+    m_splatShaderProgram = new QOpenGLShaderProgram(this);
+
+    // Vertex shader for splats
+    const char* splatVertexShader = R"(
+        #version 330 core
+
+        layout (location = 0) in vec3 position;
+        layout (location = 1) in vec3 color;
+        layout (location = 2) in vec3 normal;
+        layout (location = 3) in float intensity;
+        layout (location = 4) in float radius;
+
+        uniform mat4 mvpMatrix;
+        uniform mat4 viewMatrix;
+        uniform mat4 modelMatrix;
+        uniform mat4 projectionMatrix;
+        uniform mat3 normalMatrix;
+        uniform vec3 cameraPosition_worldSpace;
+        uniform vec2 viewportSize;
+
+        // Outputs to fragment shader
+        out vec3 fragColor;
+        out float fragIntensity;
+        out vec3 fragNormal_viewSpace;
+        out vec3 fragPosition_viewSpace;
+
+        void main() {
+            gl_Position = mvpMatrix * vec4(position, 1.0);
+
+            // Transform normal to view space for lighting
+            fragNormal_viewSpace = normalMatrix * normal;
+
+            // Transform position to view space
+            vec4 position_viewSpace = viewMatrix * modelMatrix * vec4(position, 1.0);
+            fragPosition_viewSpace = position_viewSpace.xyz;
+
+            // Pass attributes
+            fragColor = color;
+            fragIntensity = intensity;
+
+            // Calculate screen-space splat size based on radius and distance
+            float distance = length(cameraPosition_worldSpace - position);
+            float screenRadius = radius * projectionMatrix[1][1] / distance;
+            gl_PointSize = clamp(screenRadius * viewportSize.y * 0.5, 1.0, 100.0);
+        }
+    )";
+
+    // Fragment shader for splats with lighting
+    const char* splatFragmentShader = R"(
+        #version 330 core
+
+        in vec3 fragColor;
+        in float fragIntensity;
+        in vec3 fragNormal_viewSpace;
+        in vec3 fragPosition_viewSpace;
+
+        // Rendering control uniforms
+        uniform bool renderWithColor;
+        uniform bool renderWithIntensity;
+        uniform vec3 uniformColor;
+
+        // Lighting uniforms
+        uniform bool lightingEnabled;
+        uniform vec3 lightDirection_viewSpace;
+        uniform vec3 lightColor;
+        uniform float ambientIntensity;
+
+        // Splat texture
+        uniform sampler2D splatTexture;
+
+        out vec4 finalColor;
+
+        void main() {
+            vec3 baseColor = uniformColor;
+
+            // Apply color/intensity rendering logic
+            if (renderWithColor) {
+                baseColor = fragColor;
+            }
+
+            if (renderWithIntensity) {
+                if (renderWithColor) {
+                    baseColor = fragColor * fragIntensity;
+                } else {
+                    baseColor = vec3(fragIntensity);
+                }
+            }
+
+            // Apply lighting if enabled
+            vec3 litColor = baseColor;
+            if (lightingEnabled) {
+                vec3 normal = normalize(fragNormal_viewSpace);
+                vec3 lightDir = normalize(-lightDirection_viewSpace);
+
+                // Lambertian diffuse lighting
+                float diffuse = max(dot(normal, lightDir), 0.0);
+
+                // Combine ambient and diffuse
+                vec3 ambient = baseColor * ambientIntensity;
+                vec3 diffuseComponent = baseColor * lightColor * diffuse;
+
+                litColor = ambient + diffuseComponent;
+            }
+
+            // Sample splat texture for shape
+            vec4 splatShape = texture(splatTexture, gl_PointCoord);
+
+            finalColor = vec4(litColor, splatShape.a);
+        }
+    )";
+
+    // Compile splat shaders
+    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, splatVertexShader)) {
+        qCritical() << "Failed to compile splat vertex shader:" << m_splatShaderProgram->log();
+        return;
+    }
+
+    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, splatFragmentShader)) {
+        qCritical() << "Failed to compile splat fragment shader:" << m_splatShaderProgram->log();
+        return;
+    }
+
+    if (!m_splatShaderProgram->link()) {
+        qCritical() << "Failed to link splat shader program:" << m_splatShaderProgram->log();
+        return;
+    }
+
+    qDebug() << "Splat shader program compiled and linked successfully";
+}
+
+void PointCloudViewerWidget::setupSplatTexture()
+{
+    // Create a simple circular splat texture
+    const int textureSize = 64;
+    QImage splatImage(textureSize, textureSize, QImage::Format_RGBA8888);
+    splatImage.fill(Qt::transparent);
+
+    QPainter painter(&splatImage);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // Create radial gradient
+    QRadialGradient gradient(textureSize/2, textureSize/2, textureSize/2);
+    gradient.setColorAt(0.0, QColor(255, 255, 255, 255));
+    gradient.setColorAt(0.7, QColor(255, 255, 255, 128));
+    gradient.setColorAt(1.0, QColor(255, 255, 255, 0));
+
+    painter.setBrush(QBrush(gradient));
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(0, 0, textureSize, textureSize);
+
+    m_splatTexture = new QOpenGLTexture(splatImage);
+    m_splatTexture->setMinificationFilter(QOpenGLTexture::Linear);
+    m_splatTexture->setMagnificationFilter(QOpenGLTexture::Linear);
+
+    qDebug() << "Splat texture created successfully";
+}
+
+void PointCloudViewerWidget::setupSplatVertexArrayObject()
+{
+    // Create point VAO
+    if (!m_pointVAO.create()) {
+        qCritical() << "Failed to create point VAO";
+        return;
+    }
+
+    if (!m_pointVertexBuffer.create()) {
+        qCritical() << "Failed to create point vertex buffer";
+        return;
+    }
+
+    // Create splat VAO
+    if (!m_splatVAO.create()) {
+        qCritical() << "Failed to create splat VAO";
+        return;
+    }
+
+    if (!m_splatVertexBuffer.create()) {
+        qCritical() << "Failed to create splat vertex buffer";
+        return;
+    }
+
+    // Setup point VAO
+    m_pointVAO.bind();
+    m_pointVertexBuffer.bind();
+
+    if (m_pointShaderProgram) {
+        m_pointShaderProgram->bind();
+
+        // Position attribute (location 0)
+        m_pointShaderProgram->enableAttributeArray(0);
+        m_pointShaderProgram->setAttributeBuffer(0, GL_FLOAT,
+            offsetof(VertexData, position), 3, sizeof(VertexData));
+
+        // Color attribute (location 1)
+        m_pointShaderProgram->enableAttributeArray(1);
+        m_pointShaderProgram->setAttributeBuffer(1, GL_FLOAT,
+            offsetof(VertexData, color), 3, sizeof(VertexData));
+
+        // Intensity attribute (location 2)
+        m_pointShaderProgram->enableAttributeArray(2);
+        m_pointShaderProgram->setAttributeBuffer(2, GL_FLOAT,
+            offsetof(VertexData, intensity), 1, sizeof(VertexData));
+
+        // Normal attribute (location 3) - default to up vector
+        glVertexAttrib3f(3, 0.0f, 0.0f, 1.0f);
+
+        m_pointShaderProgram->release();
+    }
+
+    m_pointVertexBuffer.release();
+    m_pointVAO.release();
+
+    // Setup splat VAO
+    m_splatVAO.bind();
+    m_splatVertexBuffer.bind();
+
+    if (m_splatShaderProgram) {
+        m_splatShaderProgram->bind();
+
+        // Position attribute (location 0)
+        m_splatShaderProgram->enableAttributeArray(0);
+        m_splatShaderProgram->setAttributeBuffer(0, GL_FLOAT,
+            offsetof(SplatVertex, position), 3, sizeof(SplatVertex));
+
+        // Color attribute (location 1)
+        m_splatShaderProgram->enableAttributeArray(1);
+        m_splatShaderProgram->setAttributeBuffer(1, GL_FLOAT,
+            offsetof(SplatVertex, color), 3, sizeof(SplatVertex));
+
+        // Normal attribute (location 2)
+        m_splatShaderProgram->enableAttributeArray(2);
+        m_splatShaderProgram->setAttributeBuffer(2, GL_FLOAT,
+            offsetof(SplatVertex, normal), 3, sizeof(SplatVertex));
+
+        // Intensity attribute (location 3)
+        m_splatShaderProgram->enableAttributeArray(3);
+        m_splatShaderProgram->setAttributeBuffer(3, GL_FLOAT,
+            offsetof(SplatVertex, intensity), 1, sizeof(SplatVertex));
+
+        // Radius attribute (location 4)
+        m_splatShaderProgram->enableAttributeArray(4);
+        m_splatShaderProgram->setAttributeBuffer(4, GL_FLOAT,
+            offsetof(SplatVertex, radius), 1, sizeof(SplatVertex));
+
+        m_splatShaderProgram->release();
+    }
+
+    m_splatVertexBuffer.release();
+    m_splatVAO.release();
+
+    qDebug() << "Sprint R4 VAOs setup completed";
+}
+
 // Sprint R3: Attribute rendering and point size attenuation slot implementations (as per backlog)
 void PointCloudViewerWidget::setRenderWithColor(bool enabled)
 {
@@ -1647,5 +2242,41 @@ void PointCloudViewerWidget::setPointSizeAttenuationParams(float minSize, float 
     m_attenuationFactor = factor;
     qDebug() << "Point size attenuation params - Min:" << minSize
              << "Max:" << maxSize << "Factor:" << factor;
+    update();
+}
+
+// Sprint R4: Splatting and lighting slot implementations (Task R4.3.2)
+void PointCloudViewerWidget::setSplattingEnabled(bool enabled)
+{
+    m_splattingEnabled = enabled;
+    qDebug() << "Point splatting:" << (enabled ? "enabled" : "disabled");
+    update();
+}
+
+void PointCloudViewerWidget::setLightingEnabled(bool enabled)
+{
+    m_lightingEnabled = enabled;
+    qDebug() << "Lighting:" << (enabled ? "enabled" : "disabled");
+    update();
+}
+
+void PointCloudViewerWidget::setLightDirection(const QVector3D& direction)
+{
+    m_lightDirection = direction.normalized();
+    qDebug() << "Light direction set to:" << m_lightDirection;
+    update();
+}
+
+void PointCloudViewerWidget::setLightColor(const QColor& color)
+{
+    m_lightColor = color;
+    qDebug() << "Light color set to:" << color.name();
+    update();
+}
+
+void PointCloudViewerWidget::setAmbientIntensity(float intensity)
+{
+    m_ambientIntensity = intensity;
+    qDebug() << "Ambient intensity set to:" << intensity;
     update();
 }

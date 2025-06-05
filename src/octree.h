@@ -24,6 +24,9 @@ struct PointFullData {
     // Intensity attribute (optional, normalized 0-1 range as specified in backlog)
     std::optional<float> intensity;
 
+    // Normal attribute (optional, for Sprint R4 lighting)
+    std::optional<QVector3D> normal;
+
     // Default constructor (XYZ only)
     PointFullData(float x = 0, float y = 0, float z = 0)
         : x(x), y(y), z(z) {}
@@ -43,6 +46,7 @@ struct PointFullData {
     // Utility methods as required by backlog
     bool hasColor() const { return r.has_value() && g.has_value() && b.has_value(); }
     bool hasIntensity() const { return intensity.has_value(); }
+    bool hasNormal() const { return normal.has_value(); }
 
     // Get normalized color for shader (0-1 range)
     void getNormalizedColor(float& nr, float& ng, float& nb) const {
@@ -50,6 +54,26 @@ struct PointFullData {
         ng = hasColor() ? g.value() / 255.0f : 1.0f;
         nb = hasColor() ? b.value() / 255.0f : 1.0f;
     }
+};
+
+// Sprint R4: Aggregate data structure for point splatting (Task R4.1.2)
+struct AggregateNodeData {
+    QVector3D center;
+    QVector3D averageColor;
+    float averageIntensity;
+    QVector3D averageNormal;
+    float boundingRadius;
+    int pointCount;
+    float screenSpaceSize; // For splat sizing
+
+    AggregateNodeData()
+        : center(0, 0, 0)
+        , averageColor(1, 1, 1)
+        , averageIntensity(1.0f)
+        , averageNormal(0, 0, 1)
+        , boundingRadius(0.0f)
+        , pointCount(0)
+        , screenSpaceSize(0.0f) {}
 };
 
 // Axis-Aligned Bounding Box for spatial subdivision
@@ -129,6 +153,22 @@ public:
         std::vector<PointFullData>& visiblePoints
     ) const;
 
+    // Sprint R4: Splatting and lighting methods (Task R4.1.2, R4.1.4, R4.1.5)
+    const AggregateNodeData& getAggregateData() const;
+    void calculateAggregateData() const;
+    bool shouldRenderAsSplat(float screenSpaceError, float splatThreshold) const;
+
+    // Enhanced traversal for splat rendering (Task R4.1.4, R4.1.5)
+    void collectRenderData(
+        const std::array<QVector4D, 6>& frustumPlanes,
+        const QMatrix4x4& mvpMatrix,
+        const ViewportInfo& viewport,
+        float splatThreshold,
+        bool splattingEnabled,
+        std::vector<PointFullData>& individualPoints,
+        std::vector<AggregateNodeData>& splatData
+    ) const;
+
 private:
     // Test if this node's bounding box intersects with the view frustum
     bool intersectsFrustum(const std::array<QVector4D, 6>& frustumPlanes) const;
@@ -137,7 +177,12 @@ private:
     mutable std::vector<PointFullData> m_representativePoints;
     mutable bool m_representativePointsCalculated = false;
 
+    // Sprint R4: Aggregate data for splatting (Task R4.1.2)
+    mutable AggregateNodeData m_aggregateData;
+    mutable bool m_aggregateDataCalculated = false;
+
     void calculateRepresentativePoints() const;
+    QVector3D estimateNormalFromPoints() const;
 };
 
 // Main octree class for managing the spatial data structure

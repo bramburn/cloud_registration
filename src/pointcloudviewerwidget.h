@@ -6,8 +6,10 @@
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLTexture>
 #include <QMatrix4x4>
 #include <QVector3D>
+#include <QColor>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QTimer>
@@ -95,6 +97,13 @@ public slots:
     void setPointSizeAttenuationEnabled(bool enabled);
     void setPointSizeAttenuationParams(float minSize, float maxSize, float factor);
 
+    // Sprint R4: Splatting and lighting slots (Task R4.3.2)
+    void setSplattingEnabled(bool enabled);
+    void setLightingEnabled(bool enabled);
+    void setLightDirection(const QVector3D& direction);
+    void setLightColor(const QColor& color);
+    void setAmbientIntensity(float intensity);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -142,6 +151,15 @@ private:
     void prepareVertexData(const std::vector<PointFullData>& points);
     void setupEnhancedShaders();
     void setupEnhancedVertexArrayObject();
+
+    // Sprint R4: Splatting and lighting rendering methods (Task R4.1.3, R4.1.4, R4.1.5)
+    void renderScene();
+    void renderPoints(const std::vector<PointFullData>& points);
+    void renderSplats(const std::vector<AggregateNodeData>& splats);
+    void prepareSplatVertexData(const std::vector<AggregateNodeData>& splats);
+    void setupSplatShaders();
+    void setupSplatTexture();
+    void setupSplatVertexArrayObject();
 
 private slots:
     void updateLoadingAnimation();
@@ -245,6 +263,28 @@ private:
     float m_maxPointSize;
     float m_attenuationFactor;
     std::vector<VertexData> m_vertexData;
+
+    // Sprint R4: Splatting and lighting state (Task R4.3.2)
+    bool m_splattingEnabled;
+    bool m_lightingEnabled;
+    QVector3D m_lightDirection;
+    QColor m_lightColor;
+    float m_ambientIntensity;
+    float m_splatThreshold;
+
+    // Sprint R4: OpenGL resources for splatting
+    QOpenGLShaderProgram* m_pointShaderProgram;
+    QOpenGLShaderProgram* m_splatShaderProgram;
+    QOpenGLBuffer m_pointVertexBuffer;
+    QOpenGLBuffer m_splatVertexBuffer;
+    QOpenGLVertexArrayObject m_pointVAO;
+    QOpenGLVertexArrayObject m_splatVAO;
+    QOpenGLTexture* m_splatTexture;
+
+    // Sprint R4: Rendering data
+    std::vector<AggregateNodeData> m_visibleSplats;
+    std::vector<VertexData> m_pointVertexData;
+    std::vector<SplatVertex> m_splatVertexData;
 
     // Performance monitoring
     std::chrono::high_resolution_clock::time_point m_lastFrameTime;

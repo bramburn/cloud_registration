@@ -473,3 +473,158 @@ void OctreeNode::collectVisiblePointsWithScreenSpaceError(
         }
     }
 }
+
+// Sprint R4: Aggregate data methods implementation (Task R4.1.2)
+const AggregateNodeData& OctreeNode::getAggregateData() const {
+    if (!m_aggregateDataCalculated) {
+        calculateAggregateData();
+        m_aggregateDataCalculated = true;
+    }
+    return m_aggregateData;
+}
+
+void OctreeNode::calculateAggregateData() const {
+    if (isLeaf) {
+        if (points.empty()) {
+            m_aggregateData = AggregateNodeData();
+            return;
+        }
+
+        // Calculate aggregate properties as specified in Task R4.1.2
+        QVector3D centerSum(0, 0, 0);
+        QVector3D colorSum(0, 0, 0);
+        QVector3D normalSum(0, 0, 0);
+        float intensitySum = 0.0f;
+        int colorCount = 0;
+        int intensityCount = 0;
+        int normalCount = 0;
+
+        for (const auto& point : points) {
+            centerSum += QVector3D(point.x, point.y, point.z);
+
+            if (point.hasColor()) {
+                colorSum += QVector3D(point.r.value() / 255.0f,
+                                     point.g.value() / 255.0f,
+                                     point.b.value() / 255.0f);
+                colorCount++;
+            }
+
+            if (point.hasIntensity()) {
+                intensitySum += point.intensity.value();
+                intensityCount++;
+            }
+
+            if (point.hasNormal()) {
+                normalSum += point.normal.value();
+                normalCount++;
+            }
+        }
+
+        m_aggregateData.center = centerSum / static_cast<float>(points.size());
+        m_aggregateData.averageColor = colorCount > 0 ? colorSum / colorCount : QVector3D(1, 1, 1);
+        m_aggregateData.averageIntensity = intensityCount > 0 ? intensitySum / intensityCount : 1.0f;
+        m_aggregateData.averageNormal = normalCount > 0 ?
+            normalSum.normalized() : estimateNormalFromPoints();
+        m_aggregateData.pointCount = static_cast<int>(points.size());
+
+        // Calculate bounding radius
+        float maxDistSq = 0.0f;
+        for (const auto& point : points) {
+            QVector3D pos(point.x, point.y, point.z);
+            float distSq = (pos - m_aggregateData.center).lengthSquared();
+            maxDistSq = std::max(maxDistSq, distSq);
+        }
+        m_aggregateData.boundingRadius = std::sqrt(maxDistSq);
+
+    } else {
+        // Internal node: aggregate from children
+        QVector3D centerSum(0, 0, 0);
+        QVector3D colorSum(0, 0, 0);
+        QVector3D normalSum(0, 0, 0);
+        float intensitySum = 0.0f;
+        int totalPoints = 0;
+
+        for (const auto& child : children) {
+            if (child) {
+                const auto& childData = child->getAggregateData();
+                if (childData.pointCount > 0) {
+                    centerSum += childData.center * childData.pointCount;
+                    colorSum += childData.averageColor * childData.pointCount;
+                    normalSum += childData.averageNormal * childData.pointCount;
+                    intensitySum += childData.averageIntensity * childData.pointCount;
+                    totalPoints += childData.pointCount;
+                }
+            }
+        }
+
+        if (totalPoints > 0) {
+            m_aggregateData.center = centerSum / totalPoints;
+            m_aggregateData.averageColor = colorSum / totalPoints;
+            m_aggregateData.averageIntensity = intensitySum / totalPoints;
+            m_aggregateData.averageNormal = normalSum.normalized();
+            m_aggregateData.pointCount = totalPoints;
+        }
+
+        // Calculate bounding radius from bounds
+        QVector3D boundsSize = bounds.max - bounds.min;
+        m_aggregateData.boundingRadius = boundsSize.length() * 0.5f;
+    }
+}
+
+bool OctreeNode::shouldRenderAsSplat(float screenSpaceError, float splatThreshold) const {
+    return screenSpaceError < splatThreshold && depth > 2;
+}
+
+void OctreeNode::collectRenderData(
+    const std::array<QVector4D, 6>& frustumPlanes,
+    const QMatrix4x4& mvpMatrix,
+    const ViewportInfo& viewport,
+    float splatThreshold,
+    bool splattingEnabled,
+    std::vector<PointFullData>& individualPoints,
+    std::vector<AggregateNodeData>& splatData) const {
+
+    // Frustum culling
+    if (!intersectsFrustum(frustumPlanes)) {
+        return;
+    }
+
+    // Calculate screen-space error
+    float screenSpaceError = ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(
+        bounds, mvpMatrix, viewport);
+
+    // Decide rendering method (Task R4.1.4, R4.1.5)
+    if (splattingEnabled && shouldRenderAsSplat(screenSpaceError, splatThreshold)) {
+        // Render as splat
+        splatData.push_back(getAggregateData());
+    } else if (isLeaf) {
+        // Render individual points
+        individualPoints.insert(individualPoints.end(), points.begin(), points.end());
+    } else {
+        // Recurse to children
+        for (const auto& child : children) {
+            if (child) {
+                child->collectRenderData(frustumPlanes, mvpMatrix, viewport,
+                                       splatThreshold, splattingEnabled,
+                                       individualPoints, splatData);
+            }
+        }
+    }
+}
+
+QVector3D OctreeNode::estimateNormalFromPoints() const {
+    if (points.size() < 3) {
+        return QVector3D(0, 0, 1); // Default up vector
+    }
+
+    // Simple normal estimation using first three points
+    QVector3D p1(points[0].x, points[0].y, points[0].z);
+    QVector3D p2(points[1].x, points[1].y, points[1].z);
+    QVector3D p3(points[2].x, points[2].y, points[2].z);
+
+    QVector3D v1 = p2 - p1;
+    QVector3D v2 = p3 - p1;
+    QVector3D normal = QVector3D::crossProduct(v1, v2);
+
+    return normal.length() > 0.1f ? normal.normalized() : QVector3D(0, 0, 1);
+}
