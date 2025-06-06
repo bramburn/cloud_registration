@@ -8,6 +8,8 @@
 
 class SQLiteManager;
 class QFileInfo;
+class ProjectTreeModel;
+class E57DataManager;
 struct ScanInfo;
 
 enum class ImportMode {
@@ -40,7 +42,11 @@ public:
                            QWidget *parent = nullptr);
     
     void setSQLiteManager(SQLiteManager *manager);
-    
+    void setProjectTreeModel(ProjectTreeModel *model);
+
+    // Sprint 1.3: E57-specific import methods
+    void handleE57Import(const QString& filePath);
+
     static bool isValidScanFile(const QString &filePath);
     static QStringList getSupportedExtensions();
     static QString getFileBaseName(const QString &filePath);
@@ -50,9 +56,13 @@ signals:
     void importProgress(int current, int total, const QString &currentFile);
     void importFinished();
 
+    // Sprint 1.3: E57-specific signals
+    void importCompleted(const QString& filePath, int scanCount);
+    void importFailed(const QString& filePath, const QString& error);
+
 private:
-    bool performFileOperation(const QString &sourcePath, 
-                            const QString &targetPath, 
+    bool performFileOperation(const QString &sourcePath,
+                            const QString &targetPath,
                             ImportMode mode);
     ScanInfo createScanInfo(const QString &sourcePath,
                           const QString &targetPath,
@@ -60,9 +70,14 @@ private:
                           const QString &projectId,
                           ImportMode mode);
     QString getRelativePath(const QString &filePath, const QString &projectPath);
-    
+
+    // Sprint 1.3: E57-specific helper methods
+    void handleE57ImportError(const QString& filePath, const QString& error);
+
     SQLiteManager *m_sqliteManager;
-    
+    ProjectTreeModel *m_projectTreeModel;
+    QWidget *m_parentWidget;
+
     static const QStringList SUPPORTED_EXTENSIONS;
 };
 

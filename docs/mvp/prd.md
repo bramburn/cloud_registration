@@ -331,3 +331,81 @@ These future considerations will build upon the solid foundation established by 
 #### **Works cited**
 
 1. MVP and E57 File Loading\_.pdf
+
+Product Requirements Document: FARO Scene Registration MVP v1.1
+1. Introduction
+
+This document outlines the requirements for the Minimum Viable Product (MVP) of the FARO Scene registration application, version 1.1. The primary objective of this MVP is to deliver a focused, reliable, and user-friendly tool for registering point cloud scans, with a strong emphasis on robust E57 file format support.
+
+This version of the PRD has been updated to reflect the project's maturation, including the successful integration of key dependencies such as libe57format and the Point Cloud Library (PCL) through the vcpkg package manager. This strategic shift simplifies the build process, enhances maintainability, and allows the development team to focus on core application logic.
+2. Vision and Goals
+
+The vision is to create a streamlined, high-performance desktop application for Windows that enables professionals in fields such as surveying, architecture, and construction to efficiently register 3D scans from FARO devices.
+MVP Goals:
+
+    Core Functionality: Provide essential tools for importing, visualizing, and registering E57 point cloud data.
+
+    Robust E57 Support: Ensure full compliance with the ASTM E2807 E57 standard, including reliable data integrity checks and metadata extraction.
+
+    Simplified Dependency Management: Leverage vcpkg to manage all external libraries, ensuring a stable and reproducible build environment.
+
+    User-Friendly Interface: Offer a clean, intuitive interface that guides the user through the registration workflow.
+
+    Foundation for Future Growth: Build a solid architectural foundation that can be extended with more advanced features and format support in the future.
+
+3. User Personas
+
+    Alex, the Surveyor: Alex needs to quickly register multiple scans from a worksite to create a unified point cloud. Alex values speed, accuracy, and reliability, as errors can cause costly delays.
+
+    Sam, the Architect: Sam uses registered point clouds to create as-built models. Sam needs a tool that is easy to use and provides clear visual feedback on the registration quality.
+
+4. Core Features
+4.1. Project Management
+
+    FP-1: Project Creation: Users can create new projects, specifying a name and location. The application will create a standardized project structure, including a dedicated folder for scan data and a project database file.
+
+    FP-2: Project Loading: Users can open existing projects. The application will validate the project structure and load all associated metadata.
+
+    FP-3: Data Persistence: All project data, including scan metadata and registration information, will be stored in a local SQLite database within the project folder.
+
+4.2. E57 File Handling (via libe57format and vcpkg)
+
+    FH-1: E57 File Import: Users can import one or more E57 files into the current project.
+
+        FH-1.1: Multi-Scan Support: The application must correctly identify and handle E57 files containing multiple Data3D sections (scans).
+
+        FH-1.2: Attribute Extraction: The application must parse and extract essential point attributes, including XYZ coordinates, color (RGB), and intensity.
+
+        FH-1.3: Data Integrity: The application must perform CRC-32 checksum validation on all binary sections to detect and report data corruption.
+
+    FH-2: E57 File Export: Users can export registered point clouds into a single, compliant E57 file.
+
+        FH-2.1: Metadata Preservation: The exported file must include accurate metadata, such as scanner pose and coordinate systems.
+
+    FH-3: Dependency Management: The libe57format library, used for all E57 I/O, will be managed via vcpkg. This simplifies the build process and ensures version consistency.
+
+4.3. Point Cloud Visualization
+
+    PV-1: 3D Viewer: The application will feature an OpenGL-based 3D viewer to display point clouds.
+
+    PV-2: Camera Controls: Users can navigate the 3D scene using standard orbit, pan, and zoom controls.
+
+    PV-3: Level of Detail (LOD): The viewer will implement an octree-based LOD system to render large point clouds efficiently, ensuring a smooth user experience.
+
+4.4. Point Cloud Registration (via PCL)
+
+    PR-1: Manual Registration: Users can manually align two scans by selecting corresponding points.
+
+    PR-2: Automated Registration (ICP): The application will use the Iterative Closest Point (ICP) algorithm from the Point Cloud Library (PCL) to automatically refine the alignment of two scans.
+
+    PR-3: Dependency Management: The PCL library will be managed via vcpkg.
+
+5. Non-Functional Requirements
+
+    NF-1: Performance: The application must be responsive, especially when loading and rendering large point clouds. The target is to maintain a minimum of 30 FPS during 3D navigation.
+
+    NF-2: Stability: The application must handle invalid or corrupted files gracefully without crashing.
+
+    NF-3: Platform: The MVP will be developed and tested exclusively for the Windows operating system.
+
+    NF-4: Usability: The user interface should be intuitive and require minimal training for users familiar with 3D scanning software.

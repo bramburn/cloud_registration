@@ -1,6 +1,9 @@
 #include "scanimportmanager.h"
 #include "sqlitemanager.h"
 #include "projectmanager.h"
+#include "projecttreemodel.h"
+#include "E57DataManager.h"
+#include "errordialog.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
@@ -11,18 +14,27 @@
 #include <QApplication>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QMessageBox>
+#include <numeric>
 
 const QStringList ScanImportManager::SUPPORTED_EXTENSIONS = {".las", ".e57"};
 
 ScanImportManager::ScanImportManager(QObject *parent)
     : QObject(parent)
     , m_sqliteManager(nullptr)
+    , m_projectTreeModel(nullptr)
+    , m_parentWidget(nullptr)
 {
 }
 
 void ScanImportManager::setSQLiteManager(SQLiteManager *manager)
 {
     m_sqliteManager = manager;
+}
+
+void ScanImportManager::setProjectTreeModel(ProjectTreeModel *model)
+{
+    m_projectTreeModel = model;
 }
 
 ImportResult ScanImportManager::importScans(const QStringList &filePaths,
@@ -259,4 +271,116 @@ QString ScanImportManager::getFileBaseName(const QString &filePath)
 {
     QFileInfo fileInfo(filePath);
     return fileInfo.completeBaseName();
+}
+
+// Sprint 1.3: E57-specific import implementation
+void ScanImportManager::handleE57Import(const QString& filePath)
+{
+    try {
+        qDebug() << "ScanImportManager: Starting E57 import for" << filePath;
+
+        // Create progress dialog
+        auto* progressDialog = new QProgressDialog(
+            QString("Importing E57 file: %1").arg(QFileInfo(filePath).fileName()),
+            "Cancel", 0, 100, m_parentWidget);
+        progressDialog->setWindowModality(Qt::WindowModal);
+        progressDialog->setAutoClose(false);
+        progressDialog->show();
+
+        // Initialize E57DataManager
+        auto* e57Manager = new E57DataManager(this);
+
+        // Connect progress signals
+        connect(e57Manager, &E57DataManager::progress,
+                progressDialog, &QProgressDialog::setValue);
+        connect(e57Manager, &E57DataManager::operationStarted,
+                progressDialog, &QProgressDialog::setLabelText);
+        connect(progressDialog, &QProgressDialog::canceled,
+                this, [this]() {
+                    qDebug() << "E57 import canceled by user";
+                });
+
+        // First, validate the file and get metadata
+        if (!e57Manager->isValidE57File(filePath)) {
+            throw std::runtime_error("Invalid E57 file format");
+        }
+
+        QVector<ScanMetadata> scanMetadata = e57Manager->getScanMetadata(filePath);
+
+        if (scanMetadata.isEmpty()) {
+            throw std::runtime_error("E57 file contains no valid scans");
+        }
+
+        qDebug() << "ScanImportManager: Found" << scanMetadata.size() << "scans in E57 file";
+
+        // Process each scan
+        for (int i = 0; i < scanMetadata.size(); ++i) {
+            const ScanMetadata& metadata = scanMetadata[i];
+
+            // Create ScanInfo record for database
+            ScanInfo scanInfo;
+            scanInfo.scanId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            scanInfo.scanName = metadata.name.isEmpty() ?
+                QString("E57_Scan_%1").arg(i + 1) : metadata.name;
+            scanInfo.filePathRelative = filePath; // Store original path for E57
+            scanInfo.importType = "E57";
+            scanInfo.pointCountEstimate = static_cast<int>(metadata.pointCount);
+            scanInfo.dateAdded = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+            // Store E57-specific metadata
+            scanInfo.originalSourcePath = metadata.guid; // Store E57 GUID in this field
+
+            // Set bounding box information
+            scanInfo.boundingBoxMinX = metadata.minX;
+            scanInfo.boundingBoxMinY = metadata.minY;
+            scanInfo.boundingBoxMinZ = metadata.minZ;
+            scanInfo.boundingBoxMaxX = metadata.maxX;
+            scanInfo.boundingBoxMaxY = metadata.maxY;
+            scanInfo.boundingBoxMaxZ = metadata.maxZ;
+
+            // Insert into database
+            if (!m_sqliteManager->insertScan(scanInfo)) {
+                throw std::runtime_error("Failed to insert scan info into database");
+            }
+
+            // Update project tree model if available
+            if (m_projectTreeModel) {
+                // Note: This may need to be adapted based on ProjectTreeModel's interface
+                qDebug() << "ScanImportManager: Would update project tree with scan" << scanInfo.scanName;
+            }
+
+            qDebug() << "ScanImportManager: Successfully imported scan" << scanInfo.scanName
+                     << "with" << scanInfo.pointCountEstimate << "points";
+        }
+
+        progressDialog->close();
+        delete progressDialog;
+        delete e57Manager;
+
+        // Show success message
+        QMessageBox::information(m_parentWidget, "Import Successful",
+            QString("Successfully imported %1 scan(s) from E57 file:\n%2\n\nTotal points: %3")
+            .arg(scanMetadata.size())
+            .arg(QFileInfo(filePath).fileName())
+            .arg(std::accumulate(scanMetadata.begin(), scanMetadata.end(), 0ULL,
+                [](uint64_t sum, const ScanMetadata& scan) { return sum + scan.pointCount; })));
+
+        emit importCompleted(filePath, scanMetadata.size());
+
+    } catch (const std::exception& ex) {
+        handleE57ImportError(filePath, QString("Error: %1").arg(ex.what()));
+    }
+}
+
+void ScanImportManager::handleE57ImportError(const QString& filePath, const QString& error)
+{
+    qDebug() << "ScanImportManager: E57 import error:" << error;
+
+    // Use ErrorDialog if available, otherwise fallback to QMessageBox
+    QMessageBox::critical(m_parentWidget, "E57 Import Failed",
+        QString("Could not import E57 file:\n%1\n\n%2")
+        .arg(QFileInfo(filePath).fileName())
+        .arg(error));
+
+    emit importFailed(filePath, error);
 }

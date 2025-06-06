@@ -20,7 +20,11 @@ enum class ItemState {
     Unlocked,
     Missing,
     Loading,
-    Error
+    Error,
+    Processing,     // Sprint 2.1: Being processed
+    Cached,         // Sprint 2.1: In LRU cache
+    MemoryWarning,  // Sprint 2.1: Approaching memory limits
+    Optimized       // Sprint 2.1: Processed and ready
 };
 
 enum class ImportType {

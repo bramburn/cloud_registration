@@ -177,12 +177,29 @@ void SidebarWidget::createContextMenu()
     m_renameClusterAction = new QAction("Rename", this);
     m_deleteClusterAction = new QAction("Delete", this);
 
-    // New Sprint 2.1 actions
+    // Enhanced Sprint 2.1 actions
     m_loadScanAction = new QAction("Load Scan", this);
     m_unloadScanAction = new QAction("Unload Scan", this);
     m_loadClusterAction = new QAction("Load All Scans in Cluster", this);
     m_unloadClusterAction = new QAction("Unload All Scans in Cluster", this);
     m_viewPointCloudAction = new QAction("View Point Cloud", this);
+
+    // Sprint 2.1: Advanced operations
+    m_preprocessScanAction = new QAction("Preprocess Scan", this);
+    m_optimizeScanAction = new QAction("Optimize for Registration", this);
+    m_batchLoadAction = new QAction("Batch Load Selected", this);
+    m_batchUnloadAction = new QAction("Batch Unload Selected", this);
+    m_memoryOptimizeAction = new QAction("Optimize Memory Usage", this);
+
+    // Sprint 2.1: Advanced submenu
+    m_advancedMenu = new QMenu("Advanced Operations", this);
+    m_filterMovingObjectsAction = new QAction("Filter Moving Objects", this);
+    m_colorBalanceAction = new QAction("Color Balance", this);
+    m_registrationPreviewAction = new QAction("Registration Preview", this);
+
+    m_advancedMenu->addAction(m_filterMovingObjectsAction);
+    m_advancedMenu->addAction(m_colorBalanceAction);
+    m_advancedMenu->addAction(m_registrationPreviewAction);
 
     // Sprint 2.3 actions
     m_lockClusterAction = new QAction("Lock Cluster", this);
@@ -196,12 +213,22 @@ void SidebarWidget::createContextMenu()
     connect(m_renameClusterAction, &QAction::triggered, this, &SidebarWidget::onRenameCluster);
     connect(m_deleteClusterAction, &QAction::triggered, this, &SidebarWidget::onDeleteCluster);
 
-    // Connect new Sprint 2.1 actions
+    // Connect enhanced Sprint 2.1 actions
     connect(m_loadScanAction, &QAction::triggered, this, &SidebarWidget::onLoadScan);
     connect(m_unloadScanAction, &QAction::triggered, this, &SidebarWidget::onUnloadScan);
     connect(m_loadClusterAction, &QAction::triggered, this, &SidebarWidget::onLoadCluster);
     connect(m_unloadClusterAction, &QAction::triggered, this, &SidebarWidget::onUnloadCluster);
     connect(m_viewPointCloudAction, &QAction::triggered, this, &SidebarWidget::onViewPointCloud);
+
+    // Sprint 2.1: Connect advanced operation actions
+    connect(m_preprocessScanAction, &QAction::triggered, this, &SidebarWidget::onPreprocessScan);
+    connect(m_optimizeScanAction, &QAction::triggered, this, &SidebarWidget::onOptimizeScan);
+    connect(m_batchLoadAction, &QAction::triggered, this, &SidebarWidget::onBatchLoad);
+    connect(m_batchUnloadAction, &QAction::triggered, this, &SidebarWidget::onBatchUnload);
+    connect(m_memoryOptimizeAction, &QAction::triggered, this, &SidebarWidget::onMemoryOptimize);
+    connect(m_filterMovingObjectsAction, &QAction::triggered, this, &SidebarWidget::onFilterMovingObjects);
+    connect(m_colorBalanceAction, &QAction::triggered, this, &SidebarWidget::onColorBalance);
+    connect(m_registrationPreviewAction, &QAction::triggered, this, &SidebarWidget::onRegistrationPreview);
 
     // Connect Sprint 2.3 actions
     connect(m_lockClusterAction, &QAction::triggered, this, &SidebarWidget::onLockCluster);
@@ -227,14 +254,38 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
         QString itemId = m_model->getItemId(m_contextItem);
 
         if (itemType == "scan") {
-            // Right-clicked on scan
+            // Right-clicked on scan - Enhanced Sprint 2.1 context menu
             if (m_loadManager) {
-                bool isLoaded = m_loadManager->isScanLoaded(itemId);
-                if (isLoaded) {
-                    m_contextMenu->addAction(m_unloadScanAction);
-                } else {
-                    m_contextMenu->addAction(m_loadScanAction);
+                LoadedState state = m_model->getScanLoadedState(itemId);
+
+                // Basic load/unload actions based on state
+                switch (state) {
+                    case LoadedState::Unloaded:
+                        m_contextMenu->addAction(m_loadScanAction);
+                        m_contextMenu->addAction(m_preprocessScanAction);
+                        break;
+                    case LoadedState::Loaded:
+                        m_contextMenu->addAction(m_unloadScanAction);
+                        m_contextMenu->addAction(m_optimizeScanAction);
+                        m_contextMenu->addMenu(m_advancedMenu);
+                        break;
+                    case LoadedState::Processing:
+                        // Limited options during processing
+                        m_contextMenu->addAction("Cancel Processing")->setEnabled(false);
+                        break;
+                    case LoadedState::Error:
+                        m_contextMenu->addAction("Retry Load");
+                        m_contextMenu->addAction("View Error Details");
+                        break;
+                    case LoadedState::Cached:
+                        m_contextMenu->addAction("Restore to Memory");
+                        m_contextMenu->addAction(m_unloadScanAction);
+                        break;
+                    default:
+                        m_contextMenu->addAction(m_loadScanAction);
+                        break;
                 }
+
                 m_contextMenu->addSeparator();
                 m_contextMenu->addAction(m_viewPointCloudAction);
                 m_contextMenu->addSeparator();
@@ -249,11 +300,17 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
                 m_contextMenu->addAction(m_createSubClusterAction);
                 m_contextMenu->addSeparator();
 
-                // Add load/unload actions for clusters
+                // Enhanced load/unload actions for clusters
                 if (m_loadManager) {
                     m_contextMenu->addAction(m_loadClusterAction);
                     m_contextMenu->addAction(m_unloadClusterAction);
                     m_contextMenu->addSeparator();
+
+                    // Sprint 2.1: Batch operations
+                    m_contextMenu->addAction(m_batchLoadAction);
+                    m_contextMenu->addAction(m_batchUnloadAction);
+                    m_contextMenu->addSeparator();
+
                     m_contextMenu->addAction(m_viewPointCloudAction);
                     m_contextMenu->addSeparator();
                 }
@@ -274,6 +331,12 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
                 m_contextMenu->addAction(m_deleteClusterRecursiveAction);
             }
         }
+    }
+
+    // Sprint 2.1: Always available memory optimization
+    if (!m_contextMenu->isEmpty()) {
+        m_contextMenu->addSeparator();
+        m_contextMenu->addAction(m_memoryOptimizeAction);
     }
 
     if (!m_contextMenu->isEmpty()) {
@@ -703,4 +766,141 @@ void SidebarWidget::onDeleteClusterRecursive()
         bool deletePhysicalFiles = dialog.deletePhysicalFiles();
         emit deleteClusterRequested(clusterId, deletePhysicalFiles);
     }
+}
+
+// Sprint 2.1: Enhanced operation slot implementations
+void SidebarWidget::onPreprocessScan()
+{
+    if (!m_contextItem) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit preprocessScanRequested(scanId);
+}
+
+void SidebarWidget::onOptimizeScan()
+{
+    if (!m_contextItem) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit optimizeScanRequested(scanId);
+}
+
+void SidebarWidget::onBatchLoad()
+{
+    QStringList selectedScans = getSelectedScanIds();
+    if (!selectedScans.isEmpty()) {
+        emit batchOperationRequested("load", selectedScans);
+    }
+}
+
+void SidebarWidget::onBatchUnload()
+{
+    QStringList selectedScans = getSelectedScanIds();
+    if (!selectedScans.isEmpty()) {
+        emit batchOperationRequested("unload", selectedScans);
+    }
+}
+
+void SidebarWidget::onMemoryOptimize()
+{
+    emit memoryOptimizationRequested();
+}
+
+void SidebarWidget::onFilterMovingObjects()
+{
+    if (!m_contextItem) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit filterMovingObjectsRequested(scanId);
+}
+
+void SidebarWidget::onColorBalance()
+{
+    if (!m_contextItem) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit colorBalanceRequested(scanId);
+}
+
+void SidebarWidget::onRegistrationPreview()
+{
+    if (!m_contextItem) {
+        return;
+    }
+
+    QString itemType = m_model->getItemType(m_contextItem);
+    if (itemType != "scan") {
+        return;
+    }
+
+    QString scanId = m_model->getItemId(m_contextItem);
+    emit registrationPreviewRequested(scanId);
+}
+
+// Sprint 2.1: Helper method implementations
+QStringList SidebarWidget::getSelectedScanIds() const
+{
+    QStringList scanIds;
+    QModelIndexList indexes = selectedIndexes();
+
+    for (const QModelIndex &index : indexes) {
+        QStandardItem *item = m_model->itemFromIndex(index);
+        if (item) {
+            QString itemType = m_model->getItemType(item);
+            if (itemType == "scan") {
+                QString scanId = m_model->getItemId(item);
+                scanIds.append(scanId);
+            }
+        }
+    }
+
+    return scanIds;
+}
+
+QString SidebarWidget::getItemIdFromIndex(const QModelIndex &index) const
+{
+    if (!index.isValid()) {
+        return QString();
+    }
+
+    QStandardItem *item = m_model->itemFromIndex(index);
+    return item ? m_model->getItemId(item) : QString();
+}
+
+QString SidebarWidget::getItemTypeFromIndex(const QModelIndex &index) const
+{
+    if (!index.isValid()) {
+        return QString();
+    }
+
+    QStandardItem *item = m_model->itemFromIndex(index);
+    return item ? m_model->getItemType(item) : QString();
 }

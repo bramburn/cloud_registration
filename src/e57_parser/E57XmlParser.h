@@ -13,7 +13,7 @@ namespace e57 {
     class VectorNode;
     class CompressedVectorNode;
     class Node;
-    enum ElementType;
+    enum ElementType : int;
 }
 
 namespace E57Parser {

@@ -1,5 +1,5 @@
 #include <iostream>
-#include <E57Format.h>
+#include <E57Format/E57Format.h>
 #include "../src/e57parserlib.h"
 
 /**

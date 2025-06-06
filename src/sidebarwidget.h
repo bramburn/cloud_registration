@@ -48,6 +48,15 @@ signals:
     void unloadClusterRequested(const QString &clusterId);
     void viewPointCloudRequested(const QString &itemId, const QString &itemType);
 
+    // Sprint 2.1: Enhanced signals
+    void preprocessScanRequested(const QString &scanId);
+    void optimizeScanRequested(const QString &scanId);
+    void batchOperationRequested(const QString &operation, const QStringList &scanIds);
+    void memoryOptimizationRequested();
+    void filterMovingObjectsRequested(const QString &scanId);
+    void colorBalanceRequested(const QString &scanId);
+    void registrationPreviewRequested(const QString &scanId);
+
     // Sprint 2.3 - New signals
     void lockClusterRequested(const QString &clusterId);
     void unlockClusterRequested(const QString &clusterId);
@@ -67,12 +76,22 @@ private slots:
     void onRenameCluster();
     void onDeleteCluster();
 
-    // New slots for Sprint 2.1
+    // Enhanced slots for Sprint 2.1
     void onLoadScan();
     void onUnloadScan();
     void onLoadCluster();
     void onUnloadCluster();
     void onViewPointCloud();
+
+    // Sprint 2.1: Advanced operation slots
+    void onPreprocessScan();
+    void onOptimizeScan();
+    void onBatchLoad();
+    void onBatchUnload();
+    void onMemoryOptimize();
+    void onFilterMovingObjects();
+    void onColorBalance();
+    void onRegistrationPreview();
 
     // Sprint 2.3 - New slots
     void onLockCluster();
@@ -88,6 +107,11 @@ private:
     QString promptForClusterName(const QString &title = "Create Cluster", const QString &defaultName = "");
     bool canDropOn(QStandardItem *item, const QString &draggedType);
 
+    // Sprint 2.1: Helper methods for batch operations
+    QStringList getSelectedScanIds() const;
+    QString getItemIdFromIndex(const QModelIndex &index) const;
+    QString getItemTypeFromIndex(const QModelIndex &index) const;
+
     ProjectTreeModel *m_model;
     ProjectManager *m_projectManager;
     PointCloudLoadManager *m_loadManager;
@@ -100,12 +124,25 @@ private:
     QAction *m_renameClusterAction;
     QAction *m_deleteClusterAction;
 
-    // New actions for Sprint 2.1
+    // Enhanced actions for Sprint 2.1
     QAction *m_loadScanAction;
     QAction *m_unloadScanAction;
     QAction *m_loadClusterAction;
     QAction *m_unloadClusterAction;
     QAction *m_viewPointCloudAction;
+
+    // Sprint 2.1: Advanced operations
+    QAction *m_preprocessScanAction;
+    QAction *m_optimizeScanAction;
+    QAction *m_batchLoadAction;
+    QAction *m_batchUnloadAction;
+    QAction *m_memoryOptimizeAction;
+
+    // Sprint 2.1: Advanced submenu
+    QMenu *m_advancedMenu;
+    QAction *m_filterMovingObjectsAction;
+    QAction *m_colorBalanceAction;
+    QAction *m_registrationPreviewAction;
 
     // Sprint 2.3 - New actions
     QAction *m_lockClusterAction;

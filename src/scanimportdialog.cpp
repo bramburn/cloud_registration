@@ -226,6 +226,22 @@ ImportMode ScanImportDialog::importMode() const
 void ScanImportDialog::accept()
 {
     if (validateSelection()) {
+        // Sprint 1.3: Emit file-specific signals for different file types
+        for (const QString& filePath : m_selectedFiles) {
+            QFileInfo fileInfo(filePath);
+            QString extension = fileInfo.suffix().toLower();
+
+            qDebug() << "ScanImportDialog: Processing file" << filePath << "with extension" << extension;
+
+            if (extension == "e57") {
+                emit importE57FileRequested(filePath);
+            } else if (extension == "las" || extension == "laz") {
+                emit importLasFileRequested(filePath);
+            } else {
+                qDebug() << "ScanImportDialog: Unsupported file type:" << extension;
+            }
+        }
+
         QDialog::accept();
     }
 }

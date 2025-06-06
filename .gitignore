@@ -69,3 +69,6 @@ Thumbs.db
 repomix-output*.xml
 repomix-output*.md
 vcpkg_installed
+build-test
+build_test
+Testing

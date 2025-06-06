@@ -1,5 +1,5 @@
 #include "e57parserlib.h"
-#include <E57Format.h>
+#include <E57Format/E57Format.h>
 #include <sstream>
 #include <QString>
 #include <QDebug>
@@ -247,7 +247,7 @@ E57ParserLib::ScanMetadata E57ParserLib::getScanMetadata(int scanIndex) const {
         // Check for intensity and color data
         if (scanHeader.isDefined("points")) {
             e57::CompressedVectorNode points(scanHeader.get("points"));
-            e57::StructureNode prototype = points.prototype();
+            e57::StructureNode prototype(points.prototype());
 
             metadata.hasIntensity = prototype.isDefined("intensity");
             metadata.hasColor = prototype.isDefined("colorRed") &&
@@ -268,20 +268,20 @@ E57ParserLib::ScanMetadata E57ParserLib::getScanMetadata(int scanIndex) const {
     }
 }
 
-std::string E57ParserLib::getLastError() const {
-    return m_lastError;
-}
+// Removed duplicate getLastError() method - using QString version above
 
 bool E57ParserLib::isOpen() const {
     return m_imageFile && m_imageFile->isOpen();
 }
 
-void E57ParserLib::clearError() {
+void E57ParserLib::clearError() const {
+    QMutexLocker locker(&m_errorMutex);
     m_lastError.clear();
 }
 
-void E57ParserLib::setError(const std::string& error) {
-    m_lastError = error;
+void E57ParserLib::setError(const std::string& error) const {
+    QMutexLocker locker(&m_errorMutex);
+    m_lastError = QString::fromStdString(error);
 }
 
 // Sprint 2: Point data extraction methods
@@ -297,13 +297,13 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
 
         if (!isOpen()) {
             setError("No E57 file is open");
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return std::vector<float>();
         }
 
         if (scanIndex < 0 || scanIndex >= getScanCount()) {
             setError("Invalid scan index: " + std::to_string(scanIndex));
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return std::vector<float>();
         }
 
@@ -315,7 +315,7 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
 
         if (data3DVectorNode.childCount() <= scanIndex) {
             setError("Scan index out of range");
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return std::vector<float>();
         }
 
@@ -325,7 +325,7 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
 
         // Task 2.1.2 & 2.1.3: Inspect the point prototype
         if (!inspectPointPrototype(scanHeaderNode)) {
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return std::vector<float>();
         }
 
@@ -333,7 +333,7 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
 
         // Task 2.2: Extract the actual point data
         if (!extractUncompressedXYZData(scanHeaderNode)) {
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return std::vector<float>();
         }
 
@@ -344,11 +344,11 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
 
     } catch (const e57::E57Exception& ex) {
         setError(std::string("E57 Exception during point extraction: ") + ex.what());
-        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        emit parsingFinished(false, getLastError(), std::vector<float>());
         return std::vector<float>();
     } catch (const std::exception& ex) {
         setError(std::string("Standard exception during point extraction: ") + ex.what());
-        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        emit parsingFinished(false, getLastError(), std::vector<float>());
         return std::vector<float>();
     }
 }
@@ -395,7 +395,7 @@ bool E57ParserLib::inspectPointPrototype(const e57::StructureNode& scanHeaderNod
         }
 
         e57::CompressedVectorNode cvNode = static_cast<e57::CompressedVectorNode>(pointsNode);
-        e57::StructureNode pointPrototype = static_cast<e57::StructureNode>(cvNode.prototype());
+        e57::StructureNode pointPrototype(cvNode.prototype());
 
         // Task 2.1.3: Inspect the prototype to identify cartesianX, Y, Z fields
         validatePrototypeFields(pointPrototype);
@@ -542,13 +542,13 @@ std::vector<E57ParserLib::PointData> E57ParserLib::extractEnhancedPointData(int 
 
         if (!isOpen()) {
             setError("No E57 file is open");
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return points;
         }
 
         if (scanIndex < 0 || scanIndex >= getScanCount()) {
             setError("Invalid scan index: " + std::to_string(scanIndex));
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return points;
         }
 
@@ -563,7 +563,7 @@ std::vector<E57ParserLib::PointData> E57ParserLib::extractEnhancedPointData(int 
 
         // Task 3.1.1 & 3.2.1: Enhanced prototype inspection for intensity and color
         if (!inspectEnhancedPrototype(scanHeaderNode)) {
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return points;
         }
 
@@ -579,7 +579,7 @@ std::vector<E57ParserLib::PointData> E57ParserLib::extractEnhancedPointData(int 
 
         // Task 3.3: Extract point data with all available attributes
         if (!extractEnhancedPointData(scanHeaderNode, points)) {
-            emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+            emit parsingFinished(false, getLastError(), std::vector<float>());
             return points;
         }
 
@@ -590,11 +590,11 @@ std::vector<E57ParserLib::PointData> E57ParserLib::extractEnhancedPointData(int 
 
     } catch (const e57::E57Exception& ex) {
         setError(std::string("E57 Exception during enhanced point extraction: ") + ex.what());
-        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        emit parsingFinished(false, getLastError(), std::vector<float>());
         return std::vector<PointData>();
     } catch (const std::exception& ex) {
         setError(std::string("Standard exception during enhanced point extraction: ") + ex.what());
-        emit parsingFinished(false, QString::fromStdString(getLastError()), std::vector<float>());
+        emit parsingFinished(false, getLastError(), std::vector<float>());
         return std::vector<PointData>();
     }
 }
@@ -610,7 +610,7 @@ bool E57ParserLib::inspectEnhancedPrototype(const e57::StructureNode& scanHeader
 
         // Get the CompressedVectorNode for points
         e57::CompressedVectorNode cvNode = static_cast<e57::CompressedVectorNode>(scanHeaderNode.get("points"));
-        e57::StructureNode prototype = cvNode.prototype();
+        e57::StructureNode prototype(cvNode.prototype());
 
         // Task 3.1.1: Check for intensity field
         if (prototype.isDefined("intensity")) {
@@ -618,13 +618,13 @@ bool E57ParserLib::inspectEnhancedPrototype(const e57::StructureNode& scanHeader
             e57::Node intensityNode = prototype.get("intensity");
 
             switch (intensityNode.type()) {
-                case e57::E57_FLOAT:
+                case e57::TypeFloat:
                     m_prototypeInfo.intensityDataType = "float";
                     break;
-                case e57::E57_INTEGER:
+                case e57::TypeInteger:
                     m_prototypeInfo.intensityDataType = "integer";
                     break;
-                case e57::E57_SCALED_INTEGER:
+                case e57::TypeScaledInteger:
                     m_prototypeInfo.intensityDataType = "scaledInteger";
                     break;
                 default:
@@ -646,20 +646,15 @@ bool E57ParserLib::inspectEnhancedPrototype(const e57::StructureNode& scanHeader
 
         if (m_prototypeInfo.hasColorRed || m_prototypeInfo.hasColorGreen || m_prototypeInfo.hasColorBlue) {
             // Determine color data type from the first available color channel
-            e57::Node colorNode;
-            if (m_prototypeInfo.hasColorRed) {
-                colorNode = prototype.get("colorRed");
-            } else if (m_prototypeInfo.hasColorGreen) {
-                colorNode = prototype.get("colorGreen");
-            } else {
-                colorNode = prototype.get("colorBlue");
-            }
+            e57::Node colorNode = m_prototypeInfo.hasColorRed ? prototype.get("colorRed") :
+                                  m_prototypeInfo.hasColorGreen ? prototype.get("colorGreen") :
+                                  prototype.get("colorBlue");
 
             switch (colorNode.type()) {
-                case e57::E57_INTEGER:
+                case e57::TypeInteger:
                     m_prototypeInfo.colorDataType = "integer";
                     break;
-                case e57::E57_SCALED_INTEGER:
+                case e57::TypeScaledInteger:
                     m_prototypeInfo.colorDataType = "scaledInteger";
                     break;
                 default:
@@ -697,22 +692,22 @@ bool E57ParserLib::extractDataLimits(const e57::StructureNode& scanHeaderNode) {
 
             if (intensityLimits.isDefined("intensityMinimum")) {
                 e57::Node minNode = intensityLimits.get("intensityMinimum");
-                if (minNode.type() == e57::E57_FLOAT) {
+                if (minNode.type() == e57::TypeFloat) {
                     m_dataLimits.intensityMin = static_cast<e57::FloatNode>(minNode).value();
-                } else if (minNode.type() == e57::E57_INTEGER) {
+                } else if (minNode.type() == e57::TypeInteger) {
                     m_dataLimits.intensityMin = static_cast<double>(static_cast<e57::IntegerNode>(minNode).value());
-                } else if (minNode.type() == e57::E57_SCALED_INTEGER) {
+                } else if (minNode.type() == e57::TypeScaledInteger) {
                     m_dataLimits.intensityMin = static_cast<e57::ScaledIntegerNode>(minNode).scaledValue();
                 }
             }
 
             if (intensityLimits.isDefined("intensityMaximum")) {
                 e57::Node maxNode = intensityLimits.get("intensityMaximum");
-                if (maxNode.type() == e57::E57_FLOAT) {
+                if (maxNode.type() == e57::TypeFloat) {
                     m_dataLimits.intensityMax = static_cast<e57::FloatNode>(maxNode).value();
-                } else if (maxNode.type() == e57::E57_INTEGER) {
+                } else if (maxNode.type() == e57::TypeInteger) {
                     m_dataLimits.intensityMax = static_cast<double>(static_cast<e57::IntegerNode>(maxNode).value());
-                } else if (maxNode.type() == e57::E57_SCALED_INTEGER) {
+                } else if (maxNode.type() == e57::TypeScaledInteger) {
                     m_dataLimits.intensityMax = static_cast<e57::ScaledIntegerNode>(maxNode).scaledValue();
                 }
             }
@@ -733,10 +728,10 @@ bool E57ParserLib::extractDataLimits(const e57::StructureNode& scanHeaderNode) {
                 e57::Node redMinNode = colorLimits.get("colorRedMinimum");
                 e57::Node redMaxNode = colorLimits.get("colorRedMaximum");
 
-                if (redMinNode.type() == e57::E57_INTEGER) {
+                if (redMinNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorRedMin = static_cast<double>(static_cast<e57::IntegerNode>(redMinNode).value());
                 }
-                if (redMaxNode.type() == e57::E57_INTEGER) {
+                if (redMaxNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorRedMax = static_cast<double>(static_cast<e57::IntegerNode>(redMaxNode).value());
                 }
             }
@@ -746,10 +741,10 @@ bool E57ParserLib::extractDataLimits(const e57::StructureNode& scanHeaderNode) {
                 e57::Node greenMinNode = colorLimits.get("colorGreenMinimum");
                 e57::Node greenMaxNode = colorLimits.get("colorGreenMaximum");
 
-                if (greenMinNode.type() == e57::E57_INTEGER) {
+                if (greenMinNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorGreenMin = static_cast<double>(static_cast<e57::IntegerNode>(greenMinNode).value());
                 }
-                if (greenMaxNode.type() == e57::E57_INTEGER) {
+                if (greenMaxNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorGreenMax = static_cast<double>(static_cast<e57::IntegerNode>(greenMaxNode).value());
                 }
             }
@@ -759,10 +754,10 @@ bool E57ParserLib::extractDataLimits(const e57::StructureNode& scanHeaderNode) {
                 e57::Node blueMinNode = colorLimits.get("colorBlueMinimum");
                 e57::Node blueMaxNode = colorLimits.get("colorBlueMaximum");
 
-                if (blueMinNode.type() == e57::E57_INTEGER) {
+                if (blueMinNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorBlueMin = static_cast<double>(static_cast<e57::IntegerNode>(blueMinNode).value());
                 }
-                if (blueMaxNode.type() == e57::E57_INTEGER) {
+                if (blueMaxNode.type() == e57::TypeInteger) {
                     m_dataLimits.colorBlueMax = static_cast<double>(static_cast<e57::IntegerNode>(blueMaxNode).value());
                 }
             }

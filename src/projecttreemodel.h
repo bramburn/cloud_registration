@@ -15,13 +15,17 @@ class SQLiteManager;
 struct ScanInfo;
 struct ClusterInfo;
 
-// Enum for tracking loaded state of scans and clusters
+// Enhanced enum for tracking loaded state of scans and clusters (Sprint 2.1)
 enum class LoadedState {
     Unloaded,       // Not loaded in memory
     Loaded,         // Fully loaded in memory
     Partial,        // Partially loaded (for clusters with some loaded scans)
     Loading,        // Currently being loaded
-    Error           // Error occurred during loading
+    Processing,     // Being processed (filtering, registration)
+    Error,          // Error occurred during loading
+    Cached,         // In LRU cache but not actively displayed
+    MemoryWarning,  // Approaching memory limits
+    Optimized       // Processed and ready for registration
 };
 
 class ProjectTreeModel : public QStandardItemModel
@@ -49,12 +53,21 @@ public:
     QString getItemId(QStandardItem *item) const;
     QString getItemType(QStandardItem *item) const;
 
-    // New methods for Sprint 2.1 - Loaded state management
+    // Enhanced methods for Sprint 2.1 - Loaded state management
     void setScanLoadedState(const QString &scanId, LoadedState state);
     LoadedState getScanLoadedState(const QString &scanId) const;
     void updateClusterLoadedStates();
     LoadedState calculateClusterLoadedState(const QString &clusterId) const;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+
+    // Sprint 2.1: Memory monitoring and warnings
+    void setMemoryWarningThreshold(size_t thresholdMB);
+    void updateMemoryInfo(const QString &scanId, size_t memoryUsage, size_t pointCount);
+    size_t getTotalMemoryUsage() const;
+
+    // Sprint 2.1: Batch operations support
+    void setClusterState(const QString &clusterId, LoadedState state);
+    QStringList getScansInState(LoadedState state) const;
 
     // Sprint 2.3 - Lock state management
     void setClusterLockState(const QString &clusterId, bool isLocked);
@@ -72,6 +85,12 @@ public:
     QList<ClusterInfo> getAllClusters() const;
     QList<ScanInfo> getAllScans() const;
     void populateFromData(const QList<ClusterInfo> &clusters, const QList<ScanInfo> &scans);
+
+signals:
+    // Sprint 2.1: Enhanced state management signals
+    void scanStateChanged(const QString &scanId, LoadedState oldState, LoadedState newState);
+    void memoryWarningTriggered(size_t currentUsage, size_t threshold);
+    void memoryUsageChanged(size_t totalUsage);
 
 private:
     void createProjectStructure();
@@ -96,9 +115,15 @@ private:
     QHash<QString, QStandardItem*> m_clusterItems;
     QHash<QString, QStandardItem*> m_scanItems;
 
-    // New for Sprint 2.1 - Loaded state tracking
+    // Enhanced for Sprint 2.1 - Loaded state tracking
     QHash<QString, LoadedState> m_scanLoadedStates;
     QHash<QString, LoadedState> m_clusterLoadedStates;
+
+    // Sprint 2.1: Memory tracking
+    QHash<QString, size_t> m_scanMemoryUsage;
+    QHash<QString, size_t> m_scanPointCounts;
+    size_t m_totalMemoryUsage;
+    size_t m_memoryWarningThreshold;
 
     // Sprint 2.3 - Lock state tracking
     QHash<QString, bool> m_clusterLockStates;

@@ -111,6 +111,54 @@ MainWindow::MainWindow(QWidget *parent)
         connect(m_loadManager, &PointCloudLoadManager::pointCloudViewFailed,
                 this, &MainWindow::onPointCloudViewFailed);
 
+        // Sprint 1.3: Connect E57 loading signals
+        connect(m_loadManager, &PointCloudLoadManager::loadingStarted,
+                this, [this](const QString& message) {
+                    statusBar()->showMessage(message);
+                    setCursor(Qt::WaitCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::loadingCompleted,
+                this, [this]() {
+                    setCursor(Qt::ArrowCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::statusUpdate,
+                this, [this](const QString& status) {
+                    statusBar()->showMessage(status);
+                });
+
+        // Sprint 2.1: Connect enhanced state management signals
+        connect(m_loadManager, &PointCloudLoadManager::batchOperationProgress,
+                this, [this](const QString& operation, int completed, int total) {
+                    QString message = QString("Batch %1: %2/%3 completed").arg(operation).arg(completed).arg(total);
+                    statusBar()->showMessage(message);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Preprocessing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Preprocessing completed: %1").arg(scanId) :
+                        QString("Preprocessing failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Optimizing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Optimization completed: %1").arg(scanId) :
+                        QString("Optimization failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
         // Set window properties
         qDebug() << "Setting window properties...";
         updateWindowTitle();
@@ -820,6 +868,50 @@ void MainWindow::transitionToProjectView(const QString &projectPath)
         m_loadManager->setProjectTreeModel(m_sidebar->getModel());
         m_sidebar->setPointCloudLoadManager(m_loadManager);
 
+        // Sprint 2.1: Connect ProjectTreeModel enhanced signals
+        connect(m_sidebar->getModel(), &ProjectTreeModel::memoryWarningTriggered,
+                this, [this](size_t currentUsage, size_t threshold) {
+                    QString message = QString("Memory warning: %1 MB used (threshold: %2 MB)")
+                                     .arg(currentUsage / (1024 * 1024))
+                                     .arg(threshold / (1024 * 1024));
+                    statusBar()->showMessage(message, 5000);
+
+                    // Show warning dialog for critical memory usage
+                    if (currentUsage > threshold * 1.2) { // 20% over threshold
+                        QMessageBox::warning(this, "Memory Warning",
+                            "Memory usage is critically high. Consider unloading some scans to free memory.");
+                    }
+                });
+
+        connect(m_sidebar->getModel(), &ProjectTreeModel::scanStateChanged,
+                this, [this](const QString& scanId, LoadedState oldState, LoadedState newState) {
+                    Q_UNUSED(oldState)
+                    QString stateStr;
+                    switch (newState) {
+                        case LoadedState::Loaded: stateStr = "loaded"; break;
+                        case LoadedState::Unloaded: stateStr = "unloaded"; break;
+                        case LoadedState::Loading: stateStr = "loading"; break;
+                        case LoadedState::Processing: stateStr = "processing"; break;
+                        case LoadedState::Error: stateStr = "error"; break;
+                        case LoadedState::Cached: stateStr = "cached"; break;
+                        case LoadedState::MemoryWarning: stateStr = "memory warning"; break;
+                        case LoadedState::Optimized: stateStr = "optimized"; break;
+                        default: stateStr = "unknown"; break;
+                    }
+                    qDebug() << "Scan state changed:" << scanId << "to" << stateStr;
+                });
+
+        // Sprint 1.3: Connect scan activation for E57 handling
+        connect(m_sidebar, &SidebarWidget::viewPointCloudRequested,
+                this, [this](const QString& itemId, const QString& itemType) {
+                    if (itemType == "scan") {
+                        onScanActivated(itemId);
+                    } else {
+                        // For clusters, use the existing mechanism
+                        m_loadManager->viewPointCloud(itemId, itemType);
+                    }
+                });
+
         // Update window title
         updateWindowTitle(m_currentProject->projectName());
 
@@ -913,25 +1005,45 @@ void MainWindow::onImportScans()
     ScanImportDialog dialog(this);
     dialog.setProjectPath(m_currentProject->projectPath());
 
-    if (dialog.exec() == QDialog::Accepted) {
-        QStringList files = dialog.selectedFiles();
-        ImportMode mode = dialog.importMode();
+    // Sprint 1.3: Connect E57-specific import signals
+    auto* scanImportManager = m_projectManager->getScanImportManager();
+    scanImportManager->setProjectTreeModel(m_sidebar->getProjectTreeModel());
 
-        if (!files.isEmpty()) {
-            auto result = m_projectManager->getScanImportManager()->importScans(
-                files, m_currentProject->projectPath(), m_currentProject->projectId(), mode, this);
+    connect(&dialog, &ScanImportDialog::importE57FileRequested,
+            scanImportManager, &ScanImportManager::handleE57Import);
+    connect(&dialog, &ScanImportDialog::importLasFileRequested,
+            this, [this, scanImportManager](const QString& filePath) {
+                // Handle LAS import using existing mechanism
+                QStringList files = {filePath};
+                auto result = scanImportManager->importScans(
+                    files, m_currentProject->projectPath(), m_currentProject->projectId(), ImportMode::Copy, this);
 
-            if (result.success) {
-                // Hide guidance and refresh sidebar
+                if (result.success) {
+                    showImportGuidance(false);
+                    m_sidebar->refreshFromDatabase();
+                    statusBar()->showMessage("Successfully imported LAS file", 3000);
+                } else {
+                    QMessageBox::warning(this, "Import Failed", result.errorMessage);
+                }
+            });
+
+    connect(scanImportManager, &ScanImportManager::importCompleted,
+            this, [this](const QString& filePath, int scanCount) {
                 showImportGuidance(false);
                 m_sidebar->refreshFromDatabase();
-
                 statusBar()->showMessage(
-                    QString("Successfully imported %1 scan(s)").arg(result.successfulFiles.size()), 3000);
-            } else {
-                QMessageBox::warning(this, "Import Failed", result.errorMessage);
-            }
-        }
+                    QString("Successfully imported %1 scan(s) from E57 file").arg(scanCount), 3000);
+            });
+
+    connect(scanImportManager, &ScanImportManager::importFailed,
+            this, [this](const QString& filePath, const QString& error) {
+                QMessageBox::critical(this, "E57 Import Failed",
+                    QString("Failed to import %1:\n%2").arg(QFileInfo(filePath).fileName(), error));
+            });
+
+    if (dialog.exec() == QDialog::Accepted) {
+        // The dialog will emit the appropriate signals for E57 or LAS files
+        // No additional processing needed here for Sprint 1.3
     }
 }
 
@@ -946,6 +1058,49 @@ void MainWindow::onScansImported(const QList<ScanInfo> &scans)
     showImportGuidance(false);
 
     qDebug() << "Imported" << scans.size() << "scans";
+}
+
+// Sprint 1.3: E57 scan activation implementation
+void MainWindow::onScanActivated(const QString& scanId)
+{
+    try {
+        if (!m_projectManager || !m_projectManager->getSQLiteManager()) {
+            qDebug() << "MainWindow: No project manager or database available";
+            return;
+        }
+
+        // Get scan info from database
+        ScanInfo scanInfo = m_projectManager->getSQLiteManager()->getScanById(scanId);
+
+        if (scanInfo.scanId.isEmpty()) {
+            QMessageBox::warning(this, "Scan Not Found",
+                QString("Scan with ID %1 was not found in the database.").arg(scanId));
+            return;
+        }
+
+        qDebug() << "MainWindow: Activating scan" << scanInfo.scanName << "of type" << scanInfo.importType;
+
+        if (scanInfo.importType == "E57") {
+            // Load E57 scan using the stored GUID (stored in originalSourcePath field)
+            QString e57Guid = scanInfo.originalSourcePath;
+            QString filePath = scanInfo.filePathRelative;
+
+            if (e57Guid.isEmpty() || filePath.isEmpty()) {
+                QMessageBox::warning(this, "Invalid E57 Data",
+                    "E57 scan data is incomplete. Please re-import the file.");
+                return;
+            }
+
+            m_loadManager->loadE57Scan(filePath, e57Guid);
+        } else {
+            // Handle other file types using existing mechanism
+            emit m_sidebar->viewPointCloudRequested(scanId, "scan");
+        }
+
+    } catch (const std::exception& ex) {
+        QMessageBox::critical(this, "Load Error",
+            QString("Failed to load scan: %1").arg(ex.what()));
+    }
 }
 
 void MainWindow::showImportGuidance(bool show)

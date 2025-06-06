@@ -1,4 +1,4 @@
-#include <E57Format.h>
+#include <E57Format/E57Format.h>
 #include <iostream>
 #include <string>
 

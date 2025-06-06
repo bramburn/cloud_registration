@@ -106,8 +106,8 @@ void ErrorDialog::setErrorDetails(const ErrorDetails& details) {
 }
 
 void ErrorDialog::updateIconForSeverity(ErrorSeverity severity) {
-    QStyle::StandardPixmap iconType;
-    
+    QStyle::StandardPixmap iconType = QStyle::SP_MessageBoxInformation; // Default value
+
     switch (severity) {
         case ErrorSeverity::Information:
             iconType = QStyle::SP_MessageBoxInformation;
@@ -120,6 +120,9 @@ void ErrorDialog::updateIconForSeverity(ErrorSeverity severity) {
             break;
         case ErrorSeverity::Fatal:
             iconType = QStyle::SP_MessageBoxCritical;
+            break;
+        default:
+            iconType = QStyle::SP_MessageBoxInformation;
             break;
     }
     

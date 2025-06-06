@@ -12,6 +12,8 @@ ProjectTreeModel::ProjectTreeModel(QObject *parent)
     , m_sqliteManager(nullptr)
     , m_rootItem(nullptr)
     , m_scansFolder(nullptr)
+    , m_totalMemoryUsage(0)
+    , m_memoryWarningThreshold(1536 * 1024 * 1024) // 1.5GB default
 {
     setHorizontalHeaderLabels({"Project Structure"});
     initializeIcons();
@@ -30,6 +32,11 @@ void ProjectTreeModel::setProject(const QString &projectName, const QString &pro
     m_scanItems.clear();
     m_scanLoadedStates.clear();
     m_clusterLoadedStates.clear();
+
+    // Sprint 2.1: Clear memory tracking
+    m_scanMemoryUsage.clear();
+    m_scanPointCounts.clear();
+    m_totalMemoryUsage = 0;
 
     createProjectStructure();
     refreshHierarchy();
@@ -347,6 +354,7 @@ void ProjectTreeModel::initializeIcons()
 
 void ProjectTreeModel::setScanLoadedState(const QString &scanId, LoadedState state)
 {
+    LoadedState oldState = m_scanLoadedStates.value(scanId, LoadedState::Unloaded);
     m_scanLoadedStates[scanId] = state;
 
     // Update the visual representation of the scan item
@@ -358,12 +366,75 @@ void ProjectTreeModel::setScanLoadedState(const QString &scanId, LoadedState sta
     // Update cluster states that might be affected
     updateClusterLoadedStates();
 
-    qDebug() << "Set scan loaded state:" << scanId << "to" << static_cast<int>(state);
+    // Emit state change signal
+    if (oldState != state) {
+        emit scanStateChanged(scanId, oldState, state);
+    }
+
+    qDebug() << "Set scan loaded state:" << scanId << "from" << static_cast<int>(oldState)
+             << "to" << static_cast<int>(state);
 }
 
 LoadedState ProjectTreeModel::getScanLoadedState(const QString &scanId) const
 {
     return m_scanLoadedStates.value(scanId, LoadedState::Unloaded);
+}
+
+// Sprint 2.1: Enhanced memory monitoring methods
+void ProjectTreeModel::setMemoryWarningThreshold(size_t thresholdMB)
+{
+    m_memoryWarningThreshold = thresholdMB * 1024 * 1024; // Convert to bytes
+    qDebug() << "Memory warning threshold set to:" << thresholdMB << "MB";
+}
+
+void ProjectTreeModel::updateMemoryInfo(const QString &scanId, size_t memoryUsage, size_t pointCount)
+{
+    size_t oldMemoryUsage = m_scanMemoryUsage.value(scanId, 0);
+    m_scanMemoryUsage[scanId] = memoryUsage;
+    m_scanPointCounts[scanId] = pointCount;
+
+    // Update total memory usage
+    m_totalMemoryUsage = m_totalMemoryUsage - oldMemoryUsage + memoryUsage;
+
+    // Check for memory warning
+    if (m_totalMemoryUsage > m_memoryWarningThreshold) {
+        setScanLoadedState(scanId, LoadedState::MemoryWarning);
+        emit memoryWarningTriggered(m_totalMemoryUsage, m_memoryWarningThreshold);
+    }
+
+    emit memoryUsageChanged(m_totalMemoryUsage);
+
+    qDebug() << "Updated memory info for scan" << scanId << ":" << memoryUsage << "bytes,"
+             << pointCount << "points. Total usage:" << m_totalMemoryUsage << "bytes";
+}
+
+size_t ProjectTreeModel::getTotalMemoryUsage() const
+{
+    return m_totalMemoryUsage;
+}
+
+void ProjectTreeModel::setClusterState(const QString &clusterId, LoadedState state)
+{
+    m_clusterLoadedStates[clusterId] = state;
+
+    // Update visual representation
+    QStandardItem *clusterItem = findClusterItem(clusterId);
+    if (clusterItem) {
+        setItemLoadedState(clusterItem, state);
+    }
+
+    qDebug() << "Set cluster loaded state:" << clusterId << "to" << static_cast<int>(state);
+}
+
+QStringList ProjectTreeModel::getScansInState(LoadedState state) const
+{
+    QStringList scansInState;
+    for (auto it = m_scanLoadedStates.begin(); it != m_scanLoadedStates.end(); ++it) {
+        if (it.value() == state) {
+            scansInState.append(it.key());
+        }
+    }
+    return scansInState;
 }
 
 void ProjectTreeModel::updateClusterLoadedStates()
@@ -405,7 +476,7 @@ LoadedState ProjectTreeModel::calculateClusterLoadedState(const QString &cluster
         if (cluster.parentClusterId == clusterId) {
             subClusterIds.append(cluster.clusterId);
             // Recursively get scans from sub-clusters
-            LoadedState subClusterState = calculateClusterLoadedState(cluster.clusterId);
+            /*LoadedState subClusterState =*/ calculateClusterLoadedState(cluster.clusterId);
             // For now, we'll consider the cluster state based on direct child scans
         }
     }
@@ -571,7 +642,7 @@ QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
         case PointCountRole: {
             if (itemType == "scan" && m_sqliteManager) {
                 ScanInfo scan = m_sqliteManager->getScanById(itemId);
-                return scan.pointCount;
+                return scan.pointCountEstimate;
             }
             break;
         }
@@ -579,7 +650,8 @@ QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
         case FileSizeRole: {
             if (itemType == "scan" && m_sqliteManager) {
                 ScanInfo scan = m_sqliteManager->getScanById(itemId);
-                return scan.fileSize;
+                // fileSize field not available in current ScanInfo structure
+                return QVariant(); // Return invalid QVariant for missing data
             }
             break;
         }
@@ -598,7 +670,8 @@ QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
         case FullPathRole: {
             if (itemType == "scan" && m_sqliteManager) {
                 ScanInfo scan = m_sqliteManager->getScanById(itemId);
-                return scan.filePathAbsolute;
+                // filePathAbsolute field not available, use filePathRelative instead
+                return scan.filePathRelative;
             }
             break;
         }
@@ -770,10 +843,10 @@ QString ProjectTreeModel::generateScanTooltip(const ScanInfo& scan) const
         "<b>Status:</b> %7"
     ).arg(scan.scanName)
      .arg(scan.filePathRelative)
-     .arg(getImportTypeString(static_cast<ImportType>(scan.importType)))
-     .arg(formatPointCount(scan.pointCount))
-     .arg(formatFileSize(scan.fileSize))
-     .arg(scan.dateAdded.toString("yyyy-MM-dd hh:mm"))
+     .arg(scan.importType)
+     .arg(formatPointCount(scan.pointCountEstimate))
+     .arg("N/A") // fileSize field not available in current ScanInfo structure
+     .arg(scan.dateAdded) // dateAdded is already a QString in ISO format
      .arg(getScanLoadedState(scan.scanId) == LoadedState::Loaded ? "Loaded" : "Unloaded");
 
     if (isScanMissing(scan.scanId)) {
@@ -816,7 +889,7 @@ QString ProjectTreeModel::generateClusterTooltip(const ClusterInfo& cluster) con
     ).arg(cluster.clusterName)
      .arg(scanCount)
      .arg(subClusterCount)
-     .arg(cluster.creationDate.toString("yyyy-MM-dd hh:mm"))
+     .arg(cluster.creationDate) // creationDate is already a QString in ISO format
      .arg(m_clusterLoadedStates.value(cluster.clusterId, LoadedState::Unloaded) == LoadedState::Loaded ? "Loaded" : "Unloaded")
      .arg(getClusterLockState(cluster.clusterId) ? "Locked" : "Unlocked");
 
@@ -875,6 +948,11 @@ ItemState ProjectTreeModel::convertLoadedStateToItemState(LoadedState state) con
         case LoadedState::Loaded: return ItemState::Loaded;
         case LoadedState::Loading: return ItemState::Loading;
         case LoadedState::Error: return ItemState::Error;
+        // Sprint 2.1: New state mappings
+        case LoadedState::Processing: return ItemState::Processing;
+        case LoadedState::Cached: return ItemState::Cached;
+        case LoadedState::MemoryWarning: return ItemState::MemoryWarning;
+        case LoadedState::Optimized: return ItemState::Optimized;
         default: return ItemState::Unloaded;
     }
 }
@@ -889,7 +967,15 @@ ImportType ProjectTreeModel::getItemImportType(QStandardItem* item) const
     if (itemType == "scan") {
         QString scanId = getItemId(item);
         ScanInfo scan = m_sqliteManager->getScanById(scanId);
-        return static_cast<ImportType>(scan.importType);
+
+        // Convert QString importType to ImportType enum
+        if (scan.importType == "COPIED") {
+            return ImportType::Copy;
+        } else if (scan.importType == "MOVED") {
+            return ImportType::Move;
+        } else if (scan.importType == "LINKED") {
+            return ImportType::Link;
+        }
     }
 
     return ImportType::None;

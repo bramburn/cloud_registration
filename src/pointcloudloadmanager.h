@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QHash>
+#include <QMap>
 #include <QUuid>
 #include <QTimer>
 #include <QMutex>
@@ -18,6 +19,10 @@
 class SQLiteManager;
 class ProjectTreeModel;
 struct ScanInfo;
+
+// Sprint 1.3: Include E57 data structures
+struct PointData;
+struct ScanMetadata;
 
 // Include the LoadedState enum from ProjectTreeModel
 #include "projecttreemodel.h"
@@ -118,6 +123,9 @@ public:
     bool viewScan(const QString &scanId);
     bool viewCluster(const QString &clusterId);
 
+    // Sprint 1.3: E57-specific loading methods
+    void loadE57Scan(const QString& filePath, const QString& scanGuid);
+
     // Get aggregated point cloud data for rendering
     std::vector<float> getAggregatedPointCloudData(const QStringList &scanIds);
     std::vector<float> getScanPointCloudData(const QString &scanId);
@@ -153,6 +161,15 @@ public slots:
     void onUnloadClusterRequested(const QString &clusterId);
     void onViewPointCloudRequested(const QString &itemId, const QString &itemType);
 
+    // Sprint 2.1: Enhanced operation slots
+    void onPreprocessScanRequested(const QString &scanId);
+    void onOptimizeScanRequested(const QString &scanId);
+    void onBatchOperationRequested(const QString &operation, const QStringList &scanIds);
+    void onMemoryOptimizationRequested();
+    void onFilterMovingObjectsRequested(const QString &scanId);
+    void onColorBalanceRequested(const QString &scanId);
+    void onRegistrationPreviewRequested(const QString &scanId);
+
 signals:
     void scanLoaded(const QString &scanId);
     void scanUnloaded(const QString &scanId);
@@ -165,6 +182,18 @@ signals:
     // Sprint 3.2: Point cloud viewing signals
     void pointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
     void pointCloudViewFailed(const QString &error);
+
+    // Sprint 1.3: E57-specific loading signals
+    void loadingStarted(const QString& message);
+    void loadingCompleted();
+    void statusUpdate(const QString& status);
+
+    // Sprint 2.1: Enhanced signals
+    void batchOperationProgress(const QString &operation, int completed, int total);
+    void preprocessingStarted(const QString &scanId);
+    void preprocessingFinished(const QString &scanId, bool success);
+    void optimizationStarted(const QString &scanId);
+    void optimizationFinished(const QString &scanId, bool success);
 
     // Sprint 3.4: Memory usage and LOD signals
     void memoryUsageChanged(size_t totalBytes);
@@ -180,11 +209,25 @@ private:
     bool loadScanData(const QString &scanId);
     bool unloadScanData(const QString &scanId);
     std::unique_ptr<PointCloudData> parsePointCloudFile(const QString &filePath);
+
+    // Sprint 1.3: E57-specific helper methods
+    void onE57ScanLoaded(const std::vector<float>& points, const QString& sourceInfo);
+    void onLoadError(const QString& error);
     
     // Memory management
     void updateMemoryUsage();
     void evictLeastRecentlyUsed();
-    
+
+    // Sprint 2.1: Enhanced memory management
+    void predictiveLoadCandidates();
+    void optimizeMemoryUsage();
+    size_t estimateScanMemoryUsage(const QString &scanId) const;
+
+    // Sprint 2.1: Processing operations
+    bool preprocessScan(const QString &scanId);
+    bool optimizeScanForRegistration(const QString &scanId);
+    void batchProcessScans(const QString &operation, const QStringList &scanIds);
+
     // Helper methods
     QString getScanFilePath(const QString &scanId) const;
     void updateScanState(const QString &scanId, LoadedState state, const QString &error = QString());
@@ -194,21 +237,27 @@ private:
     SQLiteManager *m_sqliteManager;
     ProjectTreeModel *m_treeModel;
     
-    // State tracking
-    QHash<QString, std::unique_ptr<ScanLoadState>> m_scanStates;
+    // State tracking - Use QMap instead of QHash for move-only types
+    QMap<QString, std::unique_ptr<ScanLoadState>> m_scanStates;
     mutable QMutex m_stateMutex;
     
     // Memory management
     size_t m_memoryLimitMB;
     size_t m_currentMemoryUsage;
     QTimer *m_memoryCheckTimer;
-    
+
+    // Sprint 2.1: Enhanced memory management
+    size_t m_predictiveLoadThreshold;
+    QTimer *m_predictiveLoadTimer;
+    QHash<QString, QStringList> m_clusterRelationships;
+
     // Error handling
     QString m_lastError;
-    
+
     // Constants
     static const size_t DEFAULT_MEMORY_LIMIT_MB = 2048; // 2GB default
     static const int MEMORY_CHECK_INTERVAL_MS = 30000;  // 30 seconds
+    static const size_t DEFAULT_PREDICTIVE_THRESHOLD_MB = 512; // 512MB for predictive loading
 };
 
 #endif // POINTCLOUDLOADMANAGER_H

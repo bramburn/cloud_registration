@@ -3,6 +3,7 @@
 #include <QPalette>
 #include <QDir>
 #include <QStandardPaths>
+#include <QStyle>
 #include <QDebug>
 
 const QSize IconManager::DEFAULT_ICON_SIZE(16, 16);
@@ -63,7 +64,13 @@ void IconManager::loadOverlayIcons()
     m_iconCache["missing_overlay"] = QIcon(getIconPath("overlays/missing.svg"));
     m_iconCache["loading_overlay"] = QIcon(getIconPath("overlays/loading.svg"));
     m_iconCache["error_overlay"] = QIcon(getIconPath("overlays/error.svg"));
-    
+
+    // Sprint 2.1: New state overlays
+    m_iconCache["processing_overlay"] = QIcon(getIconPath("overlays/processing.svg"));
+    m_iconCache["cached_overlay"] = QIcon(getIconPath("overlays/cached.svg"));
+    m_iconCache["memory_warning_overlay"] = QIcon(getIconPath("overlays/memory_warning.svg"));
+    m_iconCache["optimized_overlay"] = QIcon(getIconPath("overlays/optimized.svg"));
+
     // Fallback overlays using built-in icons
     if (m_iconCache["loaded_overlay"].isNull()) {
         m_iconCache["loaded_overlay"] = QApplication::style()->standardIcon(QStyle::SP_DialogApplyButton);
@@ -76,6 +83,20 @@ void IconManager::loadOverlayIcons()
     }
     if (m_iconCache["error_overlay"].isNull()) {
         m_iconCache["error_overlay"] = QApplication::style()->standardIcon(QStyle::SP_MessageBoxCritical);
+    }
+
+    // Sprint 2.1: Fallback icons for new states
+    if (m_iconCache["processing_overlay"].isNull()) {
+        m_iconCache["processing_overlay"] = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
+    }
+    if (m_iconCache["cached_overlay"].isNull()) {
+        m_iconCache["cached_overlay"] = QApplication::style()->standardIcon(QStyle::SP_FileDialogListView);
+    }
+    if (m_iconCache["memory_warning_overlay"].isNull()) {
+        m_iconCache["memory_warning_overlay"] = QApplication::style()->standardIcon(QStyle::SP_MessageBoxWarning);
+    }
+    if (m_iconCache["optimized_overlay"].isNull()) {
+        m_iconCache["optimized_overlay"] = QApplication::style()->standardIcon(QStyle::SP_DialogOkButton);
     }
 }
 
@@ -146,9 +167,14 @@ QIcon IconManager::getCompositeIcon(ItemType type, ItemState state, ImportType i
         case ItemState::Missing: overlayIcon = m_iconCache.value("missing_overlay"); break;
         case ItemState::Loading: overlayIcon = m_iconCache.value("loading_overlay"); break;
         case ItemState::Error: overlayIcon = m_iconCache.value("error_overlay"); break;
+        // Sprint 2.1: New state overlays
+        case ItemState::Processing: overlayIcon = m_iconCache.value("processing_overlay"); break;
+        case ItemState::Cached: overlayIcon = m_iconCache.value("cached_overlay"); break;
+        case ItemState::MemoryWarning: overlayIcon = m_iconCache.value("memory_warning_overlay"); break;
+        case ItemState::Optimized: overlayIcon = m_iconCache.value("optimized_overlay"); break;
         case ItemState::Unloaded:
         case ItemState::Unlocked:
-        default: 
+        default:
             // No overlay for these states
             break;
     }
@@ -164,7 +190,7 @@ QIcon IconManager::getCompositeIcon(ItemType type, ItemState state, ImportType i
     }
     
     QPixmap composite = createCompositePixmap(baseIcon, overlayIcon, badgeIcon);
-    m_compositeCache[cacheKey] = composite;
+    m_compositeCache.insert(cacheKey, composite);
     
     return QIcon(composite);
 }
@@ -225,6 +251,11 @@ QIcon IconManager::getStateOverlayIcon(ItemState state) const
         case ItemState::Missing: return m_iconCache.value("missing_overlay");
         case ItemState::Loading: return m_iconCache.value("loading_overlay");
         case ItemState::Error: return m_iconCache.value("error_overlay");
+        // Sprint 2.1: New state overlays
+        case ItemState::Processing: return m_iconCache.value("processing_overlay");
+        case ItemState::Cached: return m_iconCache.value("cached_overlay");
+        case ItemState::MemoryWarning: return m_iconCache.value("memory_warning_overlay");
+        case ItemState::Optimized: return m_iconCache.value("optimized_overlay");
         default: return QIcon();
     }
 }
@@ -285,7 +316,7 @@ QIcon IconManager::getScaledIcon(ItemType type, ItemState state, const QSize& si
     // Create scaled version
     QIcon baseIcon = getIcon(type, state);
     QPixmap scaledPixmap = baseIcon.pixmap(size);
-    m_compositeCache[cacheKey] = scaledPixmap;
+    m_compositeCache.insert(cacheKey, scaledPixmap);
     
     return QIcon(scaledPixmap);
 }

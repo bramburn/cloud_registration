@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QAction>
 #include <QProgressBar>
+#include <QVBoxLayout>
 #include <vector>
 #include "progressmanager.h"
 
@@ -45,6 +46,9 @@ private slots:
     // Sprint 1.2: Scan Import functionality
     void onImportScans();
     void onScansImported(const QList<ScanInfo> &scans);
+
+    // Sprint 1.3: E57 scan activation
+    void onScanActivated(const QString& scanId);
 
     // Legacy point cloud loading slots (for existing functionality)
     void onOpenFileClicked();

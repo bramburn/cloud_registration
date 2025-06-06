@@ -1,5 +1,5 @@
 #include "E57XmlParser.h"
-#include "E57Foundation.h"
+#include <E57Format/E57Format.h>
 #include <iostream>
 #include <stdexcept>
 
@@ -47,7 +47,7 @@ bool E57XmlParser::isValidE57File() {
         }
         
         // Try to access the root node
-        e57::StructureNode root = m_imageFile->root();
+        e57::StructureNode root(m_imageFile->root());
         return true;
         
     } catch (const e57::E57Exception&) {
@@ -65,7 +65,7 @@ E57FileMetadata E57XmlParser::parseFile() {
     }
     
     try {
-        e57::StructureNode root = m_imageFile->root();
+        e57::StructureNode root(m_imageFile->root());
         
         // Parse file-level metadata
         if (root.isDefined("guid")) {
@@ -109,7 +109,7 @@ std::vector<ScanMetadata> E57XmlParser::parseData3DSections() {
     }
     
     try {
-        e57::StructureNode root = m_imageFile->root();
+        e57::StructureNode root(m_imageFile->root());
         
         if (!root.isDefined("data3D")) {
             return scans; // No 3D data sections
@@ -140,8 +140,12 @@ std::vector<ScanMetadata> E57XmlParser::parseData3DSections() {
 
 ScanMetadata E57XmlParser::parseScanNode(const e57::Node& scanNode, int scanIndex) {
     ScanMetadata scan;
-    
+
     try {
+        // Verify the node is a structure node before casting
+        if (scanNode.type() != e57::TypeStructure) {
+            throw std::runtime_error("Scan node " + std::to_string(scanIndex) + " is not a structure node");
+        }
         e57::StructureNode structNode(scanNode);
         
         // Validate scan node has required elements
@@ -179,7 +183,7 @@ ScanMetadata E57XmlParser::parseScanNode(const e57::Node& scanNode, int scanInde
             scan.pointCount = static_cast<uint64_t>(points.childCount());
             
             // Parse point prototype
-            e57::StructureNode prototype = points.prototype();
+            e57::StructureNode prototype(points.prototype());
             scan.pointAttributes = parsePointPrototype(prototype);
             
             // Extract binary section information
@@ -241,17 +245,17 @@ PointAttribute E57XmlParser::parseAttributeNode(const e57::Node& attrNode) {
         attr.elementType = static_cast<int>(attrNode.type());
         
         // Parse limits based on node type
-        if (attrNode.type() == e57::E57_SCALED_INTEGER) {
+        if (attrNode.type() == e57::TypeScaledInteger) {
             e57::ScaledIntegerNode scaledNode(attrNode);
             attr.minimum = scaledNode.minimum();
             attr.maximum = scaledNode.maximum();
             attr.hasLimits = true;
-        } else if (attrNode.type() == e57::E57_FLOAT) {
+        } else if (attrNode.type() == e57::TypeFloat) {
             e57::FloatNode floatNode(attrNode);
             attr.minimum = floatNode.minimum();
             attr.maximum = floatNode.maximum();
             attr.hasLimits = true;
-        } else if (attrNode.type() == e57::E57_INTEGER) {
+        } else if (attrNode.type() == e57::TypeInteger) {
             e57::IntegerNode intNode(attrNode);
             attr.minimum = static_cast<double>(intNode.minimum());
             attr.maximum = static_cast<double>(intNode.maximum());
@@ -269,7 +273,7 @@ std::vector<std::string> E57XmlParser::parseImages2D() {
     std::vector<std::string> images;
     
     try {
-        e57::StructureNode root = m_imageFile->root();
+        e57::StructureNode root(m_imageFile->root());
         
         if (!root.isDefined("images2D")) {
             return images; // No 2D images
@@ -279,7 +283,11 @@ std::vector<std::string> E57XmlParser::parseImages2D() {
         int64_t imageCount = images2D.childCount();
         
         for (int64_t i = 0; i < imageCount; ++i) {
-            e57::StructureNode imageNode(images2D.get(i));
+            e57::Node imageNodeBase = images2D.get(i);
+            if (imageNodeBase.type() != e57::TypeStructure) {
+                continue; // Skip non-structure nodes
+            }
+            e57::StructureNode imageNode(imageNodeBase);
             
             if (imageNode.isDefined("guid")) {
                 e57::StringNode guidNode(imageNode.get("guid"));
@@ -388,7 +396,7 @@ bool E57XmlParser::validateScanNode(const e57::StructureNode& scanNode, int scan
 
         // Validate points section is a CompressedVectorNode
         e57::Node pointsNode = scanNode.get("points");
-        if (pointsNode.type() != e57::E57_COMPRESSED_VECTOR) {
+        if (pointsNode.type() != e57::TypeCompressedVector) {
             std::cerr << "Warning: Scan " << scanIndex << " 'points' is not a CompressedVector" << std::endl;
             return false;
         }
@@ -422,10 +430,10 @@ CoordinateMetadata E57XmlParser::parseCoordinateMetadata(const e57::Node& coordN
     CoordinateMetadata coord;
 
     try {
-        if (coordNode.type() == e57::E57_STRING) {
+        if (coordNode.type() == e57::TypeString) {
             e57::StringNode stringNode(coordNode);
             coord.coordinateSystemName = stringNode.value();
-        } else if (coordNode.type() == e57::E57_STRUCTURE) {
+        } else if (coordNode.type() == e57::TypeStructure) {
             e57::StructureNode structNode(coordNode);
 
             if (structNode.isDefined("coordinateSystemName")) {
@@ -453,14 +461,14 @@ CoordinateMetadata E57XmlParser::parseCoordinateMetadata(const e57::Node& coordN
 
 std::string E57XmlParser::elementTypeToString(int elementType) {
     switch (elementType) {
-        case e57::E57_STRUCTURE: return "Structure";
-        case e57::E57_VECTOR: return "Vector";
-        case e57::E57_COMPRESSED_VECTOR: return "CompressedVector";
-        case e57::E57_INTEGER: return "Integer";
-        case e57::E57_SCALED_INTEGER: return "ScaledInteger";
-        case e57::E57_FLOAT: return "Float";
-        case e57::E57_STRING: return "String";
-        case e57::E57_BLOB: return "Blob";
+        case e57::TypeStructure: return "Structure";
+        case e57::TypeVector: return "Vector";
+        case e57::TypeCompressedVector: return "CompressedVector";
+        case e57::TypeInteger: return "Integer";
+        case e57::TypeScaledInteger: return "ScaledInteger";
+        case e57::TypeFloat: return "Float";
+        case e57::TypeString: return "String";
+        case e57::TypeBlob: return "Blob";
         default: return "Unknown(" + std::to_string(elementType) + ")";
     }
 }

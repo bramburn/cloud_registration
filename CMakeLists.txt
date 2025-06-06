@@ -88,6 +88,9 @@ endif()
 # Find Qt6 components - require minimum version 6.9.0
 find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
 
+# Find Vulkan SDK
+# find_package(Vulkan REQUIRED)
+
 # Find E57Format library for enhanced E57 parsing (Sprint 1.2)
 find_package(E57Format CONFIG REQUIRED)
 
@@ -225,7 +228,14 @@ target_link_libraries(CloudRegistration
     Qt6::Sql
     Qt6::Concurrent
     E57Format
+    Vulkan::Vulkan
 )
+
+# Ensure E57Format include directories are available
+get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)
+if(E57_INCLUDE_DIRS)
+    target_include_directories(CloudRegistration PRIVATE ${E57_INCLUDE_DIRS})
+endif()
 
 
 
@@ -1048,11 +1058,57 @@ if(TARGET GTest::gtest_main)
     target_include_directories(SprintR2LODTests PRIVATE src)
     add_test(NAME SprintR2LODTests COMMAND SprintR2LODTests)
 
+    # Sprint 2.1: Point Cloud State Management and Memory Control Tests
+    add_executable(Sprint21Tests
+        tests/test_sprint2_1.cpp
+        src/projecttreemodel.cpp
+        src/pointcloudloadmanager.cpp
+        src/sidebarwidget.cpp
+        src/sqlitemanager.cpp
+        src/iconmanager.cpp
+        src/e57parserlib.cpp
+        src/lasparser.cpp
+        src/voxelgridfilter.cpp
+        src/performance_profiler.cpp
+        src/performance_benchmark.cpp
+        src/e57_parser/E57HeaderParser.cpp
+        src/e57_parser/E57BinaryReader.cpp
+        src/e57_parser/E57XmlParser.cpp
+        src/scanimportmanager.cpp
+        src/project.cpp
+        src/projectmanager.cpp
+        src/recentprojectsmanager.cpp
+        src/confirmationdialog.cpp
+    )
+
+    target_link_libraries(Sprint21Tests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Sql
+        Qt6::Concurrent
+        Qt6::Test
+        ${SQLITE3_LIBRARIES}
+    )
+
+    # Add libe57format if available
+    if(TARGET E57Format)
+        target_link_libraries(Sprint21Tests E57Format)
+    endif()
+
+    target_include_directories(Sprint21Tests PRIVATE
+        src
+        src/e57_parser
+        ${SQLITE3_INCLUDE_DIRS}
+    )
+
+    add_test(NAME Sprint21Tests COMMAND Sprint21Tests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57HeaderParserTests E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
-        COMMENT "Running all unit tests including Sprint 1.1 E57 header parsing, Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57HeaderParserTests E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint21Tests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
+        COMMENT "Running all unit tests including Sprint 2.1 state management, Sprint 1.1 E57 header parsing, Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1.1: E57 Header Parser testing targets
@@ -1102,6 +1158,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*SprintR2.*"
         DEPENDS SprintR2LODTests
         COMMENT "Running Sprint R2 screen-space error LOD enhancement tests"
+    )
+
+    # Sprint 2.1: Point Cloud State Management and Memory Control testing targets
+    add_custom_target(run_sprint21_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Sprint21.*"
+        DEPENDS Sprint21Tests
+        COMMENT "Running Sprint 2.1 point cloud state management and memory control tests"
     )
 
     add_custom_target(generate_complex_test_files

@@ -2,7 +2,7 @@
 #include <QTemporaryDir>
 #include <QFileInfo>
 #include <QDebug>
-#include <E57Format.h>
+#include <E57Format/E57Format.h>
 #include "../src/e57writer_lib.h"
 
 /**

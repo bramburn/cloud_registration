@@ -25,6 +25,11 @@ public:
     
     void setProjectPath(const QString &projectPath);
 
+signals:
+    // Sprint 1.3: E57-specific import signals
+    void importE57FileRequested(const QString& filePath);
+    void importLasFileRequested(const QString& filePath);
+
 private slots:
     void browseFiles();
     void removeSelectedFiles();

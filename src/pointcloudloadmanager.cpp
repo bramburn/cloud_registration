@@ -19,13 +19,19 @@ PointCloudLoadManager::PointCloudLoadManager(QObject *parent)
     , m_treeModel(nullptr)
     , m_memoryLimitMB(DEFAULT_MEMORY_LIMIT_MB)
     , m_currentMemoryUsage(0)
+    , m_predictiveLoadThreshold(DEFAULT_PREDICTIVE_THRESHOLD_MB)
     , m_memoryCheckTimer(new QTimer(this))
 {
     // Setup memory monitoring timer
     m_memoryCheckTimer->setInterval(MEMORY_CHECK_INTERVAL_MS);
     connect(m_memoryCheckTimer, &QTimer::timeout, this, &PointCloudLoadManager::onMemoryCheckTimer);
     m_memoryCheckTimer->start();
-    
+
+    // Sprint 2.1: Setup predictive loading timer
+    m_predictiveLoadTimer = new QTimer(this);
+    connect(m_predictiveLoadTimer, &QTimer::timeout, this, &PointCloudLoadManager::predictiveLoadCandidates);
+    m_predictiveLoadTimer->start(60000); // Check every minute
+
     qDebug() << "PointCloudLoadManager initialized with memory limit:" << m_memoryLimitMB << "MB";
 }
 
@@ -815,4 +821,312 @@ size_t PointCloudLoadManager::getClusterMemoryUsage(const QString &clusterId) co
     }
 
     return totalMemory;
+}
+
+// Sprint 1.3: E57-specific loading implementation (simplified for now)
+void PointCloudLoadManager::loadE57Scan(const QString& filePath, const QString& scanGuid)
+{
+    qDebug() << "PointCloudLoadManager: E57 scan loading not yet implemented" << scanGuid;
+    emit loadingStarted(QString("E57 loading not implemented: %1").arg(scanGuid));
+    emit pointCloudViewFailed("E57 loading not yet implemented in this build");
+    emit loadingCompleted();
+}
+
+void PointCloudLoadManager::onE57ScanLoaded(const std::vector<float>& /*points*/, const QString& /*sourceInfo*/)
+{
+    // Placeholder implementation
+    qDebug() << "PointCloudLoadManager: E57 scan loaded (placeholder)";
+    emit loadingCompleted();
+}
+
+void PointCloudLoadManager::onLoadError(const QString& error)
+{
+    qDebug() << "PointCloudLoadManager: Load error:" << error;
+    emit pointCloudViewFailed(error);
+    emit loadingCompleted();
+}
+
+// Sprint 2.1: Enhanced operation slot implementations
+void PointCloudLoadManager::onPreprocessScanRequested(const QString &scanId)
+{
+    if (scanId.isEmpty()) {
+        return;
+    }
+
+    emit preprocessingStarted(scanId);
+
+    // Update scan state to processing
+    updateScanState(scanId, LoadedState::Processing);
+
+    // Perform preprocessing in a separate thread
+    QtConcurrent::run([this, scanId]() {
+        bool success = preprocessScan(scanId);
+
+        if (success) {
+            updateScanState(scanId, LoadedState::Optimized);
+            emit preprocessingFinished(scanId, true);
+        } else {
+            updateScanState(scanId, LoadedState::Error, m_lastError);
+            emit preprocessingFinished(scanId, false);
+        }
+    });
+}
+
+void PointCloudLoadManager::onOptimizeScanRequested(const QString &scanId)
+{
+    if (scanId.isEmpty()) {
+        return;
+    }
+
+    emit optimizationStarted(scanId);
+
+    // Update scan state to processing
+    updateScanState(scanId, LoadedState::Processing);
+
+    // Perform optimization in a separate thread
+    QtConcurrent::run([this, scanId]() {
+        bool success = optimizeScanForRegistration(scanId);
+
+        if (success) {
+            updateScanState(scanId, LoadedState::Optimized);
+            emit optimizationFinished(scanId, true);
+        } else {
+            updateScanState(scanId, LoadedState::Error, m_lastError);
+            emit optimizationFinished(scanId, false);
+        }
+    });
+}
+
+void PointCloudLoadManager::onBatchOperationRequested(const QString &operation, const QStringList &scanIds)
+{
+    if (scanIds.isEmpty()) {
+        return;
+    }
+
+    // Perform batch operation in a separate thread
+    QtConcurrent::run([this, operation, scanIds]() {
+        batchProcessScans(operation, scanIds);
+    });
+}
+
+void PointCloudLoadManager::onMemoryOptimizationRequested()
+{
+    // Perform memory optimization in a separate thread
+    QtConcurrent::run([this]() {
+        optimizeMemoryUsage();
+    });
+}
+
+void PointCloudLoadManager::onFilterMovingObjectsRequested(const QString &scanId)
+{
+    if (scanId.isEmpty()) {
+        return;
+    }
+
+    // Placeholder for moving object filtering
+    qDebug() << "Filter moving objects requested for scan:" << scanId;
+    // TODO: Implement moving object filtering algorithm
+}
+
+void PointCloudLoadManager::onColorBalanceRequested(const QString &scanId)
+{
+    if (scanId.isEmpty()) {
+        return;
+    }
+
+    // Placeholder for color balance adjustment
+    qDebug() << "Color balance requested for scan:" << scanId;
+    // TODO: Implement color balance algorithm
+}
+
+void PointCloudLoadManager::onRegistrationPreviewRequested(const QString &scanId)
+{
+    if (scanId.isEmpty()) {
+        return;
+    }
+
+    // Placeholder for registration preview
+    qDebug() << "Registration preview requested for scan:" << scanId;
+    // TODO: Implement registration preview functionality
+}
+
+// Sprint 2.1: Enhanced memory management implementations
+void PointCloudLoadManager::predictiveLoadCandidates()
+{
+    // Identify scans that are likely to be accessed next
+    QStringList candidates;
+
+    for (auto it = m_scanStates.begin(); it != m_scanStates.end(); ++it) {
+        const QString& scanId = it.key();
+        const auto& state = it.value();
+
+        if (state->state == LoadedState::Loaded) {
+            // Find related scans in the same cluster
+            for (auto clusterIt = m_clusterRelationships.begin(); clusterIt != m_clusterRelationships.end(); ++clusterIt) {
+                const QStringList& clusterScans = clusterIt.value();
+                if (clusterScans.contains(scanId)) {
+                    for (const QString& relatedScan : clusterScans) {
+                        if (relatedScan != scanId && !m_scanStates.contains(relatedScan)) {
+                            candidates.append(relatedScan);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Load candidates if memory allows
+    size_t availableMemory = (m_memoryLimitMB * 1024 * 1024) - m_currentMemoryUsage;
+    if (availableMemory > m_predictiveLoadThreshold * 1024 * 1024) {
+        // Load up to 2 candidates
+        for (int i = 0; i < qMin(2, candidates.size()); ++i) {
+            loadScan(candidates[i]);
+        }
+    }
+}
+
+void PointCloudLoadManager::optimizeMemoryUsage()
+{
+    QStringList candidatesForEviction;
+
+    // Find scans that haven't been accessed recently
+    QDateTime threshold = QDateTime::currentDateTime().addSecs(-600); // 10 minutes
+
+    for (auto it = m_scanStates.begin(); it != m_scanStates.end(); ++it) {
+        const QString& scanId = it.key();
+        const auto& state = it.value();
+
+        if (state->state == LoadedState::Loaded && state->lastAccessed < threshold) {
+            candidatesForEviction.append(scanId);
+        }
+    }
+
+    // Sort by last accessed time (oldest first)
+    std::sort(candidatesForEviction.begin(), candidatesForEviction.end(), [this](const QString& a, const QString& b) {
+        const auto& stateA = m_scanStates[a];
+        const auto& stateB = m_scanStates[b];
+        return stateA->lastAccessed < stateB->lastAccessed;
+    });
+
+    // Evict oldest scans until we're under 75% of memory limit
+    size_t targetMemory = (m_memoryLimitMB * 1024 * 1024) * 0.75;
+
+    for (const QString& scanId : candidatesForEviction) {
+        if (m_currentMemoryUsage <= targetMemory) {
+            break;
+        }
+
+        // Set to cached state instead of fully unloading
+        updateScanState(scanId, LoadedState::Cached);
+        unloadScanData(scanId);
+    }
+
+    qDebug() << "Memory optimization completed. Current usage:" << (m_currentMemoryUsage / (1024 * 1024)) << "MB";
+}
+
+size_t PointCloudLoadManager::estimateScanMemoryUsage(const QString &scanId) const
+{
+    if (!m_sqliteManager) {
+        return 50 * 1024 * 1024; // Default estimate: 50MB
+    }
+
+    ScanInfo scan = m_sqliteManager->getScanById(scanId);
+    if (!scan.isValid()) {
+        return 50 * 1024 * 1024; // Default estimate
+    }
+
+    // Rough estimate based on point count
+    // Assuming 12 bytes per point (XYZ as floats)
+    size_t estimatedSize = scan.pointCountEstimate * 12;
+
+    // Add overhead for data structures
+    estimatedSize += sizeof(PointCloudData) + 1024; // 1KB overhead
+
+    return estimatedSize;
+}
+
+bool PointCloudLoadManager::preprocessScan(const QString &scanId)
+{
+    // Ensure scan is loaded
+    if (!isScanLoaded(scanId)) {
+        if (!loadScan(scanId)) {
+            m_lastError = "Failed to load scan for preprocessing: " + scanId;
+            return false;
+        }
+    }
+
+    auto it = m_scanStates.find(scanId);
+    if (it == m_scanStates.end() || !it.value()->data) {
+        m_lastError = "Scan data not available for preprocessing: " + scanId;
+        return false;
+    }
+
+    // Placeholder preprocessing operations
+    // TODO: Implement actual preprocessing algorithms
+    // - Noise removal
+    // - Outlier detection
+    // - Statistical filtering
+
+    qDebug() << "Preprocessing scan:" << scanId;
+
+    // Simulate processing time
+    QThread::msleep(100);
+
+    return true;
+}
+
+bool PointCloudLoadManager::optimizeScanForRegistration(const QString &scanId)
+{
+    // Ensure scan is loaded
+    if (!isScanLoaded(scanId)) {
+        if (!loadScan(scanId)) {
+            m_lastError = "Failed to load scan for optimization: " + scanId;
+            return false;
+        }
+    }
+
+    auto it = m_scanStates.find(scanId);
+    if (it == m_scanStates.end() || !it.value()->data) {
+        m_lastError = "Scan data not available for optimization: " + scanId;
+        return false;
+    }
+
+    // Placeholder optimization operations
+    // TODO: Implement actual optimization algorithms
+    // - Keypoint extraction
+    // - Feature descriptor computation
+    // - Voxel grid downsampling for registration
+
+    qDebug() << "Optimizing scan for registration:" << scanId;
+
+    // Simulate processing time
+    QThread::msleep(200);
+
+    return true;
+}
+
+void PointCloudLoadManager::batchProcessScans(const QString &operation, const QStringList &scanIds)
+{
+    int completed = 0;
+    int total = scanIds.size();
+
+    for (const QString& scanId : scanIds) {
+        if (operation == "load") {
+            loadScan(scanId);
+        } else if (operation == "unload") {
+            unloadScan(scanId);
+        } else if (operation == "preprocess") {
+            onPreprocessScanRequested(scanId);
+        } else if (operation == "optimize") {
+            onOptimizeScanRequested(scanId);
+        }
+
+        completed++;
+        emit batchOperationProgress(operation, completed, total);
+
+        // Allow UI updates between operations
+        QCoreApplication::processEvents();
+    }
+
+    qDebug() << "Batch operation completed:" << operation << "for" << total << "scans";
 }

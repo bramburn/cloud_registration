@@ -5,9 +5,6 @@
     "libe57format",
     "xerces-c",
     "gtest",
-    "vulkan-headers",
-    "vulkan-loader",
-    "vulkan-utility-libraries",
-    "vulkan-validationlayers"
+    "vulkan"
   ]
 }
