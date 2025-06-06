@@ -10,11 +10,11 @@
 #include <QVBoxLayout>
 #include <vector>
 #include "progressmanager.h"
+#include "projectmanager.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
 class PointCloudViewerWidget;
-class ProjectManager;
 class PointCloudLoadManager;
 class Project;
 class E57ParserLib;
@@ -26,7 +26,6 @@ class QPushButton;
 class QCheckBox;
 class QSlider;
 struct LasHeaderMetadata;
-struct ScanInfo;
 
 class MainWindow : public QMainWindow
 {
@@ -118,6 +117,9 @@ private:
     // Sprint 3.4: Memory statistics display
     void setupMemoryDisplay();
     void onMemoryUsageChanged(size_t totalBytes);
+
+    // Sprint 2.2: Performance statistics display
+    void onStatsUpdated(float fps, int visiblePoints);
 
     // Main UI Components
     QStackedWidget *m_centralStack;

@@ -86,7 +86,7 @@ private:
     
     // Icon storage
     QHash<QString, QIcon> m_iconCache;
-    QHash<QString, QPixmap> m_compositeCache;
+    mutable QHash<QString, QPixmap> m_compositeCache;
     
     // Theme management
     QString m_currentTheme;

@@ -308,7 +308,7 @@ int E57XmlParser::getScanCount() {
             return 0;
         }
         
-        e57::StructureNode root = m_imageFile->root();
+        e57::StructureNode root(m_imageFile->root());
         
         if (!root.isDefined("data3D")) {
             return 0;
@@ -368,7 +368,7 @@ BinarySection E57XmlParser::extractBinarySectionInfo(const e57::CompressedVector
         if (pointCount > 0) {
             // Estimate binary size based on point count and prototype
             // This is a rough estimate - actual implementation would need precise calculation
-            e57::StructureNode prototype = pointsNode.prototype();
+            e57::StructureNode prototype(pointsNode.prototype());
             size_t estimatedPointSize = 12; // Minimum for XYZ coordinates
 
             if (prototype.isDefined("intensity")) estimatedPointSize += 4;
@@ -403,7 +403,7 @@ bool E57XmlParser::validateScanNode(const e57::StructureNode& scanNode, int scan
 
         // Check prototype has required coordinate fields
         e57::CompressedVectorNode points(pointsNode);
-        e57::StructureNode prototype = points.prototype();
+        e57::StructureNode prototype(points.prototype());
 
         bool hasCartesianCoords = prototype.isDefined("cartesianX") &&
                                  prototype.isDefined("cartesianY") &&

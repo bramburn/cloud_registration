@@ -254,34 +254,51 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
         QString itemId = m_model->getItemId(m_contextItem);
 
         if (itemType == "scan") {
-            // Right-clicked on scan - Enhanced Sprint 2.1 context menu
+            // Sprint 2.2: Enhanced context-aware menu for scans
             if (m_loadManager) {
                 LoadedState state = m_model->getScanLoadedState(itemId);
 
-                // Basic load/unload actions based on state
+                // Sprint 2.2: Context-aware actions based on loaded state
                 switch (state) {
                     case LoadedState::Unloaded:
+                        // Only show load actions for unloaded scans
+                        m_loadScanAction->setEnabled(true);
+                        m_unloadScanAction->setEnabled(false);
                         m_contextMenu->addAction(m_loadScanAction);
                         m_contextMenu->addAction(m_preprocessScanAction);
                         break;
                     case LoadedState::Loaded:
+                        // Only show unload actions for loaded scans
+                        m_loadScanAction->setEnabled(false);
+                        m_unloadScanAction->setEnabled(true);
                         m_contextMenu->addAction(m_unloadScanAction);
                         m_contextMenu->addAction(m_optimizeScanAction);
                         m_contextMenu->addMenu(m_advancedMenu);
                         break;
                     case LoadedState::Processing:
-                        // Limited options during processing
+                        // Limited options during processing - disable load/unload
+                        m_loadScanAction->setEnabled(false);
+                        m_unloadScanAction->setEnabled(false);
                         m_contextMenu->addAction("Cancel Processing")->setEnabled(false);
                         break;
                     case LoadedState::Error:
+                        // Allow retry for error state
+                        m_loadScanAction->setEnabled(true);
+                        m_unloadScanAction->setEnabled(false);
                         m_contextMenu->addAction("Retry Load");
                         m_contextMenu->addAction("View Error Details");
                         break;
                     case LoadedState::Cached:
+                        // Allow restore or unload for cached state
+                        m_loadScanAction->setEnabled(true);
+                        m_unloadScanAction->setEnabled(true);
                         m_contextMenu->addAction("Restore to Memory");
                         m_contextMenu->addAction(m_unloadScanAction);
                         break;
                     default:
+                        // Default to allowing load
+                        m_loadScanAction->setEnabled(true);
+                        m_unloadScanAction->setEnabled(false);
                         m_contextMenu->addAction(m_loadScanAction);
                         break;
                 }
@@ -356,7 +373,7 @@ void SidebarWidget::dragEnterEvent(QDragEnterEvent *event)
 
 void SidebarWidget::dragMoveEvent(QDragMoveEvent *event)
 {
-    QStandardItem *item = getItemAt(event->pos());
+    QStandardItem *item = getItemAt(event->position().toPoint());
     if (item) {
         QString itemType = m_model->getItemType(item);
         QString draggedType = event->mimeData()->hasFormat("application/x-scan-ids") ? "scan" : "cluster";
@@ -371,7 +388,7 @@ void SidebarWidget::dragMoveEvent(QDragMoveEvent *event)
 
 void SidebarWidget::dropEvent(QDropEvent *event)
 {
-    QStandardItem *targetItem = getItemAt(event->pos());
+    QStandardItem *targetItem = getItemAt(event->position().toPoint());
     if (!targetItem || !m_projectManager) {
         event->ignore();
         return;
@@ -391,8 +408,8 @@ void SidebarWidget::dropEvent(QDropEvent *event)
 
     if (event->mimeData()->hasFormat("application/x-scan-ids")) {
         // Handle scan drop
-        QByteArray data = event->mimeData()->data("application/x-scan-ids");
-        QStringList scanIds = QString::fromUtf8(data).split(',', Qt::SkipEmptyParts);
+        QByteArray mimeData = event->mimeData()->data("application/x-scan-ids");
+        QStringList scanIds = QString::fromUtf8(mimeData).split(',', Qt::SkipEmptyParts);
 
         for (const QString &scanId : scanIds) {
             if (m_projectManager->moveScanToCluster(scanId, targetClusterId)) {

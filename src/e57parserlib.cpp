@@ -1154,7 +1154,7 @@ std::vector<E57ParserLib::PointData> E57ParserLib::extractPointDataFromScan(int 
 
         e57::CompressedVectorNode pointsNode =
             static_cast<e57::CompressedVectorNode>(scan.get("points"));
-        e57::StructureNode prototype = pointsNode.prototype();
+        e57::StructureNode prototype(pointsNode.prototype());
 
         // Check available fields
         bool hasX = prototype.isDefined("cartesianX");

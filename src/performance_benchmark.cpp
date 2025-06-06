@@ -95,9 +95,9 @@ BenchmarkResult PerformanceBenchmark::runSingleBenchmark(const QString &filePath
     // Create parser and connect signals
     QObject* parser = nullptr;
     if (parserType == "E57") {
-        E57Parser* e57Parser = new E57Parser();
+        E57ParserLib* e57Parser = new E57ParserLib();
         parser = e57Parser;
-        connect(e57Parser, &E57Parser::parsingFinished, 
+        connect(e57Parser, &E57ParserLib::parsingFinished,
                 this, &PerformanceBenchmark::onParsingFinished);
         
         // Start parsing in a separate thread

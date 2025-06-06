@@ -91,9 +91,24 @@ struct ScanLoadState {
         return *this;
     }
     
-    // Delete copy constructor and assignment
-    ScanLoadState(const ScanLoadState&) = delete;
-    ScanLoadState& operator=(const ScanLoadState&) = delete;
+    // Copy constructor and assignment for shared_ptr compatibility
+    ScanLoadState(const ScanLoadState& other)
+        : scanId(other.scanId)
+        , state(other.state)
+        , data(other.data ? std::make_unique<PointCloudData>(*other.data) : nullptr)
+        , errorMessage(other.errorMessage)
+        , lastAccessed(other.lastAccessed) {}
+
+    ScanLoadState& operator=(const ScanLoadState& other) {
+        if (this != &other) {
+            scanId = other.scanId;
+            state = other.state;
+            data = other.data ? std::make_unique<PointCloudData>(*other.data) : nullptr;
+            errorMessage = other.errorMessage;
+            lastAccessed = other.lastAccessed;
+        }
+        return *this;
+    }
 };
 
 class PointCloudLoadManager : public QObject
@@ -237,8 +252,8 @@ private:
     SQLiteManager *m_sqliteManager;
     ProjectTreeModel *m_treeModel;
     
-    // State tracking - Use QMap instead of QHash for move-only types
-    QMap<QString, std::unique_ptr<ScanLoadState>> m_scanStates;
+    // State tracking - Use QMap with shared_ptr for copyable smart pointer semantics
+    QMap<QString, std::shared_ptr<ScanLoadState>> m_scanStates;
     mutable QMutex m_stateMutex;
     
     // Memory management

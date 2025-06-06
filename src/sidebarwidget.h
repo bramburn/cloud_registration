@@ -5,11 +5,11 @@
 #include <QStandardItemModel>
 #include <QMenu>
 #include <QAction>
+#include "pointcloudloadmanager.h"
 
 class ProjectTreeModel;
 class SQLiteManager;
 class ProjectManager;
-class PointCloudLoadManager;
 struct ScanInfo;
 struct ClusterInfo;
 

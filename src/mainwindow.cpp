@@ -645,6 +645,28 @@ void MainWindow::cleanupParsingThread()
     }
 }
 
+void MainWindow::cleanupParsingThread(QObject* parser)
+{
+    if (m_parserThread) {
+        m_parserThread->quit();
+        m_parserThread->wait(5000); // Wait up to 5 seconds
+
+        if (m_parserThread->isRunning()) {
+            qWarning() << "Parser thread did not quit gracefully, terminating";
+            m_parserThread->terminate();
+            m_parserThread->wait(1000);
+        }
+
+        m_parserThread->deleteLater();
+        m_parserThread = nullptr;
+    }
+
+    if (parser) {
+        parser->deleteLater();
+        m_workerParser = nullptr;
+    }
+}
+
 void MainWindow::cleanupProgressDialog()
 {
     if (m_progressDialog) {
@@ -838,7 +860,33 @@ void MainWindow::onProjectOpened(const QString &projectPath)
 {
     try {
         // Load project using ProjectManager
-        auto projectInfo = m_projectManager->loadProject(projectPath);
+        auto loadResult = m_projectManager->loadProject(projectPath);
+
+        if (loadResult != ProjectLoadResult::Success) {
+            QString errorMsg = "Failed to load project";
+            switch (loadResult) {
+                case ProjectLoadResult::MetadataCorrupted:
+                    errorMsg = "Project metadata is corrupted";
+                    break;
+                case ProjectLoadResult::DatabaseCorrupted:
+                    errorMsg = "Project database is corrupted";
+                    break;
+                case ProjectLoadResult::DatabaseMissing:
+                    errorMsg = "Project database is missing";
+                    break;
+                case ProjectLoadResult::MetadataMissing:
+                    errorMsg = "Project metadata is missing";
+                    break;
+                default:
+                    errorMsg = "Unknown error loading project";
+                    break;
+            }
+            QMessageBox::critical(this, "Project Load Error", errorMsg);
+            return;
+        }
+
+        // Get project info using legacy method for Project object creation
+        auto projectInfo = m_projectManager->loadProjectLegacy(projectPath);
 
         // Create Project object
         delete m_currentProject;
@@ -1007,7 +1055,7 @@ void MainWindow::onImportScans()
 
     // Sprint 1.3: Connect E57-specific import signals
     auto* scanImportManager = m_projectManager->getScanImportManager();
-    scanImportManager->setProjectTreeModel(m_sidebar->getProjectTreeModel());
+    scanImportManager->setProjectTreeModel(m_sidebar->getModel());
 
     connect(&dialog, &ScanImportDialog::importE57FileRequested,
             scanImportManager, &ScanImportManager::handleE57Import);
@@ -1029,6 +1077,7 @@ void MainWindow::onImportScans()
 
     connect(scanImportManager, &ScanImportManager::importCompleted,
             this, [this](const QString& filePath, int scanCount) {
+                Q_UNUSED(filePath)
                 showImportGuidance(false);
                 m_sidebar->refreshFromDatabase();
                 statusBar()->showMessage(
@@ -1259,6 +1308,7 @@ void MainWindow::onProgressUpdated(const QString& operationId, int value, int ma
 
 void MainWindow::onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd)
 {
+    Q_UNUSED(estimatedEnd)
     if (operationId == m_currentOperationId) {
         QString timeText = ProgressManager::instance().formatTimeRemaining(operationId);
         m_timeLabel->setText(timeText);

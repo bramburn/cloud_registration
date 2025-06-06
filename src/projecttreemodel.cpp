@@ -980,3 +980,55 @@ ImportType ProjectTreeModel::getItemImportType(QStandardItem* item) const
 
     return ImportType::None;
 }
+
+// Sprint 2.3 - Lock state management implementation
+void ProjectTreeModel::setClusterLockState(const QString &clusterId, bool isLocked)
+{
+    if (clusterId.isEmpty()) {
+        return;
+    }
+
+    m_clusterLockStates[clusterId] = isLocked;
+
+    // Update visual representation
+    QStandardItem *clusterItem = findClusterItem(clusterId);
+    if (clusterItem) {
+        // Force refresh of the item's icon
+        QModelIndex index = indexFromItem(clusterItem);
+        emit dataChanged(index, index, {Qt::DecorationRole});
+    }
+
+    qDebug() << "Set cluster lock state:" << clusterId << "to" << (isLocked ? "locked" : "unlocked");
+}
+
+bool ProjectTreeModel::getClusterLockState(const QString &clusterId) const
+{
+    if (clusterId.isEmpty()) {
+        return false;
+    }
+
+    return m_clusterLockStates.value(clusterId, false);
+}
+
+void ProjectTreeModel::refreshClusterLockStates()
+{
+    if (!m_sqliteManager) {
+        return;
+    }
+
+    // Get lock states from database and update local cache
+    QList<ClusterInfo> clusters = m_sqliteManager->getAllClusters();
+    for (const ClusterInfo &cluster : clusters) {
+        bool isLocked = m_sqliteManager->getClusterLockState(cluster.clusterId);
+        m_clusterLockStates[cluster.clusterId] = isLocked;
+    }
+
+    // Refresh visual representation
+    for (auto it = m_clusterItems.begin(); it != m_clusterItems.end(); ++it) {
+        QStandardItem *clusterItem = it.value();
+        if (clusterItem) {
+            QModelIndex index = indexFromItem(clusterItem);
+            emit dataChanged(index, index, {Qt::DecorationRole});
+        }
+    }
+}

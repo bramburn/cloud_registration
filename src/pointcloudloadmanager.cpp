@@ -411,7 +411,7 @@ bool PointCloudLoadManager::loadScanData(const QString &scanId)
 
     // Create or update scan state
     if (!m_scanStates.contains(scanId)) {
-        m_scanStates[scanId] = std::make_unique<ScanLoadState>(scanId);
+        m_scanStates[scanId] = std::make_shared<ScanLoadState>(scanId);
     }
 
     auto &scanState = m_scanStates[scanId];
@@ -612,7 +612,7 @@ void PointCloudLoadManager::updateScanState(const QString &scanId, LoadedState s
 {
     // Update internal state
     if (!m_scanStates.contains(scanId)) {
-        m_scanStates[scanId] = std::make_unique<ScanLoadState>(scanId);
+        m_scanStates[scanId] = std::make_shared<ScanLoadState>(scanId);
     }
 
     auto &scanState = m_scanStates[scanId];
@@ -826,6 +826,7 @@ size_t PointCloudLoadManager::getClusterMemoryUsage(const QString &clusterId) co
 // Sprint 1.3: E57-specific loading implementation (simplified for now)
 void PointCloudLoadManager::loadE57Scan(const QString& filePath, const QString& scanGuid)
 {
+    Q_UNUSED(filePath)
     qDebug() << "PointCloudLoadManager: E57 scan loading not yet implemented" << scanGuid;
     emit loadingStarted(QString("E57 loading not implemented: %1").arg(scanGuid));
     emit pointCloudViewFailed("E57 loading not yet implemented in this build");
@@ -859,7 +860,7 @@ void PointCloudLoadManager::onPreprocessScanRequested(const QString &scanId)
     updateScanState(scanId, LoadedState::Processing);
 
     // Perform preprocessing in a separate thread
-    QtConcurrent::run([this, scanId]() {
+    (void)QtConcurrent::run([this, scanId]() {
         bool success = preprocessScan(scanId);
 
         if (success) {
@@ -884,7 +885,7 @@ void PointCloudLoadManager::onOptimizeScanRequested(const QString &scanId)
     updateScanState(scanId, LoadedState::Processing);
 
     // Perform optimization in a separate thread
-    QtConcurrent::run([this, scanId]() {
+    (void)QtConcurrent::run([this, scanId]() {
         bool success = optimizeScanForRegistration(scanId);
 
         if (success) {
@@ -904,7 +905,7 @@ void PointCloudLoadManager::onBatchOperationRequested(const QString &operation, 
     }
 
     // Perform batch operation in a separate thread
-    QtConcurrent::run([this, operation, scanIds]() {
+    (void)QtConcurrent::run([this, operation, scanIds]() {
         batchProcessScans(operation, scanIds);
     });
 }
@@ -912,7 +913,7 @@ void PointCloudLoadManager::onBatchOperationRequested(const QString &operation, 
 void PointCloudLoadManager::onMemoryOptimizationRequested()
 {
     // Perform memory optimization in a separate thread
-    QtConcurrent::run([this]() {
+    (void)QtConcurrent::run([this]() {
         optimizeMemoryUsage();
     });
 }

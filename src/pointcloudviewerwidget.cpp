@@ -73,6 +73,13 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     connect(m_loadingTimer, &QTimer::timeout,
             this, &PointCloudViewerWidget::updateLoadingAnimation);
 
+    // Sprint 2.2: Setup performance statistics timer
+    m_statsTimer = new QTimer(this);
+    m_statsTimer->setInterval(1000); // Update stats every second
+    connect(m_statsTimer, &QTimer::timeout,
+            this, &PointCloudViewerWidget::emitPerformanceStats);
+    m_statsTimer->start();
+
     // Setup fonts for overlay text
     m_overlayFont.setFamily("Arial");
     m_overlayFont.setPointSize(16);
@@ -1648,4 +1655,21 @@ void PointCloudViewerWidget::setPointSizeAttenuationParams(float minSize, float 
     qDebug() << "Point size attenuation params - Min:" << minSize
              << "Max:" << maxSize << "Factor:" << factor;
     update();
+}
+
+// Sprint 2.2: Performance statistics emission
+void PointCloudViewerWidget::emitPerformanceStats()
+{
+    // Calculate visible points based on current rendering mode
+    int visiblePoints = 0;
+    if (m_hasData) {
+        if (m_lodEnabled && !m_visiblePoints.empty()) {
+            visiblePoints = static_cast<int>(m_visiblePoints.size());
+        } else {
+            visiblePoints = m_pointCount;
+        }
+    }
+
+    // Emit performance statistics signal
+    emit statsUpdated(m_fps, visiblePoints);
 }
