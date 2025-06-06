@@ -123,6 +123,11 @@ set(SOURCES
     src/voxelgridfilter.cpp
     src/performance_profiler.cpp
     src/performance_benchmark.cpp
+    # Sprint 1.1: E57 Header Parsing
+    src/e57_parser/E57HeaderParser.cpp
+    # Sprint 1.2: E57 Data Integrity and XML Parsing
+    src/e57_parser/E57BinaryReader.cpp
+    src/e57_parser/E57XmlParser.cpp
     # Sprint 1.2: Scan Import & SQLite Database Setup
     src/sqlitemanager.cpp
     src/scanimportmanager.cpp
@@ -164,6 +169,11 @@ set(HEADERS
     src/voxelgridfilter.h
     src/performance_profiler.h
     src/performance_benchmark.h
+    # Sprint 1.1: E57 Header Parsing
+    src/e57_parser/E57HeaderParser.h
+    # Sprint 1.2: E57 Data Integrity and XML Parsing
+    src/e57_parser/E57BinaryReader.h
+    src/e57_parser/E57XmlParser.h
     # Sprint 1.2: Scan Import & SQLite Database Setup
     src/sqlitemanager.h
     src/scanimportmanager.h
@@ -268,6 +278,71 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserTests PRIVATE src)
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
+
+    # Sprint 1.2: E57BinaryReader Tests
+    add_executable(E57BinaryReaderTests
+        tests/e57_parser/TestE57BinaryReader.cpp
+        src/e57_parser/E57BinaryReader.cpp
+    )
+
+    target_link_libraries(E57BinaryReaderTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+    )
+
+    target_include_directories(E57BinaryReaderTests PRIVATE src)
+    add_test(NAME E57BinaryReaderTests COMMAND E57BinaryReaderTests)
+
+    # Sprint 1.2: E57XmlParser Tests
+    add_executable(E57XmlParserTests
+        tests/e57_parser/TestE57XmlParser.cpp
+        src/e57_parser/E57XmlParser.cpp
+        src/e57_parser/E57BinaryReader.cpp
+    )
+
+    target_link_libraries(E57XmlParserTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(E57XmlParserTests PRIVATE src)
+    add_test(NAME E57XmlParserTests COMMAND E57XmlParserTests)
+
+    # Sprint 1.2: Complete Integration Tests
+    add_executable(Sprint12CompleteTests
+        tests/test_sprint1_2_complete.cpp
+        src/e57_parser/E57HeaderParser.cpp
+        src/e57_parser/E57BinaryReader.cpp
+        src/e57_parser/E57XmlParser.cpp
+    )
+
+    target_link_libraries(Sprint12CompleteTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(Sprint12CompleteTests PRIVATE src)
+    add_test(NAME Sprint12CompleteTests COMMAND Sprint12CompleteTests)
+
+    # Sprint 1.2: Demo Program
+    add_executable(Sprint12Demo
+        tests/demos/test_sprint1_2_demo.cpp
+        src/e57_parser/E57HeaderParser.cpp
+        src/e57_parser/E57BinaryReader.cpp
+        src/e57_parser/E57XmlParser.cpp
+    )
+
+    target_link_libraries(Sprint12Demo
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(Sprint12Demo PRIVATE src)
 
     # E57ParserLib Tests (Sprint 1)
     add_executable(E57ParserLibTests
@@ -519,6 +594,43 @@ if(TARGET GTest::gtest_main)
     )
 
     target_include_directories(LibE57LinkageTest PRIVATE src)
+
+    # Sprint 1.1: E57 Header Parser Tests
+    add_executable(E57HeaderParserTests
+        tests/e57_parser/TestE57HeaderParser.cpp
+        src/e57_parser/E57HeaderParser.cpp
+    )
+
+    target_link_libraries(E57HeaderParserTests
+        GTest::gtest_main
+    )
+
+    target_include_directories(E57HeaderParserTests PRIVATE src)
+    add_test(NAME E57HeaderParserTests COMMAND E57HeaderParserTests)
+
+    # Sprint 1.1: E57 Header Parser Simple Tests
+    add_executable(E57HeaderParserSimpleTests
+        tests/e57_parser/TestE57HeaderParserSimple.cpp
+        src/e57_parser/E57HeaderParser.cpp
+    )
+
+    target_link_libraries(E57HeaderParserSimpleTests
+        GTest::gtest_main
+    )
+
+    target_include_directories(E57HeaderParserSimpleTests PRIVATE src)
+    add_test(NAME E57HeaderParserSimpleTests COMMAND E57HeaderParserSimpleTests)
+
+    # Sprint 1.1: Enhanced libE57Format Linkage Test
+    add_executable(LibE57LinkageTestEnhanced
+        tests/linkage_tests/TestLibE57Linkage.cpp
+    )
+
+    target_link_libraries(LibE57LinkageTestEnhanced
+        E57Format
+    )
+
+    target_include_directories(LibE57LinkageTestEnhanced PRIVATE src)
 
     # Sprint 1 Manual Verification Test
     add_executable(Sprint1VerificationTest
@@ -906,9 +1018,16 @@ if(TARGET GTest::gtest_main)
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
-        COMMENT "Running all unit tests including Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57HeaderParserTests E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
+        COMMENT "Running all unit tests including Sprint 1.1 E57 header parsing, Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
+
+# Sprint 1.1: E57 Header Parser testing targets
+add_custom_target(run_sprint11_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57HeaderParser.*"
+        DEPENDS E57HeaderParserTests
+        COMMENT "Running Sprint 1.1 E57 header parser tests"
+    )
 
 # Sprint 1: E57ParserLib testing targets
 add_custom_target(run_sprint1_tests

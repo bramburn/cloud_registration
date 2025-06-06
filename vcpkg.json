@@ -4,6 +4,10 @@
   "dependencies": [
     "libe57format",
     "xerces-c",
-    "gtest"
+    "gtest",
+    "vulkan-headers",
+    "vulkan-loader",
+    "vulkan-utility-libraries",
+    "vulkan-validationlayers"
   ]
 }
