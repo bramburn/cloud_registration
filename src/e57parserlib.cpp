@@ -10,7 +10,7 @@
 #include <random>
 
 E57ParserLib::E57ParserLib(QObject *parent)
-    : QObject(parent), m_imageFile(nullptr), m_totalScans(0)
+    : IE57Parser(parent), m_imageFile(nullptr), m_totalScans(0)
 {
     setupForThreading();
 }
@@ -313,20 +313,17 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
         emit progressUpdated(10, "Accessing scan data...");
 
         // Task 2.1.1: Access the first Data3D StructureNode
-        e57::StructureNode scanHeaderNode;
-        {
-            PROFILE_SECTION("E57::AccessScanData");
-            e57::StructureNode rootNode = m_imageFile->root();
-            e57::VectorNode data3DVectorNode = static_cast<e57::VectorNode>(rootNode.get("/data3D"));
+        PROFILE_SECTION("E57::AccessScanData");
+        e57::StructureNode rootNode = m_imageFile->root();
+        e57::VectorNode data3DVectorNode = static_cast<e57::VectorNode>(rootNode.get("/data3D"));
 
-            if (data3DVectorNode.childCount() <= scanIndex) {
-                setError("Scan index out of range");
-                emit parsingFinished(false, getLastError(), std::vector<float>());
-                return std::vector<float>();
-            }
-
-            scanHeaderNode = static_cast<e57::StructureNode>(data3DVectorNode.get(scanIndex));
+        if (data3DVectorNode.childCount() <= scanIndex) {
+            setError("Scan index out of range");
+            emit parsingFinished(false, getLastError(), std::vector<float>());
+            return std::vector<float>();
         }
+
+        e57::StructureNode scanHeaderNode = static_cast<e57::StructureNode>(data3DVectorNode.get(scanIndex));
 
         emit progressUpdated(20, "Inspecting point prototype...");
 

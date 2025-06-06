@@ -27,12 +27,18 @@ class IE57Parser : public QObject {
 public:
     // Point data structure for enhanced parsing
     struct PointData {
-        double x, y, z;
+        double x = 0.0, y = 0.0, z = 0.0;
         float intensity = 0.0f;
-        uint8_t r = 255, g = 255, b = 255;
+        uint8_t r = 0, g = 0, b = 0;
         bool hasIntensity = false;
         bool hasColor = false;
         bool isValid = true;
+
+        // Default constructor
+        PointData() = default;
+
+        // Constructor with XYZ coordinates
+        PointData(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
     };
 
     // Loading settings structure

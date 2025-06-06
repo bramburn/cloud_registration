@@ -97,6 +97,11 @@ find_package(E57Format CONFIG REQUIRED)
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
 
+# Fix Windows macro conflicts
+if(WIN32)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 # Enable Qt's MOC (Meta-Object Compiler)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -121,6 +126,7 @@ set(SOURCES
     src/project.cpp
     src/pointcloudviewerwidget.cpp
     src/e57parserlib.cpp
+    src/IE57Parser.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
@@ -138,6 +144,7 @@ set(HEADERS
     src/project.h
     src/pointcloudviewerwidget.h
     src/e57parserlib.h
+    src/IE57Parser.h
     src/lasparser.h
     src/loadingsettingsdialog.h
     src/loadingsettings.h
@@ -212,6 +219,7 @@ if(TARGET GTest::gtest_main)
     add_executable(E57ParserTests
         tests/test_e57parser.cpp
         src/e57parserlib.cpp
+        src/IE57Parser.cpp
         src/performance_profiler.cpp
     )
 
@@ -225,6 +233,11 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserTests PRIVATE src)
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
+
+
+
+
+
 
     # LAS Parser Tests
     add_executable(LasParserTests
