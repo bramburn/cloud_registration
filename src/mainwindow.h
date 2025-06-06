@@ -17,7 +17,7 @@ class SidebarWidget;
 class PointCloudViewerWidget;
 class PointCloudLoadManager;
 class Project;
-class E57ParserLib;
+class IE57Parser;
 class LasParser;
 class ScanImportDialog;
 class SQLiteManager;
@@ -33,6 +33,7 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(IE57Parser* e57Parser, QWidget *parent = nullptr);
     ~MainWindow();
 
 private slots:
@@ -159,6 +160,9 @@ private:
     QObject *m_workerParser = nullptr;  // Generic pointer for any parser type
     QString m_currentFilePath;
     bool m_isLoading;
+
+    // Sprint 1 Decoupling: Injected E57 parser interface
+    IE57Parser *m_e57Parser = nullptr;
 
     // E57-specific data storage
     int m_currentScanCount = 0;
