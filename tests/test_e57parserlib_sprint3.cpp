@@ -56,7 +56,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractIntensityScaledInteger) {
 // Test Case 3.1.2: Parse E57 file where intensity is FloatNode
 TEST_F(E57ParserLibSprint3Test, ExtractIntensityFloat) {
     // Test the PointData structure
-    E57ParserLib::PointData point(1.0f, 2.0f, 3.0f);
+    IE57Parser::PointData point(1.0f, 2.0f, 3.0f);
 
     EXPECT_FLOAT_EQ(point.x, 1.0f);
     EXPECT_FLOAT_EQ(point.y, 2.0f);
@@ -72,7 +72,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractIntensityFloat) {
 // Test Case 3.1.3: Parse E57 file without intensity field
 TEST_F(E57ParserLibSprint3Test, NoIntensityField) {
     // Test default PointData construction
-    E57ParserLib::PointData point;
+    IE57Parser::PointData point;
     
     EXPECT_FLOAT_EQ(point.x, 0.0f);
     EXPECT_FLOAT_EQ(point.y, 0.0f);
@@ -96,7 +96,7 @@ TEST_F(E57ParserLibSprint3Test, IntensityLimitsMinEqualsMax) {
 // Test Case 3.2.1: Parse E57 file with 8-bit RGB color (IntegerNode 0-255)
 TEST_F(E57ParserLibSprint3Test, ExtractColor8Bit) {
     // Test PointData color functionality
-    E57ParserLib::PointData point;
+    IE57Parser::PointData point;
     point.r = 255;
     point.g = 128;
     point.b = 64;
@@ -111,7 +111,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractColor8Bit) {
 // Test Case 3.2.2: Parse E57 file with 16-bit RGB color (ScaledIntegerNode)
 TEST_F(E57ParserLibSprint3Test, ExtractColor16Bit) {
     // Test that color values are properly constrained to uint8_t range
-    E57ParserLib::PointData point;
+    IE57Parser::PointData point;
     point.r = 255;  // Max value
     point.g = 0;    // Min value
     point.b = 127;  // Mid value
@@ -124,7 +124,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractColor16Bit) {
 
 // Test Case 3.2.3: Parse E57 file without color information
 TEST_F(E57ParserLibSprint3Test, NoColorFields) {
-    E57ParserLib::PointData point;
+    IE57Parser::PointData point;
     
     EXPECT_FALSE(point.hasColor);
     EXPECT_EQ(point.r, 0);
@@ -135,7 +135,7 @@ TEST_F(E57ParserLibSprint3Test, NoColorFields) {
 // Test Case 3.3.1: Parse E57 file containing XYZ, Intensity, and RGB Color
 TEST_F(E57ParserLibSprint3Test, ExtractAllAttributes) {
     // Test complete PointData with all attributes
-    E57ParserLib::PointData point(10.5f, 20.3f, 30.1f);
+    IE57Parser::PointData point(10.5f, 20.3f, 30.1f);
     point.intensity = 0.75f;
     point.hasIntensity = true;
     point.r = 200;
@@ -156,7 +156,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractAllAttributes) {
 
 // Test Case 3.3.2: Parse E57 file with only XYZ and Intensity (no color)
 TEST_F(E57ParserLibSprint3Test, ExtractXYZAndIntensity) {
-    E57ParserLib::PointData point(1.0f, 2.0f, 3.0f);
+    IE57Parser::PointData point(1.0f, 2.0f, 3.0f);
     point.intensity = 0.5f;
     point.hasIntensity = true;
     // Color should remain default
@@ -171,7 +171,7 @@ TEST_F(E57ParserLibSprint3Test, ExtractXYZAndIntensity) {
 
 // Test Case 3.3.3: Parse E57 file with only XYZ and Color (no intensity)
 TEST_F(E57ParserLibSprint3Test, ExtractXYZAndColor) {
-    E57ParserLib::PointData point(1.0f, 2.0f, 3.0f);
+    IE57Parser::PointData point(1.0f, 2.0f, 3.0f);
     point.r = 255;
     point.g = 255;
     point.b = 255;
@@ -224,12 +224,12 @@ TEST_F(E57ParserLibSprint3Test, PerformanceConsiderations) {
     // This test verifies that the API can handle the expected data structures
     // In a real scenario, this would test with large E57 files
     
-    std::vector<E57ParserLib::PointData> largePointSet;
+    std::vector<IE57Parser::PointData> largePointSet;
     largePointSet.reserve(1000000); // Reserve space for 1M points
     
     // Simulate adding points
     for (int i = 0; i < 1000; ++i) {
-        E57ParserLib::PointData point(
+        IE57Parser::PointData point(
             static_cast<float>(i), 
             static_cast<float>(i * 2), 
             static_cast<float>(i * 3)

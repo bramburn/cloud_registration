@@ -97,6 +97,11 @@ find_package(E57Format CONFIG REQUIRED)
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
 
+# Fix Windows macro conflicts
+if(WIN32)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 # Enable Qt's MOC (Meta-Object Compiler)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -121,6 +126,7 @@ set(SOURCES
     src/project.cpp
     src/pointcloudviewerwidget.cpp
     src/e57parserlib.cpp
+    src/IE57Parser.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
@@ -167,6 +173,7 @@ set(HEADERS
     src/project.h
     src/pointcloudviewerwidget.h
     src/e57parserlib.h
+    src/IE57Parser.h
     src/lasparser.h
     src/loadingsettingsdialog.h
     src/loadingsettings.h
@@ -278,6 +285,7 @@ if(TARGET GTest::gtest_main)
     add_executable(E57ParserTests
         tests/test_e57parser.cpp
         src/e57parserlib.cpp
+        src/IE57Parser.cpp
         src/performance_profiler.cpp
     )
 
@@ -361,6 +369,8 @@ if(TARGET GTest::gtest_main)
     add_executable(E57ParserLibTests
         tests/test_e57parserlib.cpp
         src/e57parserlib.cpp
+        src/IE57Parser.cpp
+        src/performance_profiler.cpp
     )
 
     target_link_libraries(E57ParserLibTests
@@ -377,6 +387,35 @@ if(TARGET GTest::gtest_main)
     add_executable(E57ParserDecouplingTests
         tests/test_decoupling_e57parser.cpp
         src/e57parserlib.cpp
+        src/IE57Parser.cpp
+        src/performance_profiler.cpp
+        src/mainwindow.cpp
+        src/projecthubwidget.cpp
+        src/createprojectdialog.cpp
+        src/projectmanager.cpp
+        src/recentprojectsmanager.cpp
+        src/sidebarwidget.cpp
+        src/project.cpp
+        src/pointcloudviewerwidget.cpp
+        src/lasparser.cpp
+        src/loadingsettingsdialog.cpp
+        src/voxelgridfilter.cpp
+        src/performance_benchmark.cpp
+        src/sqlitemanager.cpp
+        src/scanimportmanager.cpp
+        src/scanimportdialog.cpp
+        src/projecttreemodel.cpp
+        src/pointcloudloadmanager.cpp
+        src/e57writer_lib.cpp
+        src/confirmationdialog.cpp
+        src/errordialog.cpp
+        src/relinkfiledialog.cpp
+        src/iconmanager.cpp
+        src/progressmanager.cpp
+        src/octree.cpp
+        src/screenspaceerror.cpp
+        src/E57DataManager.cpp
+        ${RESOURCES}
     )
 
     target_link_libraries(E57ParserDecouplingTests
@@ -384,6 +423,11 @@ if(TARGET GTest::gtest_main)
         E57Format
         Qt6::Core
         Qt6::Widgets
+        Qt6::Gui
+        Qt6::OpenGLWidgets
+        Qt6::Xml
+        Qt6::Sql
+        Qt6::Concurrent
         Qt6::Test
     )
 
@@ -426,6 +470,8 @@ if(TARGET GTest::gtest_main)
     add_executable(E57ParserLibSprint3Tests
         tests/test_e57parserlib_sprint3.cpp
         src/e57parserlib.cpp
+        src/IE57Parser.cpp
+        src/performance_profiler.cpp
     )
 
     target_link_libraries(E57ParserLibSprint3Tests
@@ -488,6 +534,7 @@ if(TARGET GTest::gtest_main)
 
     target_link_libraries(E57WriterDebugTest
         Qt6::Core
+        Qt6::Gui
         E57Format
     )
 
@@ -501,6 +548,7 @@ if(TARGET GTest::gtest_main)
 
     target_link_libraries(E57WriterSimpleTest
         Qt6::Core
+        Qt6::Gui
         E57Format
     )
 

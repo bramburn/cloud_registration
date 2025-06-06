@@ -119,6 +119,7 @@ private:
     size_t getCurrentMemoryUsage();
     void updateStatistics(const std::vector<TestResult>& results);
     QString generateDetailedReport(const std::vector<TestResult>& results);
+    QString determineTestCategory(const TestFileMetadata& metadata);
     
     // Test categories
     bool isVendorSpecificTest(const TestFileMetadata& metadata);

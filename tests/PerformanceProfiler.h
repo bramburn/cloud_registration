@@ -94,6 +94,12 @@ public:
     void setBaselineMemory(size_t baseline) { m_baselineMemory = baseline; }
     void setVerboseLogging(bool verbose) { m_verboseLogging = verbose; }
 
+    // Memory monitoring (public for MemoryMonitor access)
+    size_t getCurrentMemoryUsage();
+    void startMemoryMonitoring();
+    void stopMemoryMonitoring();
+    size_t getPeakMemoryUsage();
+
 signals:
     void profilingProgress(const QString& stage, int percentage);
     void benchmarkCompleted(const PerformanceMetrics& metrics);
@@ -107,15 +113,9 @@ private:
     bool m_verboseLogging = false;
     
     // Performance measurement helpers
-    size_t getCurrentMemoryUsage();
     double measureXMLParsingTime(const QString& filePath);
     double measureBinaryReadTime(const QString& filePath, const OptimizationSettings& settings);
     double measureDataConversionTime(const std::vector<float>& points);
-    
-    // Memory monitoring
-    void startMemoryMonitoring();
-    void stopMemoryMonitoring();
-    size_t getPeakMemoryUsage();
     
     // Analysis helpers
     double calculatePointsPerSecond(int64_t pointCount, double timeSeconds);

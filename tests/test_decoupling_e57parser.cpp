@@ -220,10 +220,10 @@ TEST_F(E57ParserDecouplingTest, MockParserSignalEmission) {
     QSignalSpy finishedSpy(mockParser, &IE57Parser::parsingFinished);
     
     mockParser->startParsing("test_file.e57");
-    
+
     // Wait for signals to be emitted
-    QTest::qWait(300);
-    
+    EXPECT_TRUE(finishedSpy.wait(1000)); // Wait up to 1 second for finished signal
+
     // Verify progress signals
     EXPECT_GE(progressSpy.count(), 1);
     
@@ -250,9 +250,9 @@ TEST_F(E57ParserDecouplingTest, MockParserErrorHandling) {
     
     QSignalSpy finishedSpy(mockParser, &IE57Parser::parsingFinished);
     mockParser->startParsing("invalid_file.e57");
-    
-    QTest::qWait(300);
-    
+
+    EXPECT_TRUE(finishedSpy.wait(1000)); // Wait up to 1 second for finished signal
+
     EXPECT_EQ(finishedSpy.count(), 1);
     if (finishedSpy.count() > 0) {
         QList<QVariant> arguments = finishedSpy.at(0);
