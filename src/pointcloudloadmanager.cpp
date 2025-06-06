@@ -4,6 +4,7 @@
 #include "projectmanager.h"
 #include "lasparser.h"
 #include "e57parserlib.h"
+#include "E57DataManager.h"
 #include "loadingsettings.h"
 #include <QDebug>
 #include <QFileInfo>
@@ -462,10 +463,43 @@ std::unique_ptr<PointCloudData> PointCloudLoadManager::parsePointCloudFile(const
             data->pointCount = data->points.size() / 3; // Assuming XYZ format
 
         } else if (extension == "e57") {
-            // Use E57 parser
-            E57ParserLib parser;
-            data->points = parser.parse(filePath);
-            data->pointCount = data->points.size() / 3; // Assuming XYZ format
+            // Use E57DataManager for enhanced E57 support
+            E57DataManager e57Manager;
+
+            // Import all scans from the E57 file
+            QVector<QVector<PointData>> scans = e57Manager.importE57File(filePath);
+
+            if (scans.isEmpty()) {
+                qDebug() << "No scans found in E57 file:" << filePath;
+                return nullptr;
+            }
+
+            // For now, combine all scans into a single point cloud
+            // In the future, this could be enhanced to handle multiple scans separately
+            std::vector<float> combinedPoints;
+            size_t totalPoints = 0;
+
+            // Calculate total points for efficient allocation
+            for (const auto& scan : scans) {
+                totalPoints += scan.size();
+            }
+
+            combinedPoints.reserve(totalPoints * 3); // XYZ per point
+
+            // Combine all scans into a single point cloud
+            for (const auto& scan : scans) {
+                for (const auto& point : scan) {
+                    combinedPoints.push_back(static_cast<float>(point.x));
+                    combinedPoints.push_back(static_cast<float>(point.y));
+                    combinedPoints.push_back(static_cast<float>(point.z));
+                }
+            }
+
+            data->points = combinedPoints;
+            data->pointCount = combinedPoints.size() / 3;
+
+            qDebug() << "E57DataManager: Combined" << scans.size() << "scans into"
+                     << data->pointCount << "points";
 
         } else {
             qDebug() << "Unsupported file format:" << extension;

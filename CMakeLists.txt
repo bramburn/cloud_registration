@@ -149,6 +149,8 @@ set(SOURCES
     src/octree.cpp
     # Sprint R2: Screen-Space Error LOD Enhancements
     src/screenspaceerror.cpp
+    # Ad-hoc Sprint A1: E57DataManager
+    src/E57DataManager.cpp
 )
 
 # Header files
@@ -195,6 +197,8 @@ set(HEADERS
     src/octree.h
     # Sprint R2: Screen-Space Error LOD Enhancements
     src/screenspaceerror.h
+    # Ad-hoc Sprint A1: E57DataManager
+    src/E57DataManager.h
 )
 
 # Shader files
@@ -474,6 +478,35 @@ if(TARGET GTest::gtest_main)
     )
 
     target_include_directories(E57WriterSimpleTest PRIVATE src)
+
+    # Ad-hoc Sprint A1: E57DataManager Tests
+    add_executable(E57DataManagerTests
+        tests/TestE57DataManager.cpp
+        src/E57DataManager.cpp
+    )
+
+    target_link_libraries(E57DataManagerTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(E57DataManagerTests PRIVATE src)
+    add_test(NAME E57DataManagerTests COMMAND E57DataManagerTests)
+
+    # Ad-hoc Sprint A1: E57DataManager Demo
+    add_executable(E57DataManagerDemo
+        test_e57_demo.cpp
+        src/E57DataManager.cpp
+    )
+
+    target_link_libraries(E57DataManagerDemo
+        Qt6::Core
+        E57Format
+    )
+
+    target_include_directories(E57DataManagerDemo PRIVATE src)
 
     # E57 Minimal Test (for debugging libE57Format issues)
     add_executable(E57MinimalTest
