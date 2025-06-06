@@ -13,7 +13,7 @@
 #include <vector>
 #include "mainwindow.h"
 #include "e57parserlib.h"
-#include "e57writer_lib.h"
+
 
 // Enable logging
 Q_LOGGING_CATEGORY(appLog, "CloudRegistration")
@@ -126,15 +126,10 @@ int main(int argc, char *argv[])
         QSurfaceFormat::setDefaultFormat(format);
         qDebug() << "OpenGL format configured successfully";
 
-        // Sprint 1 Decoupling: Create E57 parser and inject into main window
+        // Create E57 parser and inject into main window
         qDebug() << "Creating E57 parser...";
         E57ParserLib* e57Parser = new E57ParserLib();
         qDebug() << "E57 parser created";
-
-        // Sprint 2 Decoupling: Create E57 writer (for future use)
-        qDebug() << "Creating E57 writer...";
-        E57WriterLib* e57Writer = new E57WriterLib();
-        qDebug() << "E57 writer created";
 
         // Create and show main window with dependency injection
         qDebug() << "Creating main window with injected E57 parser...";
@@ -142,9 +137,6 @@ int main(int argc, char *argv[])
         qDebug() << "Main window created, showing...";
         window.show();
         qDebug() << "Main window shown successfully";
-
-        // Note: E57Writer is created but not currently injected into MainWindow
-        // This is prepared for future sprints that may require E57 export functionality
 
         qDebug() << "Starting application event loop...";
         int result = app.exec();
