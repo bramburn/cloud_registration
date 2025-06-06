@@ -414,6 +414,7 @@ if(TARGET GTest::gtest_main)
     target_link_libraries(E57ParserLibSprint3Tests
         GTest::gtest_main
         Qt6::Core
+        Qt6::Test
         E57Format
     )
 
@@ -632,6 +633,7 @@ if(TARGET GTest::gtest_main)
     )
 
     target_link_libraries(LibE57LinkageTest
+        Qt6::Core
         E57Format
     )
 
@@ -681,6 +683,7 @@ if(TARGET GTest::gtest_main)
     )
 
     target_link_libraries(Sprint1VerificationTest
+        Qt6::Core
         E57Format
     )
 

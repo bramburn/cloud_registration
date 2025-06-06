@@ -42,15 +42,15 @@ TEST_F(E57ParserLibTest, OpenValidFile) {
         
         EXPECT_TRUE(parser.openFile(validFile));
         EXPECT_TRUE(parser.isOpen());
-        EXPECT_TRUE(parser.getLastError().empty());
-        
+        EXPECT_TRUE(parser.getLastError().isEmpty());
+
         // Test that we can get basic metadata
         auto version = parser.getVersion();
         EXPECT_GT(version.first, 0); // Major version should be > 0
-        
+
         // Scan count should be >= 0
         EXPECT_GE(parser.getScanCount(), 0);
-        
+
         parser.closeFile();
         EXPECT_FALSE(parser.isOpen());
     } else {
@@ -62,37 +62,37 @@ TEST_F(E57ParserLibTest, OpenValidFile) {
 TEST_F(E57ParserLibTest, OpenNonExistentFile) {
     EXPECT_FALSE(parser.openFile(nonExistentFile));
     EXPECT_FALSE(parser.isOpen());
-    EXPECT_FALSE(parser.getLastError().empty());
+    EXPECT_FALSE(parser.getLastError().isEmpty());
 
     // Error message should indicate some kind of error (E57 exception is expected)
-    std::string error = parser.getLastError();
-    std::cout << "Error message: " << error << std::endl; // Debug output
-    EXPECT_TRUE(error.find("E57") != std::string::npos ||
-                error.find("exception") != std::string::npos ||
-                error.find("file") != std::string::npos ||
-                error.find("open") != std::string::npos ||
-                error.find("exist") != std::string::npos);
+    QString error = parser.getLastError();
+    std::cout << "Error message: " << error.toStdString() << std::endl; // Debug output
+    EXPECT_TRUE(error.contains("E57") ||
+                error.contains("exception") ||
+                error.contains("file") ||
+                error.contains("open") ||
+                error.contains("exist"));
 }
 
 // Test Case 1.2.3: Test opening a corrupted or non-E57 file
 TEST_F(E57ParserLibTest, OpenInvalidFile) {
     EXPECT_FALSE(parser.openFile(invalidFile));
     EXPECT_FALSE(parser.isOpen());
-    EXPECT_FALSE(parser.getLastError().empty());
-    
+    EXPECT_FALSE(parser.getLastError().isEmpty());
+
     // Error message should indicate invalid E57 format or parsing error
-    std::string error = parser.getLastError();
-    EXPECT_TRUE(error.find("E57") != std::string::npos || 
-                error.find("format") != std::string::npos ||
-                error.find("invalid") != std::string::npos ||
-                error.find("parse") != std::string::npos);
+    QString error = parser.getLastError();
+    EXPECT_TRUE(error.contains("E57") ||
+                error.contains("format") ||
+                error.contains("invalid") ||
+                error.contains("parse"));
 }
 
 // Test metadata extraction with closed file
 TEST_F(E57ParserLibTest, MetadataWithClosedFile) {
     // Ensure file is closed
     parser.closeFile();
-    
+
     EXPECT_EQ(parser.getGuid(), "");
     EXPECT_EQ(parser.getVersion(), std::make_pair(0, 0));
     EXPECT_EQ(parser.getScanCount(), 0);
@@ -104,11 +104,11 @@ TEST_F(E57ParserLibTest, ResourceManagement) {
     // Test multiple open/close cycles
     for (int i = 0; i < 3; ++i) {
         EXPECT_FALSE(parser.isOpen());
-        
+
         // Try to open invalid file
         parser.openFile(invalidFile);
         EXPECT_FALSE(parser.isOpen());
-        
+
         // Close should be safe even if file wasn't opened
         parser.closeFile();
         EXPECT_FALSE(parser.isOpen());
@@ -118,12 +118,12 @@ TEST_F(E57ParserLibTest, ResourceManagement) {
 // Test error state management
 TEST_F(E57ParserLibTest, ErrorStateManagement) {
     // Initially no error
-    EXPECT_TRUE(parser.getLastError().empty());
-    
+    EXPECT_TRUE(parser.getLastError().isEmpty());
+
     // After failed open, should have error
     parser.openFile(nonExistentFile);
-    EXPECT_FALSE(parser.getLastError().empty());
-    
+    EXPECT_FALSE(parser.getLastError().isEmpty());
+
     // After successful operation, error should be cleared
     // (We'll test this if we have a valid file)
     std::ifstream file(validFile);
@@ -144,9 +144,9 @@ TEST_F(E57ParserLibTest, ConstructorDestructor) {
     {
         E57ParserLib tempParser;
         EXPECT_FALSE(tempParser.isOpen());
-        EXPECT_TRUE(tempParser.getLastError().empty());
+        EXPECT_TRUE(tempParser.getLastError().isEmpty());
     } // tempParser should be destroyed cleanly here
-    
+
     // Original parser should still work
     EXPECT_FALSE(parser.isOpen());
 }
@@ -198,8 +198,8 @@ TEST_F(E57ParserLibTest, ExtractPointDataClosedFile) {
 
     // Should return empty vector and set error
     EXPECT_TRUE(points.empty());
-    EXPECT_FALSE(parser.getLastError().empty());
-    EXPECT_TRUE(parser.getLastError().find("No E57 file is open") != std::string::npos);
+    EXPECT_FALSE(parser.getLastError().isEmpty());
+    EXPECT_TRUE(parser.getLastError().contains("No E57 file is open"));
 }
 
 // Test Case 2.1.3: Test invalid scan index
@@ -216,8 +216,8 @@ TEST_F(E57ParserLibTest, ExtractPointDataInvalidScanIndex) {
         std::vector<float> points = parser.extractPointData(scanCount + 10);
 
         EXPECT_TRUE(points.empty());
-        EXPECT_FALSE(parser.getLastError().empty());
-        EXPECT_TRUE(parser.getLastError().find("Invalid scan index") != std::string::npos);
+        EXPECT_FALSE(parser.getLastError().isEmpty());
+        EXPECT_TRUE(parser.getLastError().contains("Invalid scan index"));
 
         parser.closeFile();
     } else {

@@ -1,4 +1,5 @@
 #include "e57parserlib.h"
+#include "performance_profiler.h"  // Sprint 2.2: Performance profiling
 #include <E57Format/E57Format.h>
 #include <sstream>
 #include <QString>
@@ -291,6 +292,8 @@ std::vector<float> E57ParserLib::extractPointData() {
 }
 
 std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
+    PROFILE_FUNCTION(); // Sprint 2.2: Performance profiling
+
     try {
         clearError();
         m_points.clear();
@@ -310,31 +313,41 @@ std::vector<float> E57ParserLib::extractPointData(int scanIndex) {
         emit progressUpdated(10, "Accessing scan data...");
 
         // Task 2.1.1: Access the first Data3D StructureNode
-        e57::StructureNode rootNode = m_imageFile->root();
-        e57::VectorNode data3DVectorNode = static_cast<e57::VectorNode>(rootNode.get("/data3D"));
+        e57::StructureNode scanHeaderNode;
+        {
+            PROFILE_SECTION("E57::AccessScanData");
+            e57::StructureNode rootNode = m_imageFile->root();
+            e57::VectorNode data3DVectorNode = static_cast<e57::VectorNode>(rootNode.get("/data3D"));
 
-        if (data3DVectorNode.childCount() <= scanIndex) {
-            setError("Scan index out of range");
-            emit parsingFinished(false, getLastError(), std::vector<float>());
-            return std::vector<float>();
+            if (data3DVectorNode.childCount() <= scanIndex) {
+                setError("Scan index out of range");
+                emit parsingFinished(false, getLastError(), std::vector<float>());
+                return std::vector<float>();
+            }
+
+            scanHeaderNode = static_cast<e57::StructureNode>(data3DVectorNode.get(scanIndex));
         }
-
-        e57::StructureNode scanHeaderNode = static_cast<e57::StructureNode>(data3DVectorNode.get(scanIndex));
 
         emit progressUpdated(20, "Inspecting point prototype...");
 
         // Task 2.1.2 & 2.1.3: Inspect the point prototype
-        if (!inspectPointPrototype(scanHeaderNode)) {
-            emit parsingFinished(false, getLastError(), std::vector<float>());
-            return std::vector<float>();
+        {
+            PROFILE_SECTION("E57::InspectPrototype");
+            if (!inspectPointPrototype(scanHeaderNode)) {
+                emit parsingFinished(false, getLastError(), std::vector<float>());
+                return std::vector<float>();
+            }
         }
 
         emit progressUpdated(30, "Extracting point data...");
 
         // Task 2.2: Extract the actual point data
-        if (!extractUncompressedXYZData(scanHeaderNode)) {
-            emit parsingFinished(false, getLastError(), std::vector<float>());
-            return std::vector<float>();
+        {
+            PROFILE_SECTION("E57::ExtractPointData");
+            if (!extractUncompressedXYZData(scanHeaderNode)) {
+                emit parsingFinished(false, getLastError(), std::vector<float>());
+                return std::vector<float>();
+            }
         }
 
         emit progressUpdated(100, "Point extraction complete");

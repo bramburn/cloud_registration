@@ -1,5 +1,6 @@
 #include <iostream>
 #include <E57Format/E57Format.h>
+#include <QString>
 #include "../src/e57parserlib.h"
 
 /**
@@ -24,13 +25,13 @@ int main() {
         std::cout << "E57ParserLib instantiated successfully" << std::endl;
         
         // Test 3: Test basic error handling
-        std::string lastError = parser.getLastError();
-        std::cout << "Initial error state: " << (lastError.empty() ? "No error" : lastError) << std::endl;
-        
+        QString lastError = parser.getLastError();
+        std::cout << "Initial error state: " << (lastError.isEmpty() ? "No error" : lastError.toStdString()) << std::endl;
+
         // Test 4: Test file operations with non-existent file
         bool result = parser.openFile("non_existent_file.e57");
         if (!result) {
-            std::cout << "Expected failure for non-existent file: " << parser.getLastError() << std::endl;
+            std::cout << "Expected failure for non-existent file: " << parser.getLastError().toStdString() << std::endl;
         }
         
         std::cout << "All linkage tests passed!" << std::endl;

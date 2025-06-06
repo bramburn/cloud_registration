@@ -364,6 +364,29 @@ void MainWindow::setupStatusBar()
     // Sprint 3.4: Setup memory display
     setupMemoryDisplay();
 
+    // Sprint 2.2: Setup performance statistics display
+    m_fpsLabel = new QLabel(this);
+    m_fpsLabel->setText("FPS: 0.0");
+    m_fpsLabel->setMinimumWidth(80);
+    m_fpsLabel->setAlignment(Qt::AlignCenter);
+    m_fpsLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    m_pointsLabel = new QLabel(this);
+    m_pointsLabel->setText("Points: 0");
+    m_pointsLabel->setMinimumWidth(100);
+    m_pointsLabel->setAlignment(Qt::AlignCenter);
+    m_pointsLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    // Add performance labels to status bar
+    statusBar()->addPermanentWidget(m_fpsLabel);
+    statusBar()->addPermanentWidget(m_pointsLabel);
+
+    // Connect to viewer performance statistics
+    if (m_viewer) {
+        connect(m_viewer, &PointCloudViewerWidget::statsUpdated,
+                this, &MainWindow::onStatsUpdated);
+    }
+
     // Setup status bar style
     statusBar()->setStyleSheet(
         "QStatusBar { border-top: 1px solid #cccccc; }"
@@ -1530,5 +1553,39 @@ void MainWindow::onAttenuationParamsChanged()
         m_minSizeLabel->setText(QString("Min Size: %1").arg(minSize, 0, 'f', 1));
         m_maxSizeLabel->setText(QString("Max Size: %1").arg(maxSize, 0, 'f', 1));
         m_attenuationFactorLabel->setText(QString("Factor: %1").arg(factor, 0, 'f', 2));
+    }
+}
+
+// Sprint 2.2: Performance statistics display implementation
+void MainWindow::onStatsUpdated(float fps, int visiblePoints)
+{
+    if (m_fpsLabel) {
+        m_fpsLabel->setText(QString("FPS: %1").arg(fps, 0, 'f', 1));
+
+        // Color code FPS based on performance
+        if (fps >= 30.0f) {
+            m_fpsLabel->setStyleSheet("QLabel { color: #4caf50; margin: 0 5px; }"); // Green
+        } else if (fps >= 15.0f) {
+            m_fpsLabel->setStyleSheet("QLabel { color: #ff9800; margin: 0 5px; }"); // Orange
+        } else {
+            m_fpsLabel->setStyleSheet("QLabel { color: #f44336; margin: 0 5px; }"); // Red
+        }
+    }
+
+    if (m_pointsLabel) {
+        QString pointsText;
+        if (visiblePoints >= 1000000) {
+            // Display in millions
+            double millions = visiblePoints / 1000000.0;
+            pointsText = QString("Points: %1M").arg(millions, 0, 'f', 1);
+        } else if (visiblePoints >= 1000) {
+            // Display in thousands
+            double thousands = visiblePoints / 1000.0;
+            pointsText = QString("Points: %1K").arg(thousands, 0, 'f', 1);
+        } else {
+            pointsText = QString("Points: %1").arg(visiblePoints);
+        }
+
+        m_pointsLabel->setText(pointsText);
     }
 }

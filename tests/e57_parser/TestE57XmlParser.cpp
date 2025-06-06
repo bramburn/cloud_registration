@@ -24,49 +24,48 @@ protected:
 // Test Case 2.1: Parse a single-scan E57 file and verify that the GUID and point prototype are correctly extracted
 TEST_F(E57XmlParserTest, ParseSingleScanFile) {
     std::string testFile = "test_data/test_real_points.e57";
-    
+
     if (!fileExists(testFile)) {
         GTEST_SKIP() << "Test file " << testFile << " not found";
         return;
     }
-    
-    EXPECT_NO_THROW({
-        E57XmlParser parser(testFile);
-        
-        // Test file validation
-        EXPECT_TRUE(parser.isValidE57File()) << "File should be valid E57 format";
-        
-        // Parse complete file metadata
-        E57FileMetadata metadata = parser.parseFile();
-        
-        // Verify file-level metadata
-        EXPECT_FALSE(metadata.fileGuid.empty()) << "File should have a GUID";
-        
-        // Verify scan data
-        EXPECT_GE(metadata.scans.size(), 1) << "File should have at least one scan";
-        
-        const ScanMetadata& scan = metadata.scans[0];
-        EXPECT_FALSE(scan.guid.empty()) << "Scan should have a GUID";
-        EXPECT_FALSE(scan.name.empty()) << "Scan should have a name";
-        EXPECT_GT(scan.pointCount, 0) << "Scan should have points";
-        
-        // Verify point attributes (should have at least XYZ coordinates)
-        EXPECT_GE(scan.pointAttributes.size(), 3) << "Scan should have at least XYZ attributes";
-        
-        bool hasX = false, hasY = false, hasZ = false;
-        for (const auto& attr : scan.pointAttributes) {
-            if (attr.name == "cartesianX") hasX = true;
-            if (attr.name == "cartesianY") hasY = true;
-            if (attr.name == "cartesianZ") hasZ = true;
-        }
-        
-        EXPECT_TRUE(hasX && hasY && hasZ) << "Scan should have cartesian X, Y, Z coordinates";
-        
-        qDebug() << "Single scan test - File GUID:" << QString::fromStdString(metadata.fileGuid);
-        qDebug() << "Scan GUID:" << QString::fromStdString(scan.guid);
-        qDebug() << "Point count:" << scan.pointCount;
-        qDebug() << "Attributes found:" << scan.pointAttributes.size();
-    });
+
+    E57XmlParser parser(testFile);
+
+    // Test file validation
+    EXPECT_TRUE(parser.isValidE57File()) << "File should be valid E57 format";
+
+    // Parse complete file metadata
+    E57FileMetadata metadata;
+    EXPECT_NO_THROW(metadata = parser.parseFile());
+
+    // Verify file-level metadata
+    EXPECT_FALSE(metadata.fileGuid.empty()) << "File should have a GUID";
+
+    // Verify scan data
+    EXPECT_GE(metadata.scans.size(), 1) << "File should have at least one scan";
+
+    const ScanMetadata& scan = metadata.scans[0];
+    EXPECT_FALSE(scan.guid.empty()) << "Scan should have a GUID";
+    EXPECT_FALSE(scan.name.empty()) << "Scan should have a name";
+    EXPECT_GT(scan.pointCount, 0) << "Scan should have points";
+
+    // Verify point attributes (should have at least XYZ coordinates)
+    EXPECT_GE(scan.pointAttributes.size(), 3) << "Scan should have at least XYZ attributes";
+
+    bool hasX = false, hasY = false, hasZ = false;
+    for (const auto& attr : scan.pointAttributes) {
+        if (attr.name == "cartesianX") hasX = true;
+        if (attr.name == "cartesianY") hasY = true;
+        if (attr.name == "cartesianZ") hasZ = true;
+    }
+
+    EXPECT_TRUE(hasX && hasY && hasZ) << "Scan should have cartesian X, Y, Z coordinates";
+
+    qDebug() << "Single scan test - File GUID:" << QString::fromStdString(metadata.fileGuid);
+    qDebug() << "Scan GUID:" << QString::fromStdString(scan.guid);
+    qDebug() << "Point count:" << scan.pointCount;
+    qDebug() << "Attributes found:" << scan.pointAttributes.size();
 }
 
 // Test Case 2.2: Parse a multi-scan E57 file and confirm that the parser identifies all data3D sections
@@ -267,29 +266,29 @@ TEST_F(E57XmlParserTest, ParseCorruptedXMLFile) {
 // Test binary section info extraction
 TEST_F(E57XmlParserTest, BinarySectionInfoExtraction) {
     std::string testFile = "test_data/test_real_points.e57";
-    
+
     if (!fileExists(testFile)) {
         GTEST_SKIP() << "Test file " << testFile << " not found";
         return;
     }
-    
-    EXPECT_NO_THROW({
-        E57XmlParser parser(testFile);
-        std::vector<ScanMetadata> scans = parser.parseData3DSections();
-        
-        if (!scans.empty()) {
-            const ScanMetadata& scan = scans[0];
-            
-            // Try to get binary section info
-            BinarySection binaryInfo = parser.getBinarySectionInfo(scan.guid);
-            
-            EXPECT_EQ(binaryInfo.guid, scan.guid) << "Binary section GUID should match scan GUID";
-            EXPECT_EQ(binaryInfo.sectionType, "points") << "Section type should be 'points'";
-            
-            qDebug() << "Binary section info - GUID:" << QString::fromStdString(binaryInfo.guid);
-            qDebug() << "Offset:" << binaryInfo.offset << "Length:" << binaryInfo.length;
-        }
-    });
+
+    E57XmlParser parser(testFile);
+    std::vector<ScanMetadata> scans;
+    EXPECT_NO_THROW(scans = parser.parseData3DSections());
+
+    if (!scans.empty()) {
+        const ScanMetadata& scan = scans[0];
+
+        // Try to get binary section info
+        BinarySection binaryInfo;
+        EXPECT_NO_THROW(binaryInfo = parser.getBinarySectionInfo(scan.guid));
+
+        EXPECT_EQ(binaryInfo.guid, scan.guid) << "Binary section GUID should match scan GUID";
+        EXPECT_EQ(binaryInfo.sectionType, "points") << "Section type should be 'points'";
+
+        qDebug() << "Binary section info - GUID:" << QString::fromStdString(binaryInfo.guid);
+        qDebug() << "Offset:" << binaryInfo.offset << "Length:" << binaryInfo.length;
+    }
 }
 
 // Test scan count functionality

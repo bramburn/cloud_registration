@@ -50,14 +50,14 @@ TEST_F(E57ParserLibSprint3Test, ExtractIntensityScaledInteger) {
     EXPECT_TRUE(points.empty()); // Should be empty since no file is open
     
     // Verify error handling
-    EXPECT_FALSE(parser->getLastError().empty());
+    EXPECT_FALSE(parser->getLastError().isEmpty());
 }
 
 // Test Case 3.1.2: Parse E57 file where intensity is FloatNode
 TEST_F(E57ParserLibSprint3Test, ExtractIntensityFloat) {
     // Test the PointData structure
     E57ParserLib::PointData point(1.0f, 2.0f, 3.0f);
-    
+
     EXPECT_FLOAT_EQ(point.x, 1.0f);
     EXPECT_FLOAT_EQ(point.y, 2.0f);
     EXPECT_FLOAT_EQ(point.z, 3.0f);
@@ -193,8 +193,8 @@ TEST_F(E57ParserLibSprint3Test, ErrorHandling) {
     
     auto points = parser->extractEnhancedPointData();
     EXPECT_TRUE(points.empty());
-    EXPECT_FALSE(parser->getLastError().empty());
-    
+    EXPECT_FALSE(parser->getLastError().isEmpty());
+
     // Test legacy method still works
     auto legacyPoints = parser->extractPointData();
     EXPECT_TRUE(legacyPoints.empty());

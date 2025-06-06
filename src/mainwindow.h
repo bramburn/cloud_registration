@@ -175,6 +175,10 @@ private:
     // Sprint 3.4: Memory usage display
     QLabel *m_memoryLabel;
 
+    // Sprint 2.2: Performance monitoring display
+    QLabel *m_fpsLabel;
+    QLabel *m_pointsLabel;
+
     // Sprint 3.3: Progress display widgets
     QProgressBar* m_progressBar;
     QLabel* m_progressLabel;

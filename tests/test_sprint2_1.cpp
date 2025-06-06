@@ -4,12 +4,15 @@
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QStandardPaths>
+#include <QUuid>
+#include <QDateTime>
 
 // Include Sprint 2.1 components
 #include "../src/projecttreemodel.h"
 #include "../src/pointcloudloadmanager.h"
 #include "../src/sidebarwidget.h"
 #include "../src/sqlitemanager.h"
+#include "../src/projectmanager.h"
 
 class Sprint21Test : public ::testing::Test {
 protected:

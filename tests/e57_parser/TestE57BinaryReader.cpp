@@ -80,25 +80,25 @@ protected:
 
 // Test Case 1.1: Load a valid E57 file and verify that all data is read correctly without any CRC errors
 TEST_F(E57BinaryReaderTest, ValidFileLoadsSuccessfully) {
-    EXPECT_NO_THROW({
-        E57BinaryReader reader("valid_test.e57");
-        BinarySection section{0, 1024, "test-guid", "points"};
-        auto data = reader.readBinarySection(section);
-        
-        EXPECT_EQ(data.size(), 1020); // Payload size without CRC
-        
-        // Verify all payload bytes are 0x42
-        for (size_t i = 0; i < data.size(); ++i) {
-            EXPECT_EQ(data[i], 0x42) << "Byte " << i << " should be 0x42";
-        }
-        
-        // Check metrics
-        auto metrics = reader.getLastValidationMetrics();
-        EXPECT_EQ(metrics.totalPages, 1);
-        EXPECT_EQ(metrics.validPages, 1);
-        EXPECT_EQ(metrics.corruptedPages, 0);
-        EXPECT_GT(metrics.throughputMBps, 0.0);
-    });
+    E57BinaryReader reader("valid_test.e57");
+    BinarySection section{0, 1024, "test-guid", "points"};
+
+    std::vector<uint8_t> data;
+    EXPECT_NO_THROW(data = reader.readBinarySection(section));
+
+    EXPECT_EQ(data.size(), 1020); // Payload size without CRC
+
+    // Verify all payload bytes are 0x42
+    for (size_t i = 0; i < data.size(); ++i) {
+        EXPECT_EQ(data[i], 0x42) << "Byte " << i << " should be 0x42";
+    }
+
+    // Check metrics
+    auto metrics = reader.getLastValidationMetrics();
+    EXPECT_EQ(metrics.totalPages, 1);
+    EXPECT_EQ(metrics.validPages, 1);
+    EXPECT_EQ(metrics.corruptedPages, 0);
+    EXPECT_GT(metrics.throughputMBps, 0.0);
 }
 
 // Test Case 1.2: Create a test E57 file with a single corrupted binary page and verify that the application detects the CRC error
