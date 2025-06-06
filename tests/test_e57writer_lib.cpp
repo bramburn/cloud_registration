@@ -3,13 +3,17 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <E57Format/E57Format.h>
+#include "../src/IE57Writer.h"
 #include "../src/e57writer_lib.h"
+#include "MockE57Writer.h"
 
 /**
  * @brief Test fixture for E57WriterLib tests
- * 
+ *
  * Implements Sprint W1 testing requirements for E57 file creation,
  * header writing, prototype definition, and file validity verification.
+ *
+ * Sprint 2 Decoupling: Now tests through IE57Writer interface for loose coupling.
  */
 class E57WriterLibTest : public ::testing::Test {
 protected:
@@ -17,20 +21,24 @@ protected:
         // Create temporary directory for test files
         tempDir = std::make_unique<QTemporaryDir>();
         ASSERT_TRUE(tempDir->isValid()) << "Failed to create temporary directory";
-        
-        writer = std::make_unique<E57WriterLib>();
-        
+
+        // Sprint 2: Create writer through interface for decoupling
+        writerImpl = std::make_unique<E57WriterLib>();
+        writer = writerImpl.get(); // Use interface pointer
+
         // Generate test file path
         testFilePath = tempDir->path() + "/test_output.e57";
     }
 
     void TearDown() override {
-        writer.reset();
+        writerImpl.reset();
+        writer = nullptr;
         tempDir.reset();
     }
 
     std::unique_ptr<QTemporaryDir> tempDir;
-    std::unique_ptr<E57WriterLib> writer;
+    std::unique_ptr<E57WriterLib> writerImpl; // Concrete implementation
+    IE57Writer* writer; // Interface pointer for testing
     QString testFilePath;
 };
 
@@ -280,14 +288,14 @@ TEST_F(E57WriterLibTest, WriteSmallSetOfXYZPoints) {
     EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define XYZ prototype";
 
     // Create test points with known coordinates
-    std::vector<E57WriterLib::Point3D> testPoints = {
+    std::vector<IE57Writer::Point3D> testPoints = {
         {1.0, 2.0, 3.0},
         {4.0, 5.0, 6.0},
         {7.0, 8.0, 9.0}
     };
 
     // Write points
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -369,7 +377,7 @@ TEST_F(E57WriterLibTest, WriteLargeDatasetBlockWise) {
 
     // Create a larger dataset (15,000 points to test multiple blocks)
     const size_t numPoints = 15000;
-    std::vector<E57WriterLib::Point3D> testPoints;
+    std::vector<IE57Writer::Point3D> testPoints;
     testPoints.reserve(numPoints);
 
     // Generate points in a known pattern
@@ -381,7 +389,7 @@ TEST_F(E57WriterLibTest, WriteLargeDatasetBlockWise) {
     }
 
     // Write points
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write large dataset: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -432,8 +440,8 @@ TEST_F(E57WriterLibTest, WriteZeroPoints) {
     EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define XYZ prototype";
 
     // Write empty point set
-    std::vector<E57WriterLib::Point3D> emptyPoints;
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    std::vector<IE57Writer::Point3D> emptyPoints;
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_TRUE(writer->writePoints(emptyPoints, xyzOnlyOptions)) << "Failed to write empty points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -489,14 +497,14 @@ TEST_F(E57WriterLibTest, CartesianBoundsWithNegativeCoordinates) {
     EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define XYZ prototype";
 
     // Create test points with negative coordinates
-    std::vector<E57WriterLib::Point3D> testPoints = {
+    std::vector<IE57Writer::Point3D> testPoints = {
         {-10.5, -20.5, -30.5},
         {-5.0, -15.0, -25.0},
         {-0.5, -1.5, -2.5}
     };
 
     // Write points
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -557,12 +565,12 @@ TEST_F(E57WriterLibTest, CartesianBoundsWithSinglePoint) {
     EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define XYZ prototype";
 
     // Create single test point
-    std::vector<E57WriterLib::Point3D> testPoints = {
+    std::vector<IE57Writer::Point3D> testPoints = {
         {7.7, 8.8, 9.9}
     };
 
     // Write points
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_TRUE(writer->writePoints(testPoints, xyzOnlyOptions)) << "Failed to write points: " << writer->getLastError().toStdString();
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -621,8 +629,8 @@ TEST_F(E57WriterLibTest, ErrorHandlingWritePointsWithoutPrototype) {
     EXPECT_TRUE(writer->addScan("Scan Without Prototype")) << "Failed to add scan";
 
     // Try to write points without defining prototype first
-    std::vector<E57WriterLib::Point3D> testPoints = {{1.0, 2.0, 3.0}};
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    std::vector<IE57Writer::Point3D> testPoints = {{1.0, 2.0, 3.0}};
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_FALSE(writer->writePoints(testPoints, xyzOnlyOptions)) << "writePoints should fail without prototype";
     EXPECT_FALSE(writer->getLastError().isEmpty()) << "Error message should be set";
 }
@@ -637,8 +645,8 @@ TEST_F(E57WriterLibTest, ErrorHandlingWritePointsInvalidScanIndex) {
     EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define XYZ prototype";
 
     // Try to write to invalid scan index
-    std::vector<E57WriterLib::Point3D> testPoints = {{1.0, 2.0, 3.0}};
-    E57WriterLib::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
+    std::vector<IE57Writer::Point3D> testPoints = {{1.0, 2.0, 3.0}};
+    IE57Writer::ExportOptions xyzOnlyOptions(false, false); // XYZ only for backward compatibility
     EXPECT_FALSE(writer->writePoints(1, testPoints, xyzOnlyOptions)) << "writePoints should fail for invalid scan index";
     EXPECT_FALSE(writer->getLastError().isEmpty()) << "Error message should be set";
 }
@@ -654,7 +662,7 @@ TEST_F(E57WriterLibTest, DefinePrototypeWithIntensityEnabled) {
     EXPECT_TRUE(writer->addScan("Intensity Test Scan")) << "Failed to add scan";
 
     // Define prototype with intensity enabled
-    E57WriterLib::ExportOptions options(true, false); // intensity=true, color=false
+    IE57Writer::ExportOptions options(true, false); // intensity=true, color=false
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define prototype with intensity";
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -711,7 +719,7 @@ TEST_F(E57WriterLibTest, DefinePrototypeWithColorEnabled) {
     EXPECT_TRUE(writer->addScan("Color Test Scan")) << "Failed to add scan";
 
     // Define prototype with color enabled
-    E57WriterLib::ExportOptions options(false, true); // intensity=false, color=true
+    IE57Writer::ExportOptions options(false, true); // intensity=false, color=true
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define prototype with color";
     EXPECT_TRUE(writer->closeFile()) << "Failed to close file";
 
@@ -775,14 +783,14 @@ TEST_F(E57WriterLibTest, WritePointsWithIntensityOnly) {
     EXPECT_TRUE(writer->addScan("Intensity Points Scan")) << "Failed to add scan";
 
     // Define prototype with intensity enabled
-    E57WriterLib::ExportOptions options(true, false); // intensity=true, color=false
+    IE57Writer::ExportOptions options(true, false); // intensity=true, color=false
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define prototype with intensity";
 
     // Create test points with intensity data
-    std::vector<E57WriterLib::Point3D> testPoints = {
-        E57WriterLib::Point3D(1.0, 2.0, 3.0, 0.1f),  // XYZ + intensity
-        E57WriterLib::Point3D(4.0, 5.0, 6.0, 0.5f),  // XYZ + intensity
-        E57WriterLib::Point3D(7.0, 8.0, 9.0, 0.9f)   // XYZ + intensity
+    std::vector<IE57Writer::Point3D> testPoints = {
+        IE57Writer::Point3D(1.0, 2.0, 3.0, 0.1f),  // XYZ + intensity
+        IE57Writer::Point3D(4.0, 5.0, 6.0, 0.5f),  // XYZ + intensity
+        IE57Writer::Point3D(7.0, 8.0, 9.0, 0.9f)   // XYZ + intensity
     };
 
     // Write points with intensity
@@ -843,14 +851,14 @@ TEST_F(E57WriterLibTest, WritePointsWithColorOnly) {
     EXPECT_TRUE(writer->addScan("Color Points Scan")) << "Failed to add scan";
 
     // Define prototype with color enabled
-    E57WriterLib::ExportOptions options(false, true); // intensity=false, color=true
+    IE57Writer::ExportOptions options(false, true); // intensity=false, color=true
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define prototype with color";
 
     // Create test points with color data
-    std::vector<E57WriterLib::Point3D> testPoints = {
-        E57WriterLib::Point3D(1.0, 2.0, 3.0, 255, 0, 0),    // XYZ + red
-        E57WriterLib::Point3D(4.0, 5.0, 6.0, 0, 255, 0),    // XYZ + green
-        E57WriterLib::Point3D(7.0, 8.0, 9.0, 0, 0, 255)     // XYZ + blue
+    std::vector<IE57Writer::Point3D> testPoints = {
+        IE57Writer::Point3D(1.0, 2.0, 3.0, 255, 0, 0),    // XYZ + red
+        IE57Writer::Point3D(4.0, 5.0, 6.0, 0, 255, 0),    // XYZ + green
+        IE57Writer::Point3D(7.0, 8.0, 9.0, 0, 0, 255)     // XYZ + blue
     };
 
     // Write points with color
@@ -934,14 +942,14 @@ TEST_F(E57WriterLibTest, WritePointsWithIntensityAndColor) {
     EXPECT_TRUE(writer->addScan("Full Attributes Scan")) << "Failed to add scan";
 
     // Define prototype with both intensity and color enabled
-    E57WriterLib::ExportOptions options(true, true); // intensity=true, color=true
+    IE57Writer::ExportOptions options(true, true); // intensity=true, color=true
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define prototype with intensity and color";
 
     // Create test points with both intensity and color data
-    std::vector<E57WriterLib::Point3D> testPoints = {
-        E57WriterLib::Point3D(1.0, 2.0, 3.0, 0.2f, 255, 128, 64),  // XYZ + intensity + color
-        E57WriterLib::Point3D(4.0, 5.0, 6.0, 0.6f, 128, 255, 32),  // XYZ + intensity + color
-        E57WriterLib::Point3D(7.0, 8.0, 9.0, 0.8f, 64, 32, 255)    // XYZ + intensity + color
+    std::vector<IE57Writer::Point3D> testPoints = {
+        IE57Writer::Point3D(1.0, 2.0, 3.0, 0.2f, 255, 128, 64),  // XYZ + intensity + color
+        IE57Writer::Point3D(4.0, 5.0, 6.0, 0.6f, 128, 255, 32),  // XYZ + intensity + color
+        IE57Writer::Point3D(7.0, 8.0, 9.0, 0.8f, 64, 32, 255)    // XYZ + intensity + color
     };
 
     // Write points with both attributes
@@ -1036,12 +1044,12 @@ TEST_F(E57WriterLibTest, ExportConfigurationFlags) {
     EXPECT_TRUE(writer->addScan("Configuration Test Scan")) << "Failed to add scan";
 
     // Define prototype with both intensity and color disabled
-    E57WriterLib::ExportOptions options(false, false); // intensity=false, color=false
+    IE57Writer::ExportOptions options(false, false); // intensity=false, color=false
     EXPECT_TRUE(writer->definePointPrototype(options)) << "Failed to define XYZ-only prototype";
 
     // Create test points with both intensity and color data (but export flags are disabled)
-    std::vector<E57WriterLib::Point3D> testPoints = {
-        E57WriterLib::Point3D(1.0, 2.0, 3.0, 0.5f, 255, 128, 64)  // XYZ + intensity + color (but won't be exported)
+    std::vector<IE57Writer::Point3D> testPoints = {
+        IE57Writer::Point3D(1.0, 2.0, 3.0, 0.5f, 255, 128, 64)  // XYZ + intensity + color (but won't be exported)
     };
 
     // Write points with disabled export options
@@ -1105,7 +1113,7 @@ TEST_F(E57WriterLibTest, WriteScannerPoseMetadata) {
     pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(0, 0, 1), 45.0f); // 45 degree rotation around Z-axis
     pose.acquisitionTime = QDateTime::currentDateTime();
 
-    E57WriterLib::ScanMetadata metadata;
+    IE57Writer::ScanMetadata metadata;
     metadata.name = "Pose Test Scan";
     metadata.description = "Test scan with pose metadata";
     metadata.sensorModel = "Test Scanner v1.0";
@@ -1214,10 +1222,10 @@ TEST_F(E57WriterLibTest, WriteScannerPoseMetadata) {
  */
 TEST_F(E57WriterLibTest, WriteMultipleScansWithMetadata) {
     // Create multiple scan data with different poses
-    std::vector<E57WriterLib::ScanData> scansData;
+    std::vector<IE57Writer::ScanData> scansData;
 
     // Scan 1
-    E57WriterLib::ScanMetadata metadata1;
+    IE57Writer::ScanMetadata metadata1;
     metadata1.name = "Scan 001";
     metadata1.description = "First scan position";
     metadata1.sensorModel = "FARO Focus S350";
@@ -1225,16 +1233,16 @@ TEST_F(E57WriterLibTest, WriteMultipleScansWithMetadata) {
     metadata1.pose.rotation = QQuaternion(); // Identity rotation
     metadata1.acquisitionStart = QDateTime::currentDateTime().addSecs(-3600); // 1 hour ago
 
-    std::vector<E57WriterLib::Point3D> points1 = {
+    std::vector<IE57Writer::Point3D> points1 = {
         {1.0, 2.0, 3.0, 0.5f, 255, 128, 64},
         {4.0, 5.0, 6.0, 0.7f, 128, 255, 32}
     };
 
-    E57WriterLib::ExportOptions options1(true, true); // Include intensity and color
+    IE57Writer::ExportOptions options1(true, true); // Include intensity and color
     scansData.emplace_back(metadata1, points1, options1);
 
     // Scan 2
-    E57WriterLib::ScanMetadata metadata2;
+    IE57Writer::ScanMetadata metadata2;
     metadata2.name = "Scan 002";
     metadata2.description = "Second scan position";
     metadata2.sensorModel = "FARO Focus S350";
@@ -1242,16 +1250,16 @@ TEST_F(E57WriterLibTest, WriteMultipleScansWithMetadata) {
     metadata2.pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(0, 0, 1), 90.0f); // 90 degree rotation
     metadata2.acquisitionStart = QDateTime::currentDateTime().addSecs(-1800); // 30 minutes ago
 
-    std::vector<E57WriterLib::Point3D> points2 = {
+    std::vector<IE57Writer::Point3D> points2 = {
         {7.0, 8.0, 9.0, 0.3f},  // XYZ + intensity only
         {10.0, 11.0, 12.0, 0.9f}
     };
 
-    E57WriterLib::ExportOptions options2(true, false); // Include intensity only
+    IE57Writer::ExportOptions options2(true, false); // Include intensity only
     scansData.emplace_back(metadata2, points2, options2);
 
     // Scan 3 - XYZ only
-    E57WriterLib::ScanMetadata metadata3;
+    IE57Writer::ScanMetadata metadata3;
     metadata3.name = "Scan 003";
     metadata3.description = "Third scan position - XYZ only";
     metadata3.sensorModel = "Leica BLK360";
@@ -1259,13 +1267,13 @@ TEST_F(E57WriterLibTest, WriteMultipleScansWithMetadata) {
     metadata3.pose.rotation = QQuaternion::fromAxisAndAngle(QVector3D(1, 0, 0), 30.0f); // 30 degree rotation around X
     metadata3.acquisitionStart = QDateTime::currentDateTime();
 
-    std::vector<E57WriterLib::Point3D> points3 = {
+    std::vector<IE57Writer::Point3D> points3 = {
         {13.0, 14.0, 15.0},
         {16.0, 17.0, 18.0},
         {19.0, 20.0, 21.0}
     };
 
-    E57WriterLib::ExportOptions options3(false, false); // XYZ only
+    IE57Writer::ExportOptions options3(false, false); // XYZ only
     scansData.emplace_back(metadata3, points3, options3);
 
     // Write multiple scans
@@ -1378,7 +1386,7 @@ TEST_F(E57WriterLibTest, ScanPoseMatrixConversion) {
     }
 
     // Test with the pose in an actual E57 file
-    E57WriterLib::ScanMetadata metadata;
+    IE57Writer::ScanMetadata metadata;
     metadata.name = "Matrix Conversion Test";
     metadata.pose = pose;
 
@@ -1435,4 +1443,110 @@ TEST_F(E57WriterLibTest, ScanPoseMatrixConversion) {
     } catch (const std::exception& ex) {
         FAIL() << "Standard exception when verifying matrix conversion: " << ex.what();
     }
+}
+
+// Sprint 2 Decoupling Tests: Interface Polymorphism and Mock Testing
+
+/**
+ * Test Case S2.1: Interface Polymorphism Test
+ * Description: Create a test case that instantiates E57WriterLib but interacts with it
+ * solely through an IE57Writer pointer to verify that the abstraction is complete and functional.
+ */
+TEST_F(E57WriterLibTest, InterfacePolymorphismTest) {
+    // Use the interface pointer from the test fixture
+    EXPECT_TRUE(writer->createFile(testFilePath)) << "Failed to create E57 file through interface";
+    EXPECT_TRUE(writer->addScan("Interface Test Scan")) << "Failed to add scan through interface";
+    EXPECT_TRUE(writer->defineXYZPrototype()) << "Failed to define prototype through interface";
+
+    // Create test points
+    std::vector<IE57Writer::Point3D> testPoints = {
+        {1.0, 2.0, 3.0},
+        {4.0, 5.0, 6.0}
+    };
+
+    // Write points through interface
+    EXPECT_TRUE(writer->writePoints(testPoints)) << "Failed to write points through interface";
+    EXPECT_TRUE(writer->closeFile()) << "Failed to close file through interface";
+
+    // Verify file was created successfully
+    QFileInfo fileInfo(testFilePath);
+    EXPECT_TRUE(fileInfo.exists()) << "E57 file was not created through interface";
+    EXPECT_GT(fileInfo.size(), 0) << "E57 file is empty";
+
+    // Verify interface state methods work
+    EXPECT_FALSE(writer->isFileOpen()) << "Interface should report file as closed";
+    EXPECT_EQ(writer->getScanCount(), 1) << "Interface should report correct scan count";
+    EXPECT_TRUE(writer->getLastError().isEmpty()) << "Interface should report no errors";
+}
+
+/**
+ * Test Case S2.2: Mock Writer Integration Test
+ * Description: Develop a mock implementation of IE57Writer that simulates file creation
+ * and writing operations without actually touching the disk. Test the mock to validate
+ * that the interface correctly exposes all necessary functionality.
+ */
+TEST(MockE57WriterTest, MockWriterIntegrationTest) {
+    MockE57Writer mockWriter;
+    IE57Writer* writer = &mockWriter; // Use interface pointer
+
+    // Test file creation
+    EXPECT_TRUE(writer->createFile("/mock/test.e57")) << "Mock should simulate successful file creation";
+    EXPECT_TRUE(writer->isFileOpen()) << "Mock should report file as open";
+    EXPECT_EQ(writer->getCurrentFilePath(), "/mock/test.e57") << "Mock should track file path";
+
+    // Test scan addition
+    EXPECT_TRUE(writer->addScan("Mock Scan 1")) << "Mock should simulate successful scan addition";
+    EXPECT_EQ(writer->getScanCount(), 1) << "Mock should track scan count";
+
+    // Test prototype definition
+    IE57Writer::ExportOptions options(true, true); // intensity and color
+    EXPECT_TRUE(writer->definePointPrototype(options)) << "Mock should simulate prototype definition";
+
+    // Test point writing
+    std::vector<IE57Writer::Point3D> testPoints = {
+        IE57Writer::Point3D(1.0, 2.0, 3.0, 0.5f, 255, 128, 64),
+        IE57Writer::Point3D(4.0, 5.0, 6.0, 0.8f, 128, 255, 32)
+    };
+
+    EXPECT_TRUE(writer->writePoints(testPoints, options)) << "Mock should simulate point writing";
+
+    // Test multiple scans
+    IE57Writer::ScanMetadata metadata;
+    metadata.name = "Mock Scan 2";
+    EXPECT_TRUE(writer->addScan(metadata)) << "Mock should simulate metadata scan addition";
+    EXPECT_EQ(writer->getScanCount(), 2) << "Mock should track multiple scans";
+
+    // Test file closing
+    EXPECT_TRUE(writer->closeFile()) << "Mock should simulate file closing";
+    EXPECT_FALSE(writer->isFileOpen()) << "Mock should report file as closed";
+
+    // Verify mock tracked method calls correctly
+    QStringList calls = mockWriter.getMethodCalls();
+    EXPECT_TRUE(calls.contains("createFile(/mock/test.e57)")) << "Mock should track createFile call";
+    EXPECT_TRUE(calls.contains("addScan(Mock Scan 1)")) << "Mock should track addScan call";
+    EXPECT_TRUE(calls.contains("writePoints(2 points, intensity=1, color=1)")) << "Mock should track writePoints call";
+    EXPECT_TRUE(calls.contains("closeFile()")) << "Mock should track closeFile call";
+
+    // Verify mock tracked points correctly
+    EXPECT_EQ(mockWriter.getTotalPointsWritten(), 2) << "Mock should track total points written";
+}
+
+/**
+ * Test Case S2.3: Mock Error Simulation Test
+ * Description: Test that the mock can simulate error conditions to validate error handling
+ */
+TEST(MockE57WriterTest, MockErrorSimulationTest) {
+    MockE57Writer mockWriter;
+    IE57Writer* writer = &mockWriter;
+
+    // Test simulated file creation failure
+    mockWriter.setShouldFailNextOperation(true);
+    EXPECT_FALSE(writer->createFile("/mock/test.e57")) << "Mock should simulate file creation failure";
+    EXPECT_FALSE(writer->getLastError().isEmpty()) << "Mock should provide error message";
+    EXPECT_FALSE(writer->isFileOpen()) << "Mock should report file as not open after failure";
+
+    // Reset and test successful operation after failure
+    mockWriter.reset();
+    EXPECT_TRUE(writer->createFile("/mock/test.e57")) << "Mock should work normally after reset";
+    EXPECT_TRUE(writer->getLastError().isEmpty()) << "Mock should clear error after successful operation";
 }

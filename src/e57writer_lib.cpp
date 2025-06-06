@@ -9,44 +9,10 @@
 #include <limits>
 #include <algorithm>
 
-// Sprint W4: ScanPose static methods implementation
-E57WriterLib::ScanPose E57WriterLib::ScanPose::fromMatrix(const QMatrix4x4& matrix)
-{
-    ScanPose pose;
 
-    // Extract translation from the last column
-    pose.translation = QVector3D(matrix(0, 3), matrix(1, 3), matrix(2, 3));
-
-    // Extract rotation matrix (upper-left 3x3) and convert to quaternion
-    QMatrix3x3 rotMatrix = matrix.normalMatrix();
-    pose.rotation = QQuaternion::fromRotationMatrix(rotMatrix).normalized();
-
-    return pose;
-}
-
-QMatrix4x4 E57WriterLib::ScanPose::toMatrix() const
-{
-    QMatrix4x4 matrix;
-    matrix.setToIdentity();
-
-    // Set rotation part
-    QMatrix3x3 rotMatrix = rotation.toRotationMatrix();
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            matrix(i, j) = rotMatrix(i, j);
-        }
-    }
-
-    // Set translation part
-    matrix(0, 3) = translation.x();
-    matrix(1, 3) = translation.y();
-    matrix(2, 3) = translation.z();
-
-    return matrix;
-}
 
 E57WriterLib::E57WriterLib(QObject *parent)
-    : QObject(parent)
+    : IE57Writer(parent)
     , m_fileOpen(false)
     , m_scanCount(0)
 {
