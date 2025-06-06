@@ -1,204 +1,462 @@
-# Cloud Registration - Point Cloud Viewer
+# CloudRegistration - Professional Point Cloud Viewer
 
-An open-source point cloud registration application built with Qt6 and OpenGL.
+A professional-grade point cloud visualization and management application built with Qt6 and OpenGL, designed for surveying, engineering, and 3D data analysis workflows.
 
-## Phase 1 Sprint 1 - Basic File Loading & 3D Visualization
+## Overview
 
-This sprint implements the foundational application structure with basic E57 file loading and 3D visualization capabilities.
+CloudRegistration is a comprehensive desktop application for loading, visualizing, and managing point cloud data from various sources. It provides robust support for industry-standard file formats, advanced 3D visualization capabilities, and a project-based workflow for organizing and analyzing large datasets.
 
-## Features
+## Key Features
 
-- **Qt6 Desktop Application**: Modern cross-platform GUI framework
-- **OpenGL 3D Viewer**: Hardware-accelerated point cloud rendering
-- **E57 File Support**: Basic E57 file format detection (mock data generation for testing)
-- **Interactive Camera**: Mouse-based orbit, pan, and zoom controls
-- **Error Handling**: Graceful handling of invalid files and loading errors
+### **File Format Support**
+- **E57 Files**: Complete support for ASTM E2807 standard using libE57Format
+  - Multi-scan E57 files with XYZ coordinates, intensity, and RGB color data
+  - Metadata preservation and scan organization
+  - High-performance reading and writing capabilities
+- **LAS Files**: Full LAS/LAZ support (versions 1.2-1.4, point formats 0-3)
+  - Header metadata extraction and validation
+  - Efficient point data parsing with configurable loading options
 
-## Requirements
+### **3D Visualization**
+- **Hardware-Accelerated Rendering**: OpenGL-based point cloud viewer
+- **Level-of-Detail (LOD) System**: Octree-based rendering for large datasets
+- **Advanced Rendering Options**:
+  - Color and intensity attribute visualization
+  - Point size attenuation and screen-space error calculations
+  - Multiple viewing modes and camera controls
+- **Interactive Navigation**: Mouse-based orbit, pan, zoom, and preset view angles
 
-- **Qt6**: Version 6.5 or later
-  - QtCore
-  - QtWidgets
-  - QtGui
-  - QtOpenGLWidgets
+### **Project Management**
+- **SQLite-Based Projects**: Organized workspace for managing multiple scans
+- **Scan Import System**: Batch import and organization of point cloud files
+- **Metadata Management**: Comprehensive scan information and properties
+- **Recent Projects**: Quick access to recently opened projects
+
+### **Performance & Efficiency**
+- **Voxel Grid Filtering**: Configurable point cloud subsampling
+- **Chunked Processing**: Memory-efficient handling of large datasets
+- **Progress Reporting**: Real-time feedback for long-running operations
+- **Multi-threaded Operations**: Non-blocking file loading and processing
+
+## System Requirements
+
+### **Windows (Primary Platform)**
+- **Operating System**: Windows 10/11 (64-bit)
+- **Qt6**: Version 6.9.0 or later (6.5.3+ supported)
+  - QtCore, QtWidgets, QtGui, QtOpenGLWidgets
+  - QtXml, QtSql, QtConcurrent, QtTest
+- **Visual Studio**: 2022 (MSVC v143 toolset)
 - **CMake**: Version 3.16 or later
-- **C++17** compatible compiler
-- **OpenGL 3.3** or later
-- **Google Test** (optional, for unit tests)
+- **vcpkg**: For dependency management
+- **OpenGL**: Version 3.3 or later
+- **Memory**: 8GB RAM minimum, 16GB+ recommended for large datasets
 
-## Building
+### **Dependencies (Managed via vcpkg)**
+- **libE57Format**: E57 file format support
+- **Xerces-C**: XML parsing for E57 files
+- **Google Test**: Unit testing framework
+- **Vulkan SDK**: Advanced graphics support (optional)
 
-### Windows
+## Windows Setup Guide
 
-1. **Using Build Scripts** (Recommended):
+### **Prerequisites Installation**
+
+1. **Install Visual Studio 2022**
+   - Download Visual Studio 2022 Community (free) or Professional
+   - During installation, select "Desktop development with C++" workload
+   - Ensure MSVC v143 toolset and Windows 10/11 SDK are included
+
+2. **Install Qt6**
+   - Download Qt6 from [qt.io](https://www.qt.io/download)
+   - Install Qt 6.9.0 (recommended) or 6.5.3+ to `C:\Qt\`
+   - Select the MSVC 2022 64-bit component during installation
+   - Add Qt bin directory to your system PATH: `C:\Qt\6.9.0\msvc2022_64\bin`
+
+3. **Install vcpkg**
    ```powershell
-   # Clean all build directories
+   # Clone vcpkg to C:\dev\vcpkg
+   git clone https://github.com/Microsoft/vcpkg.git C:\dev\vcpkg
+   cd C:\dev\vcpkg
+   .\bootstrap-vcpkg.bat
+
+   # Install required dependencies
+   .\vcpkg install libe57format:x64-windows
+   .\vcpkg install xerces-c:x64-windows
+   .\vcpkg install gtest:x64-windows
+   ```
+
+4. **Install CMake**
+   - Download and install CMake 3.16+ from [cmake.org](https://cmake.org/download/)
+   - Ensure CMake is added to your system PATH
+
+### **Building the Application**
+
+1. **Clone the Repository**
+   ```powershell
+   git clone https://github.com/bramburn/cloud_registration.git
+   cd cloud_registration
+   ```
+
+2. **Configure Environment**
+   ```powershell
+   # Set vcpkg toolchain (if not set globally)
+   $env:CMAKE_TOOLCHAIN_FILE = "C:\dev\vcpkg\scripts\buildsystems\vcpkg.cmake"
+
+   # Verify Qt installation
+   $env:Qt6_DIR = "C:\Qt\6.9.0\msvc2022_64\lib\cmake\Qt6"
+   ```
+
+3. **Build Using Scripts** (Recommended)
+   ```powershell
+   # Clean previous builds
    .\scripts\build-clean.ps1 -BuildType Clean
 
    # Build Release version
    .\scripts\build-clean.ps1 -BuildType Release
+
+   # Or build Debug version for development
+   .\scripts\build-clean.ps1 -BuildType Debug
    ```
 
-2. **Using CMake Presets Directly**:
+4. **Alternative: Manual CMake Build**
    ```powershell
-   # Configure and build Release version
+   # Configure Release build
    cmake --preset msvc-release
+
+   # Build the application
    cmake --build --preset msvc-release
+
+   # For Debug builds
+   cmake --preset msvc-debug
+   cmake --build --preset msvc-debug
    ```
 
-3. **Run the Application**:
-   ```powershell
-   .\build\release\bin\CloudRegistration.exe
-   ```
-
-### Linux/macOS
-
-1. **Install Qt6**:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install qt6-base-dev qt6-opengl-dev
-   
-   # macOS with Homebrew
-   brew install qt6
-   ```
-
-2. **Build**:
-   ```bash
-   # Clean build
-   rm -rf build/
-   
-   # Configure and build
-   cmake --preset gcc-release
-   cmake --build --preset gcc-release
-   ```
-
-3. **Run**:
-   ```bash
-   ./build/release/bin/CloudRegistration
-   ```
-
-## Usage
-
-1. **Launch Application**: Run the CloudRegistration executable
-2. **Load Point Cloud**: Click "Open E57 File" button or use File → Open menu
-3. **Navigate 3D View**:
-   - **Left Mouse + Drag**: Orbit camera around point cloud
-   - **Right Mouse + Drag**: Pan camera
-   - **Mouse Wheel**: Zoom in/out
-
-## Testing
-
-### Automated Tests
-
-Run all tests using the test script:
+### **Running the Application**
 
 ```powershell
-# Windows - Run all tests
+# Release build
+.\build-release\bin\Release\CloudRegistration.exe
+
+# Debug build
+.\build-debug\bin\Debug\CloudRegistration.exe
+```
+
+## Application Deployment
+
+### **Standalone Deployment**
+
+For distributing the application to end users:
+
+1. **Using windeployqt** (Recommended)
+   ```powershell
+   # Navigate to build directory
+   cd build-release\bin\Release
+
+   # Deploy Qt dependencies
+   windeployqt.exe CloudRegistration.exe --release --no-translations
+
+   # Copy vcpkg dependencies
+   copy "C:\dev\vcpkg\installed\x64-windows\bin\*.dll" .
+   ```
+
+2. **Manual Deployment**
+   - Copy all required Qt6 DLLs from `C:\Qt\6.9.0\msvc2022_64\bin\`
+   - Copy vcpkg dependencies from `C:\dev\vcpkg\installed\x64-windows\bin\`
+   - Include Visual C++ Redistributable 2022
+
+### **Installer Creation**
+
+For professional deployment, consider using:
+- **NSIS**: Free installer creation tool
+- **WiX Toolset**: Windows Installer XML toolset
+- **Qt Installer Framework**: Cross-platform installer solution
+
+## Getting Started
+
+### **First Launch**
+
+1. **Start the Application**
+   ```powershell
+   .\CloudRegistration.exe
+   ```
+
+2. **Create Your First Project**
+   - Click "Create New Project" on the welcome screen
+   - Choose a project name and location
+   - The project will store scan metadata and settings
+
+### **Loading Point Cloud Data**
+
+1. **Import Scans**
+   - Use **File → Import Scans** or click the import button
+   - Select E57 or LAS files from your file system
+   - The application will parse metadata and add scans to your project
+
+2. **View Point Clouds**
+   - Click on any scan in the project tree to load it
+   - Use the 3D viewer to explore your data
+
+### **3D Navigation Controls**
+
+- **Orbit**: Left mouse button + drag
+- **Pan**: Right mouse button + drag
+- **Zoom**: Mouse wheel scroll
+- **Preset Views**: Use toolbar buttons for Top, Left, Right, Bottom views
+- **Reset View**: Double-click to fit point cloud in view
+
+### **Visualization Options**
+
+- **Color Rendering**: Toggle RGB color display (if available in data)
+- **Intensity Rendering**: Toggle intensity-based coloring
+- **Point Size**: Adjust point size and attenuation settings
+- **Loading Settings**: Configure voxel grid filtering for large datasets
+
+## Testing and Validation
+
+### **Automated Test Suite**
+
+The application includes comprehensive unit and integration tests:
+
+```powershell
+# Run all tests
 .\scripts\run-tests.ps1
 
-# Run tests with coverage and verbose output
+# Run with detailed output and coverage
 .\scripts\run-tests.ps1 -Coverage -Verbose
+
+# Run specific test categories
+.\scripts\run-tests.ps1 -TestFilter "E57*"
 ```
 
-### Individual Test Executables
-
-You can also run individual test executables directly:
+### **Individual Test Components**
 
 ```powershell
-# Windows
-.\build\bin\E57ParserTests.exe
-.\build\bin\LasParserTests.exe
-.\build\bin\ProjectManagerTests.exe
+# E57 parsing and writing tests
+.\build-release\bin\Release\E57ParserTests.exe
+.\build-release\bin\Release\E57WriterLibTests.exe
 
-# Linux/macOS
-./build/bin/E57ParserTests
-./build/bin/LasParserTests
-./build/bin/ProjectManagerTests
+# LAS file parsing tests
+.\build-release\bin\Release\LasParserTests.exe
+
+# Project management tests
+.\build-release\bin\Release\ProjectManagerTests.exe
+
+# Performance and integration tests
+.\build-release\bin\Release\E57Sprint4ComprehensiveTests.exe
 ```
 
-### Manual Testing
+### **Sample Data for Testing**
 
-1. **Application Launch**: Verify the application opens with an empty 3D viewport
-2. **File Loading**: Test with various file types (E57, LAS, invalid files)
-3. **Camera Controls**: Test mouse interactions for smooth navigation
-4. **Error Handling**: Try loading non-existent or invalid files
-5. **Project Management**: Test creating and opening projects
+The repository includes sample files for testing:
+
+- **E57 Files**: `sample/bunnyDouble.e57`, `sample/bunnyInt32.e57`
+- **LAS Files**: `sample/S2max-Power line202503.las`
+- **Test Data**: Various test files in `test_data/` directory
+
+### **Manual Testing Checklist**
+
+1. **Application Startup**
+   - ✅ Application launches without errors
+   - ✅ Welcome screen displays correctly
+   - ✅ Recent projects list functions
+
+2. **Project Management**
+   - ✅ Create new project
+   - ✅ Open existing project
+   - ✅ Import scans (E57 and LAS)
+   - ✅ Project tree navigation
+
+3. **Point Cloud Visualization**
+   - ✅ Load and display point clouds
+   - ✅ 3D navigation controls
+   - ✅ Color and intensity rendering
+   - ✅ Performance with large datasets
+
+4. **File Format Support**
+   - ✅ E57 multi-scan files
+   - ✅ LAS files with various point formats
+   - ✅ Error handling for invalid files
 
 ## Project Structure
 
 ```
 cloud_registration/
-├── CMakeLists.txt              # Build configuration
-├── README.md                   # This file
-├── src/                        # Main application source code
+├── CMakeLists.txt              # Main build configuration
+├── CMakePresets.json           # CMake preset configurations
+├── vcpkg.json                  # Dependency management
+├── README.md                   # This documentation
+├── LICENSE                     # Project license
+├── resources.qrc               # Qt resource file
+│
+├── src/                        # Application source code
 │   ├── main.cpp               # Application entry point
 │   ├── mainwindow.h/cpp       # Main application window
-│   ├── pointcloudviewerwidget.h/cpp  # OpenGL 3D viewer
-│   ├── e57parserlib.h/cpp     # E57 file parser library
-│   ├── lasparser.h/cpp        # LAS file parser
-│   ├── projectmanager.h/cpp   # Project management
-│   ├── projecthubwidget.h/cpp # Project hub interface
-│   ├── sidebarwidget.h/cpp    # Sidebar interface
-│   └── ...                    # Other source files
-├── tests/                      # Unit and integration tests
-│   ├── test_e57parser.cpp     # E57 parser tests
-│   ├── test_lasparser.cpp     # LAS parser tests
-│   ├── test_projectmanager.cpp # Project manager tests
-│   ├── demos/                 # Simple test and demo programs
-│   │   ├── test_e57_simple.cpp
-│   │   ├── test_las_parser.cpp
-│   │   ├── test_sprint1_implementation.cpp
-│   │   └── ...                # Other demo files
-│   └── ...                    # Other test files
+│   ├── pointcloudviewerwidget.h/cpp  # OpenGL 3D viewer with LOD
+│   ├── projectmanager.h/cpp   # Project and workspace management
+│   ├── projecthubwidget.h/cpp # Project selection interface
+│   ├── sidebarwidget.h/cpp    # Navigation and scan tree
+│   │
+│   ├── e57parserlib.h/cpp     # E57 file parser (libE57Format)
+│   ├── e57writer_lib.h/cpp    # E57 file writing capabilities
+│   ├── E57DataManager.h/cpp   # High-level E57 operations
+│   ├── lasparser.h/cpp        # LAS/LAZ file parser
+│   │
+│   ├── pointcloudloadmanager.h/cpp  # Point cloud loading system
+│   ├── scanimportmanager.h/cpp      # Scan import workflows
+│   ├── sqlitemanager.h/cpp          # Database operations
+│   ├── projecttreemodel.h/cpp       # Project tree data model
+│   │
+│   ├── octree.h/cpp           # Spatial indexing for LOD
+│   ├── screenspaceerror.h/cpp # LOD error calculations
+│   ├── voxelgridfilter.h/cpp  # Point cloud subsampling
+│   ├── performance_profiler.h/cpp   # Performance monitoring
+│   │
+│   └── e57_parser/            # E57 parsing components
+│       ├── E57HeaderParser.h/cpp
+│       ├── E57BinaryReader.h/cpp
+│       └── E57XmlParser.h/cpp
+│
+├── tests/                      # Comprehensive test suite
+│   ├── test_e57parser.cpp     # E57 parsing tests
+│   ├── test_e57writer_lib.cpp # E57 writing tests
+│   ├── test_lasparser.cpp     # LAS parsing tests
+│   ├── test_projectmanager.cpp # Project management tests
+│   ├── test_pointcloudviewerwidget_lod.cpp # LOD system tests
+│   ├── E57TestFramework.h/cpp # Test utilities
+│   ├── PerformanceProfiler.h/cpp # Performance testing
+│   └── e57_parser/            # E57 component tests
+│
 ├── scripts/                    # Build and utility scripts
-│   ├── build-clean.ps1        # Build cleanup script
-│   ├── run-tests.ps1          # Test execution script
-│   ├── setup_libe57format.ps1 # E57 library setup
-│   ├── tests/                 # Test-specific scripts
-│   │   ├── test_app.ps1
-│   │   ├── verify_sprint1_implementation.ps1
-│   │   └── ...                # Other test scripts
-│   └── ...                    # Other utility scripts
-├── docs/                       # General documentation
-│   ├── build-instructions.md  # Build instructions
-│   ├── testing-best-practices.md # Testing guidelines
-│   ├── sprints/               # Sprint-specific documentation
-│   │   ├── SPRINT_1_IMPLEMENTATION_COMPLETE.md
-│   │   ├── E57_PARSING_FIX_SUMMARY.md
-│   │   └── ...                # Other sprint documents
-│   └── ...                    # Other documentation
-├── shaders/                    # OpenGL shaders
-│   ├── point.vert            # Vertex shader
-│   └── point.frag            # Fragment shader
-├── sample/                     # Sample point cloud files
-│   ├── bunnyDouble.e57
-│   ├── bunnyInt32.e57
-│   └── S2max-Power line202503.las
-└── test_data/                  # Test data files
-    ├── test_3_points_line.e57
-    ├── test_triangle.e57
-    └── ...                     # Other test files
+│   ├── build-clean.ps1        # Build management
+│   ├── run-tests.ps1          # Test execution
+│   ├── setup_libe57format.ps1 # Dependency setup
+│   └── tests/                 # Specialized test scripts
+│
+├── docs/                       # Documentation
+│   ├── sprints/               # Development sprint documentation
+│   ├── mvp/                   # MVP requirements and design
+│   ├── e57library2/           # E57 integration documentation
+│   └── visualization/         # Rendering and visualization docs
+│
+├── sample/                     # Sample data files
+│   ├── bunnyDouble.e57        # E57 test file (double precision)
+│   ├── bunnyInt32.e57         # E57 test file (integer)
+│   └── S2max-Power line202503.las # LAS test file
+│
+├── test_data/                  # Test data and validation files
+├── shaders/                    # OpenGL shader programs
+│   ├── point.vert            # Point cloud vertex shader
+│   └── point.frag            # Point cloud fragment shader
+│
+└── icons/                      # Application icons and resources
+    ├── project.svg
+    ├── scan.svg
+    └── cluster.svg
 ```
 
-## Current Limitations
+## Troubleshooting
 
-- **E57 Parsing**: Currently generates mock data for testing. Full E57 binary parsing will be implemented in future sprints.
-- **File Formats**: Only E57 format detection is implemented
-- **Performance**: Not optimized for very large point clouds yet
-- **Features**: Basic viewing only - no registration or advanced features
+### **Common Build Issues**
 
-## Next Steps (Future Sprints)
+1. **Qt6 Not Found**
+   ```
+   Error: Could not find Qt6
+   ```
+   - Verify Qt6 installation path: `C:\Qt\6.9.0\msvc2022_64\`
+   - Set environment variable: `Qt6_DIR=C:\Qt\6.9.0\msvc2022_64\lib\cmake\Qt6`
 
-- Implement full E57 binary parsing
-- Add support for additional file formats (RCP, PLY, etc.)
-- Implement scan/cluster tree view
-- Add point cloud registration tools
-- Performance optimizations for large datasets
+2. **vcpkg Dependencies Missing**
+   ```
+   Error: Could not find libE57Format
+   ```
+   - Ensure vcpkg is properly installed and integrated
+   - Verify dependencies: `.\vcpkg list | findstr e57`
+   - Set toolchain: `CMAKE_TOOLCHAIN_FILE=C:\dev\vcpkg\scripts\buildsystems\vcpkg.cmake`
 
-## Contributing
+3. **Visual Studio Toolset Issues**
+   ```
+   Error: MSVC compiler not found
+   ```
+   - Install Visual Studio 2022 with C++ workload
+   - Ensure MSVC v143 toolset is selected
 
-This is Phase 1 Sprint 1 of a larger point cloud registration software project. See the documentation in `docs/` for detailed requirements and development plans.
+### **Runtime Issues**
+
+1. **Missing DLL Errors**
+   - Run `windeployqt.exe` on the executable
+   - Copy vcpkg DLLs to application directory
+   - Install Visual C++ Redistributable 2022
+
+2. **OpenGL Context Errors**
+   - Update graphics drivers
+   - Verify OpenGL 3.3+ support
+   - Check Windows graphics settings
+
+### **Performance Optimization**
+
+For large point cloud files:
+- Use **Voxel Grid** loading method to reduce point count
+- Enable **LOD rendering** in visualization settings
+- Increase system RAM for better caching
+- Use SSD storage for faster file access
+
+## Development and Contributing
+
+### **Development Setup**
+
+1. **IDE Configuration**
+   - Visual Studio 2022 or VS Code with C++ extensions
+   - Qt Creator (optional, for UI design)
+   - Configure IntelliSense with CMake integration
+
+2. **Code Style**
+   - Follow Qt coding conventions
+   - Use meaningful variable and function names
+   - Document public APIs with Doxygen comments
+   - Include unit tests for new functionality
+
+3. **Testing Requirements**
+   - All new features must include unit tests
+   - Integration tests for file format support
+   - Performance benchmarks for optimization work
+   - Manual testing with real-world data
+
+### **Contributing Guidelines**
+
+1. **Fork and Branch**
+   - Fork the repository on GitHub
+   - Create feature branches from `main`
+   - Use descriptive branch names: `feature/e57-export`, `fix/las-parsing`
+
+2. **Pull Request Process**
+   - Ensure all tests pass locally
+   - Include test data for new file format features
+   - Update documentation for user-facing changes
+   - Request review from maintainers
+
+3. **Issue Reporting**
+   - Use GitHub Issues for bug reports and feature requests
+   - Include system information and reproduction steps
+   - Attach sample files for file format issues
 
 ## License
 
-Open source - license to be determined.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- **libE57Format**: ASTM E57 standard implementation
+- **Qt Framework**: Cross-platform application framework
+- **vcpkg**: C++ package management
+- **Contributors**: All developers who have contributed to this project
+
+## Support and Documentation
+
+- **GitHub Issues**: Bug reports and feature requests
+- **Documentation**: Comprehensive guides in `docs/` directory
+- **Sample Data**: Test files available in `sample/` directory
+- **API Reference**: Generated from source code comments
+
+---
+
+**CloudRegistration** - Professional point cloud visualization for surveying and engineering workflows.
