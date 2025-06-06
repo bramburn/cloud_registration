@@ -12,6 +12,7 @@
 #include <QGuiApplication>
 #include <vector>
 #include "mainwindow.h"
+#include "e57parserlib.h"
 
 // Enable logging
 Q_LOGGING_CATEGORY(appLog, "CloudRegistration")
@@ -124,9 +125,14 @@ int main(int argc, char *argv[])
         QSurfaceFormat::setDefaultFormat(format);
         qDebug() << "OpenGL format configured successfully";
 
-        // Create and show main window
-        qDebug() << "Creating main window...";
-        MainWindow window;
+        // Sprint 1 Decoupling: Create E57 parser and inject into main window
+        qDebug() << "Creating E57 parser...";
+        E57ParserLib* e57Parser = new E57ParserLib();
+        qDebug() << "E57 parser created";
+
+        // Create and show main window with dependency injection
+        qDebug() << "Creating main window with injected E57 parser...";
+        MainWindow window(e57Parser);
         qDebug() << "Main window created, showing...";
         window.show();
         qDebug() << "Main window shown successfully";

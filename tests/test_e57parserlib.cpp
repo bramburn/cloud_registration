@@ -2,7 +2,9 @@
 #include <QtTest/QSignalSpy>
 #include <QCoreApplication>
 #include "../src/e57parserlib.h"
+#include "../src/IE57Parser.h"
 #include <fstream>
+#include <memory>
 
 /**
  * @brief Unit tests for E57ParserLib class
@@ -307,4 +309,99 @@ TEST_F(E57ParserLibTest, ParsingFinishedSignalFailure) {
         EXPECT_FALSE(success) << "Expected failed parsing";
         EXPECT_FALSE(message.isEmpty()) << "Expected non-empty error message";
     }
+}
+
+// ============================================================================
+// Sprint 1 Decoupling Test Cases: Interface Compliance and Polymorphism
+// ============================================================================
+
+// Test Case: Polymorphic Usage Through Interface
+TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface) {
+    // Test that E57ParserLib can be used polymorphically through IE57Parser interface
+    std::unique_ptr<IE57Parser> interfaceParser(new E57ParserLib());
+
+    // Test basic interface methods
+    EXPECT_FALSE(interfaceParser->isOpen());
+    EXPECT_TRUE(interfaceParser->getLastError().isEmpty());
+    EXPECT_EQ(interfaceParser->getScanCount(), 0);
+
+    // Test that we can call interface methods
+    std::ifstream file(validFile);
+    if (file.good()) {
+        file.close();
+
+        EXPECT_TRUE(interfaceParser->openFile(validFile));
+        EXPECT_TRUE(interfaceParser->isOpen());
+
+        // Test metadata access through interface
+        auto version = interfaceParser->getVersion();
+        EXPECT_GT(version.first, 0);
+
+        int scanCount = interfaceParser->getScanCount();
+        EXPECT_GE(scanCount, 0);
+
+        if (scanCount > 0) {
+            auto metadata = interfaceParser->getScanMetadata(0);
+            EXPECT_EQ(metadata.index, 0);
+            EXPECT_GE(metadata.pointCount, 0);
+        }
+
+        interfaceParser->closeFile();
+        EXPECT_FALSE(interfaceParser->isOpen());
+    } else {
+        GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
+    }
+}
+
+// Test Case: Interface Signal Compatibility
+TEST_F(E57ParserLibTest, InterfaceSignalCompatibility) {
+    std::unique_ptr<IE57Parser> interfaceParser(new E57ParserLib());
+
+    // Test that signals are accessible through the interface
+    QSignalSpy progressSpy(interfaceParser.get(), &IE57Parser::progressUpdated);
+    QSignalSpy finishedSpy(interfaceParser.get(), &IE57Parser::parsingFinished);
+    QSignalSpy metadataSpy(interfaceParser.get(), &IE57Parser::scanMetadataAvailable);
+    QSignalSpy intensitySpy(interfaceParser.get(), &IE57Parser::intensityDataExtracted);
+    QSignalSpy colorSpy(interfaceParser.get(), &IE57Parser::colorDataExtracted);
+
+    EXPECT_TRUE(progressSpy.isValid());
+    EXPECT_TRUE(finishedSpy.isValid());
+    EXPECT_TRUE(metadataSpy.isValid());
+    EXPECT_TRUE(intensitySpy.isValid());
+    EXPECT_TRUE(colorSpy.isValid());
+}
+
+// Test Case: Interface Method Override Verification
+TEST_F(E57ParserLibTest, InterfaceMethodOverrideVerification) {
+    // This test verifies that all interface methods are properly overridden
+    E57ParserLib concreteParser;
+    IE57Parser* interfacePtr = &concreteParser;
+
+    // Test that virtual method calls work correctly
+    EXPECT_FALSE(interfacePtr->isOpen());
+
+    // Test file operations through interface
+    interfacePtr->openFile(invalidFile);  // Should fail gracefully
+    EXPECT_FALSE(interfacePtr->isOpen());
+    EXPECT_FALSE(interfacePtr->getLastError().isEmpty());
+
+    interfacePtr->closeFile();  // Should be safe to call
+    EXPECT_FALSE(interfacePtr->isOpen());
+}
+
+// Test Case: Dependency Injection Compatibility
+TEST_F(E57ParserLibTest, DependencyInjectionCompatibility) {
+    // Test that E57ParserLib can be used for dependency injection
+    std::unique_ptr<IE57Parser> parser(new E57ParserLib());
+
+    // Simulate what MainWindow constructor would do
+    EXPECT_NE(parser.get(), nullptr);
+    EXPECT_FALSE(parser->isOpen());
+
+    // Test that the parser can be moved to a thread (important for MainWindow usage)
+    QThread testThread;
+    parser->moveToThread(&testThread);
+
+    // Move back to main thread for cleanup
+    parser->moveToThread(QThread::currentThread());
 }

@@ -373,6 +373,23 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57ParserLibTests PRIVATE src)
     add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
 
+    # Sprint 1 Decoupling: E57 Parser Decoupling Tests
+    add_executable(E57ParserDecouplingTests
+        tests/test_decoupling_e57parser.cpp
+        src/e57parserlib.cpp
+    )
+
+    target_link_libraries(E57ParserDecouplingTests
+        GTest::gtest_main
+        E57Format
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Test
+    )
+
+    target_include_directories(E57ParserDecouplingTests PRIVATE src)
+    add_test(NAME E57ParserDecouplingTests COMMAND E57ParserDecouplingTests)
+
     # Sprint 4: Comprehensive E57 Test Suite
     add_executable(E57Sprint4ComprehensiveTests
         tests/test_e57parser_sprint4_comprehensive.cpp
@@ -1106,8 +1123,8 @@ if(TARGET GTest::gtest_main)
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57HeaderParserTests E57ParserTests E57ParserLibTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint21Tests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
-        COMMENT "Running all unit tests including Sprint 2.1 state management, Sprint 1.1 E57 header parsing, Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
+        DEPENDS E57HeaderParserTests E57ParserTests E57ParserLibTests E57ParserDecouplingTests E57WriterLibTests LasParserTests VoxelGridFilterTests Sprint1FunctionalityTests Sprint14IntegrationTests Sprint21Tests Sprint24AdvancedTests ProjectManagerTests RecentProjectsManagerTests Sprint33UIRefinementsTests SprintR1LODTests SprintR2LODTests
+        COMMENT "Running all unit tests including Sprint 1 E57 parser decoupling, Sprint 2.1 state management, Sprint 1.1 E57 header parsing, Sprint R2 screen-space error LOD, Sprint R1 LOD system, Sprint 3.3 UI/UX refinements, Sprint W1 E57WriterLib, Sprint 1.1 project management, Sprint 1 E57ParserLib, and Sprint 2.4 advanced testing framework"
 )
 
 # Sprint 1.1: E57 Header Parser testing targets
@@ -1122,6 +1139,13 @@ add_custom_target(run_sprint1_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*E57ParserLib.*"
         DEPENDS E57ParserLibTests
         COMMENT "Running Sprint 1 E57ParserLib tests"
+    )
+
+    # Sprint 1 Decoupling: E57 Parser Decoupling testing targets
+    add_custom_target(run_decoupling_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R ".*Decoupling.*"
+        DEPENDS E57ParserDecouplingTests
+        COMMENT "Running Sprint 1 E57 parser decoupling tests"
     )
 
     # Sprint W1: E57WriterLib testing targets

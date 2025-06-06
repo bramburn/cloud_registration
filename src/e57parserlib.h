@@ -10,6 +10,7 @@
 #include <QMutex>
 #include <QTimer>
 #include <QThread>
+#include "IE57Parser.h"
 
 // Forward declarations to avoid including E57Format.h in header
 namespace e57 {
@@ -24,73 +25,58 @@ namespace e57 {
  * This class provides a simplified interface to the libE57Format library
  * for opening E57 files, extracting metadata, and reading point cloud data.
  * Implements Sprint 1-5 requirements for E57 library integration with MainWindow compatibility.
+ *
+ * Sprint 1 Decoupling: Now implements IE57Parser interface for loose coupling.
  */
-class E57ParserLib : public QObject {
+class E57ParserLib : public IE57Parser {
     Q_OBJECT
-
-public:
-    struct PointData {
-        double x, y, z;
-        float intensity = 0.0f;
-        uint8_t r = 255, g = 255, b = 255;
-        bool hasIntensity = false;
-        bool hasColor = false;
-        bool isValid = true;
-    };
-
-    struct LoadingSettings {
-        bool loadIntensity = true;
-        bool loadColor = true;
-        int maxPointsPerScan = -1;  // -1 = unlimited
-        double subsamplingRatio = 1.0;  // 1.0 = no subsampling
-    };
 
 public:
     explicit E57ParserLib(QObject *parent = nullptr);
     ~E57ParserLib();
 
     // Main entry point for MainWindow integration
-    void startParsing(const QString& filePath, const LoadingSettings& settings = LoadingSettings());
+    void startParsing(const QString& filePath, const LoadingSettings& settings = LoadingSettings()) override;
 
     // Thread-safe cancellation
-    void cancelParsing();
+    void cancelParsing() override;
 
     // Error reporting
-    QString getLastError() const;
+    QString getLastError() const override;
 
     // Utility methods for MainWindow
-    bool isValidE57File(const QString& filePath);
-    int getScanCount(const QString& filePath);
+    bool isValidE57File(const QString& filePath) override;
+    int getScanCount(const QString& filePath) override;
 
     /**
      * @brief Open an E57 file for reading
      * @param filePath Path to the E57 file
      * @return true if file opened successfully, false otherwise
      */
-    bool openFile(const std::string& filePath);
+    bool openFile(const std::string& filePath) override;
 
     /**
      * @brief Close the currently opened E57 file
      */
-    void closeFile();
+    void closeFile() override;
 
     /**
      * @brief Get the GUID of the opened E57 file
      * @return File GUID as string, empty if not available
      */
-    std::string getGuid() const;
+    std::string getGuid() const override;
 
     /**
      * @brief Get the E57 standard version of the opened file
      * @return Pair of (major, minor) version numbers
      */
-    std::pair<int, int> getVersion() const;
+    std::pair<int, int> getVersion() const override;
 
     /**
      * @brief Get the number of scans (Data3D sections) in the file
      * @return Number of scans, 0 if none or file not open
      */
-    int getScanCount() const;
+    int getScanCount() const override;
 
     // Sprint 4: Multi-scan support enhancement
 
@@ -99,17 +85,7 @@ public:
      * @param scanIndex Index of the scan (0-based)
      * @return Scan metadata structure
      */
-    struct ScanMetadata {
-        int index = -1;
-        std::string name;
-        std::string guid;
-        int64_t pointCount = 0;
-        bool isLoaded = false;
-        bool hasIntensity = false;
-        bool hasColor = false;
-    };
-
-    ScanMetadata getScanMetadata(int scanIndex) const;
+    ScanMetadata getScanMetadata(int scanIndex) const override;
 
 
 
@@ -117,7 +93,7 @@ public:
      * @brief Check if a file is open
      * @return true if file is open, false otherwise
      */
-    bool isOpen() const;
+    bool isOpen() const override;
 
     // Sprint 2 & 3: Point data extraction methods
 
@@ -125,28 +101,28 @@ public:
      * @brief Extract XYZ point data from the first scan (legacy method)
      * @return Vector of floats in interleaved format (X1,Y1,Z1,X2,Y2,Z2,...)
      */
-    std::vector<float> extractPointData();
+    std::vector<float> extractPointData() override;
 
     /**
      * @brief Extract XYZ point data from a specific scan (legacy method)
      * @param scanIndex Index of the scan to extract (0-based)
      * @return Vector of floats in interleaved format (X1,Y1,Z1,X2,Y2,Z2,...)
      */
-    std::vector<float> extractPointData(int scanIndex);
+    std::vector<float> extractPointData(int scanIndex) override;
 
     /**
      * @brief Extract enhanced point data with intensity and color (Sprint 3)
      * @param scanIndex Index of the scan to extract (0-based)
      * @return Vector of PointData structures with all available attributes
      */
-    std::vector<PointData> extractEnhancedPointData(int scanIndex = 0);
+    std::vector<PointData> extractEnhancedPointData(int scanIndex = 0) override;
 
     /**
      * @brief Get the number of points in a specific scan
      * @param scanIndex Index of the scan (0-based)
      * @return Number of points, 0 if scan doesn't exist or error
      */
-    int64_t getPointCount(int scanIndex = 0) const;
+    int64_t getPointCount(int scanIndex = 0) const override;
 
 signals:
     // MainWindow-compatible signals matching old E57Parser interface
