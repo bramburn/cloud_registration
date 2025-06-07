@@ -4,6 +4,7 @@
 #include "IE57Writer.h"
 #include "IPointCloudViewer.h"
 #include "projectmanager.h"
+#include "pointcloudloadmanager.h"
 #include "scaninfo.h"
 #include "sqlitemanager.h"
 #include <QFileInfo>
@@ -11,38 +12,18 @@
 #include <QDebug>
 
 MainPresenter::MainPresenter(IMainView* view,
-                           IE57Parser* e57Parser,
-                           IE57Writer* e57Writer,
-                           QObject* parent)
-    : QObject(parent)
-    , m_view(view)
-    , m_e57Parser(e57Parser)
-    , m_e57Writer(e57Writer)
-    , m_viewer(nullptr)
-    , m_projectManager(nullptr)
-    , m_isFileOpen(false)
-    , m_isProjectOpen(false)
-    , m_isParsingInProgress(false)
-    , m_currentMemoryUsage(0)
-    , m_currentFPS(0.0f)
-    , m_currentVisiblePoints(0)
-{
-    if (m_view) {
-        m_viewer = m_view->getViewer();
-    }
-}
-
-MainPresenter::MainPresenter(IMainView* view,
-                           IE57Parser* e57Parser,
-                           IE57Writer* e57Writer,
-                           ProjectManager* projectManager,
-                           QObject* parent)
+                             IE57Parser* e57Parser,
+                             IE57Writer* e57Writer,
+                             ProjectManager* projectManager,
+                             PointCloudLoadManager* loadManager,
+                             QObject* parent)
     : QObject(parent)
     , m_view(view)
     , m_e57Parser(e57Parser)
     , m_e57Writer(e57Writer)
     , m_viewer(nullptr)
     , m_projectManager(projectManager)
+    , m_loadManager(loadManager)
     , m_isFileOpen(false)
     , m_isProjectOpen(false)
     , m_isParsingInProgress(false)
@@ -63,6 +44,10 @@ void MainPresenter::initialize() {
 
 void MainPresenter::setProjectManager(ProjectManager* projectManager) {
     m_projectManager = projectManager;
+}
+
+void MainPresenter::setPointCloudLoadManager(PointCloudLoadManager* loadManager) {
+    m_loadManager = loadManager;
 }
 
 void MainPresenter::setupConnections() {
@@ -94,33 +79,37 @@ void MainPresenter::setupConnections() {
         connect(m_viewer, &IPointCloudViewer::statsUpdated, this, &MainPresenter::onRenderingStatsUpdated);
     }
 
-    // Sprint 3: Connect sidebar signals if available
+    // Connect sidebar signals if available
     if (m_view) {
         auto* sidebar = m_view->getSidebar();
         if (sidebar) {
             // Connect cluster operations
             connect(sidebar, &SidebarWidget::clusterCreationRequested,
-                    this, &MainPresenter::handleCreateCluster);
+                    this, &MainPresenter::handleClusterCreation);
             connect(sidebar, &SidebarWidget::clusterRenameRequested,
-                    this, &MainPresenter::handleRenameCluster);
+                    this, &MainPresenter::handleClusterRename);
             connect(sidebar, &SidebarWidget::deleteClusterRequested,
-                    this, &MainPresenter::handleDeleteCluster);
+                    this, &MainPresenter::handleClusterDeletion);
 
             // Connect scan operations
             connect(sidebar, &SidebarWidget::loadScanRequested,
-                    this, &MainPresenter::handleLoadScan);
+                    this, &MainPresenter::handleScanLoad);
             connect(sidebar, &SidebarWidget::unloadScanRequested,
-                    this, &MainPresenter::handleUnloadScan);
+                    this, &MainPresenter::handleScanUnload);
             connect(sidebar, &SidebarWidget::loadClusterRequested,
-                    this, &MainPresenter::handleLoadCluster);
+                    this, &MainPresenter::handleClusterLoad);
             connect(sidebar, &SidebarWidget::unloadClusterRequested,
-                    this, &MainPresenter::handleUnloadCluster);
+                    this, &MainPresenter::handleClusterUnload);
             connect(sidebar, &SidebarWidget::viewPointCloudRequested,
-                    this, &MainPresenter::handleViewPointCloud);
+                    this, &MainPresenter::handlePointCloudView);
             connect(sidebar, &SidebarWidget::deleteScanRequested,
-                    this, &MainPresenter::handleDeleteScan);
-            connect(sidebar, &SidebarWidget::batchOperationRequested,
-                    this, &MainPresenter::handleBatchOperation);
+                    this, &MainPresenter::handleScanDeletion);
+            
+            // Connect new Sprint 4 operations
+            connect(sidebar, &SidebarWidget::clusterLockToggleRequested,
+                    this, &MainPresenter::handleClusterLockToggle);
+            connect(sidebar, &SidebarWidget::dragDropOperationRequested,
+                    this, &MainPresenter::handleDragDropOperation);
         }
     }
 }
@@ -302,8 +291,8 @@ void MainPresenter::onParsingFinished(bool success, const QString& message, cons
         
         QFileInfo fileInfo(m_currentFilePath);
         m_view->updateStatusBar(QString("Loaded %1 points from %2")
-                               .arg(points.size() / 3)
-                               .arg(fileInfo.fileName()));
+                                .arg(points.size() / 3)
+                                .arg(fileInfo.fileName()));
         
         showInfo("File Opened", message);
     } else {
@@ -424,167 +413,323 @@ void MainPresenter::clearPointCloudData() {
     m_view->updateScanList(QStringList());
 }
 
-// Sprint 3: Sidebar operation handler implementations
-void MainPresenter::handleCreateCluster(const QString& parentClusterId) {
+// Sprint 4: Sidebar-related method implementations
+void MainPresenter::handleClusterCreation(const QString& clusterName, const QString& parentClusterId) {
     if (!m_projectManager) {
-        showError("Create Cluster", "Project manager is not available.");
+        showError("Cluster Creation", "Project manager is not available.");
         return;
     }
 
-    QString clusterName = m_view->promptForClusterName("Create New Cluster");
-    if (clusterName.isEmpty()) {
+    if (clusterName.trimmed().isEmpty()) {
+        showError("Cluster Creation", "Cluster name cannot be empty.");
         return;
     }
 
-    QString clusterId = m_projectManager->createCluster(clusterName, parentClusterId);
-    if (!clusterId.isEmpty()) {
-        qDebug() << "MainPresenter: Cluster created successfully:" << clusterName;
-        m_view->updateStatusBar(QString("Created cluster: %1").arg(clusterName));
+    QString clusterId = m_projectManager->createCluster(clusterName.trimmed(), parentClusterId);
+    if (clusterId.isEmpty()) {
+        showError("Cluster Creation", "Failed to create cluster. Please try again.");
     } else {
-        showError("Create Cluster", "Failed to create cluster.");
+        showInfo("Cluster Creation", QString("Cluster '%1' created successfully.").arg(clusterName));
+        m_view->updateStatusBar(QString("Created cluster: %1").arg(clusterName));
     }
 }
 
-void MainPresenter::handleRenameCluster(const QString& clusterId, const QString& newName) {
+void MainPresenter::handleClusterRename(const QString& clusterId, const QString& newName) {
     if (!m_projectManager) {
-        showError("Rename Cluster", "Project manager is not available.");
+        showError("Cluster Rename", "Project manager is not available.");
         return;
     }
 
-    if (m_projectManager->renameCluster(clusterId, newName)) {
-        qDebug() << "MainPresenter: Cluster renamed successfully to:" << newName;
+    if (newName.trimmed().isEmpty()) {
+        showError("Cluster Rename", "Cluster name cannot be empty.");
+        return;
+    }
+
+    if (clusterId.isEmpty()) {
+        showError("Cluster Rename", "Invalid cluster selected.");
+        return;
+    }
+
+    bool success = m_projectManager->renameCluster(clusterId, newName.trimmed());
+    if (success) {
+        showInfo("Cluster Rename", QString("Cluster renamed to '%1' successfully.").arg(newName));
         m_view->updateStatusBar(QString("Renamed cluster to: %1").arg(newName));
     } else {
-        showError("Rename Cluster", "Failed to rename cluster.");
+        showError("Cluster Rename", "Failed to rename cluster. Please try again.");
     }
 }
 
-void MainPresenter::handleDeleteCluster(const QString& clusterId, bool deletePhysicalFiles) {
+void MainPresenter::handleClusterDeletion(const QString& clusterId, bool deletePhysicalFiles) {
     if (!m_projectManager) {
-        showError("Delete Cluster", "Project manager is not available.");
+        showError("Cluster Deletion", "Project manager is not available.");
         return;
     }
 
-    // Show confirmation dialog
-    QString message = QString("Are you sure you want to delete this cluster?\n\n"
-                             "All scans in this cluster will be moved to the project root.\n"
-                             "All sub-clusters will also be deleted.");
+    if (clusterId.isEmpty()) {
+        showError("Cluster Deletion", "Invalid cluster selected.");
+        return;
+    }
 
-    bool confirmed = m_view->askForConfirmation("Delete Cluster", message);
+    // Ask for confirmation
+    QString confirmMessage = deletePhysicalFiles ?
+        "Are you sure you want to delete this cluster and all its physical files? This action cannot be undone." :
+        "Are you sure you want to delete this cluster? The physical files will be preserved.";
+
+    bool confirmed = m_view->askForConfirmation("Delete Cluster", confirmMessage);
     if (!confirmed) {
         return;
     }
 
-    if (m_projectManager->deleteCluster(clusterId)) {
-        qDebug() << "MainPresenter: Cluster deleted successfully:" << clusterId;
-        m_view->updateStatusBar("Cluster deleted successfully");
+    bool success = m_projectManager->deleteCluster(clusterId, deletePhysicalFiles);
+    if (success) {
+        showInfo("Cluster Deletion", "Cluster deleted successfully.");
+        m_view->updateStatusBar("Cluster deleted");
     } else {
-        showError("Delete Cluster", "Failed to delete cluster.");
+        showError("Cluster Deletion", "Failed to delete cluster. Please try again.");
     }
 }
 
-void MainPresenter::handleLoadScan(const QString& scanId) {
-    if (!m_view) {
+void MainPresenter::handleScanLoad(const QString& scanId) {
+    if (!m_loadManager) {
+        showError("Scan Load", "Load manager is not available.");
         return;
     }
 
-    // Delegate to view's load manager through interface
-    m_view->loadScan(scanId);
-    m_view->updateStatusBar(QString("Loading scan: %1").arg(scanId));
+    if (scanId.isEmpty()) {
+        showError("Scan Load", "Invalid scan selected.");
+        return;
+    }
+
+    if (m_loadedScans.contains(scanId)) {
+        showInfo("Scan Load", "Scan is already loaded.");
+        return;
+    }
+
+    // Delegate to load manager
+    bool success = m_loadManager->loadScan(scanId);
+    if (success) {
+        m_loadedScans.append(scanId);
+        showInfo("Scan Load", "Scan loaded successfully.");
+        m_view->updateStatusBar(QString("Loaded scan: %1").arg(scanId));
+    } else {
+        showError("Scan Load", "Failed to load scan. Please try again.");
+    }
 }
 
-void MainPresenter::handleUnloadScan(const QString& scanId) {
-    if (!m_view) {
+void MainPresenter::handleScanUnload(const QString& scanId) {
+    if (!m_loadManager) {
+        showError("Scan Unload", "Load manager is not available.");
         return;
     }
 
-    // Delegate to view's load manager through interface
-    m_view->unloadScan(scanId);
-    m_view->updateStatusBar(QString("Unloading scan: %1").arg(scanId));
+    if (scanId.isEmpty()) {
+        showError("Scan Unload", "Invalid scan selected.");
+        return;
+    }
+
+    if (!m_loadedScans.contains(scanId)) {
+        showInfo("Scan Unload", "Scan is not currently loaded.");
+        return;
+    }
+
+    // Delegate to load manager
+    bool success = m_loadManager->unloadScan(scanId);
+    if (success) {
+        m_loadedScans.removeAll(scanId);
+        showInfo("Scan Unload", "Scan unloaded successfully.");
+        m_view->updateStatusBar(QString("Unloaded scan: %1").arg(scanId));
+    } else {
+        showError("Scan Unload", "Failed to unload scan. Please try again.");
+    }
 }
 
-void MainPresenter::handleLoadCluster(const QString& clusterId) {
-    if (!m_view) {
+void MainPresenter::handleClusterLoad(const QString& clusterId) {
+    if (!m_loadManager || !m_projectManager) {
+        showError("Cluster Load", "Required managers are not available.");
         return;
     }
 
-    // Delegate to view's load manager through interface
-    m_view->loadCluster(clusterId);
-    m_view->updateStatusBar(QString("Loading cluster: %1").arg(clusterId));
-}
-
-void MainPresenter::handleUnloadCluster(const QString& clusterId) {
-    if (!m_view) {
+    if (clusterId.isEmpty()) {
+        showError("Cluster Load", "Invalid cluster selected.");
         return;
     }
 
-    // Delegate to view's load manager through interface
-    m_view->unloadCluster(clusterId);
-    m_view->updateStatusBar(QString("Unloading cluster: %1").arg(clusterId));
-}
-
-void MainPresenter::handleViewPointCloud(const QString& itemId, const QString& itemType) {
-    if (!m_view) {
+    // Get all scans in the cluster
+    QStringList scanIds = m_projectManager->getScansInCluster(clusterId);
+    if (scanIds.isEmpty()) {
+        showInfo("Cluster Load", "No scans found in this cluster.");
         return;
     }
 
-    // Delegate to view's point cloud viewing mechanism
-    m_view->viewPointCloud(itemId, itemType);
-    m_view->updateStatusBar(QString("Viewing %1: %2").arg(itemType, itemId));
-}
-
-void MainPresenter::handleDeleteScan(const QString& scanId, bool deletePhysicalFile) {
-    if (!m_projectManager) {
-        showError("Delete Scan", "Project manager is not available.");
-        return;
-    }
-
-    // Get scan info to check import type and show appropriate confirmation
-    auto* sqliteManager = m_projectManager->getSQLiteManager();
-    if (!sqliteManager) {
-        showError("Delete Scan", "Database manager is not available.");
-        return;
-    }
-
-    ScanInfo scan = sqliteManager->getScanById(scanId);
-    if (!scan.isValid()) {
-        showError("Delete Scan", "Could not retrieve scan information.");
-        return;
-    }
-
-    QString message = QString("Are you sure you want to delete scan '%1'?\nThis action cannot be undone.")
-                     .arg(scan.scanName);
-
-    // For copied/moved scans, ask about deleting physical files
-    bool shouldDeletePhysicalFile = deletePhysicalFile;
-    if (scan.importType == "COPIED" || scan.importType == "MOVED") {
-        QString extendedMessage = message + "\n\nAlso delete the physical scan file from the project folder?";
-        shouldDeletePhysicalFile = m_view->askForConfirmation("Delete Scan", extendedMessage);
-        if (!shouldDeletePhysicalFile) {
-            // Still ask for basic confirmation
-            bool basicConfirm = m_view->askForConfirmation("Delete Scan", message);
-            if (!basicConfirm) {
-                return;
+    int loadedCount = 0;
+    for (const QString& scanId : scanIds) {
+        if (!m_loadedScans.contains(scanId)) {
+            if (m_loadManager->loadScan(scanId)) {
+                m_loadedScans.append(scanId);
+                loadedCount++;
             }
         }
-    } else {
-        bool confirmed = m_view->askForConfirmation("Delete Scan", message);
-        if (!confirmed) {
-            return;
-        }
     }
 
-    // Delegate to view's scan deletion mechanism
-    m_view->deleteScan(scanId, shouldDeletePhysicalFile);
-    m_view->updateStatusBar(QString("Deleting scan: %1").arg(scan.scanName));
+    if (loadedCount > 0) {
+        showInfo("Cluster Load", QString("Loaded %1 scans from cluster.").arg(loadedCount));
+        m_view->updateStatusBar(QString("Loaded %1 scans from cluster").arg(loadedCount));
+    } else {
+        showInfo("Cluster Load", "All scans in cluster are already loaded.");
+    }
 }
 
-void MainPresenter::handleBatchOperation(const QString& operation, const QStringList& scanIds) {
-    if (!m_view || scanIds.isEmpty()) {
+void MainPresenter::handleClusterUnload(const QString& clusterId) {
+    if (!m_loadManager || !m_projectManager) {
+        showError("Cluster Unload", "Required managers are not available.");
         return;
     }
 
-    // Delegate to view's batch operation mechanism
-    m_view->performBatchOperation(operation, scanIds);
-    m_view->updateStatusBar(QString("Performing %1 operation on %2 scans").arg(operation).arg(scanIds.size()));
+    if (clusterId.isEmpty()) {
+        showError("Cluster Unload", "Invalid cluster selected.");
+        return;
+    }
+
+    // Get all scans in the cluster
+    QStringList scanIds = m_projectManager->getScansInCluster(clusterId);
+    if (scanIds.isEmpty()) {
+        showInfo("Cluster Unload", "No scans found in this cluster.");
+        return;
+    }
+
+    int unloadedCount = 0;
+    for (const QString& scanId : scanIds) {
+        if (m_loadedScans.contains(scanId)) {
+            if (m_loadManager->unloadScan(scanId)) {
+                m_loadedScans.removeAll(scanId);
+                unloadedCount++;
+            }
+        }
+    }
+
+    if (unloadedCount > 0) {
+        showInfo("Cluster Unload", QString("Unloaded %1 scans from cluster.").arg(unloadedCount));
+        m_view->updateStatusBar(QString("Unloaded %1 scans from cluster").arg(unloadedCount));
+    } else {
+        showInfo("Cluster Unload", "No loaded scans found in cluster.");
+    }
+}
+
+void MainPresenter::handlePointCloudView(const QString& itemId, const QString& itemType) {
+    if (!m_viewer) {
+        showError("Point Cloud View", "Viewer is not available.");
+        return;
+    }
+
+    if (itemId.isEmpty()) {
+        showError("Point Cloud View", "Invalid item selected.");
+        return;
+    }
+
+    if (itemType == "scan") {
+        // Focus on specific scan
+        m_viewer->focusOnScan(itemId);
+        m_view->updateStatusBar(QString("Viewing scan: %1").arg(itemId));
+    } else if (itemType == "cluster") {
+        // Focus on all scans in cluster
+        m_viewer->focusOnCluster(itemId);
+        m_view->updateStatusBar(QString("Viewing cluster: %1").arg(itemId));
+    } else {
+        showError("Point Cloud View", "Unknown item type selected.");
+    }
+}
+
+void MainPresenter::handleScanDeletion(const QString& scanId, bool deletePhysicalFile) {
+    if (!m_projectManager) {
+        showError("Scan Deletion", "Project manager is not available.");
+        return;
+    }
+
+    if (scanId.isEmpty()) {
+        showError("Scan Deletion", "Invalid scan selected.");
+        return;
+    }
+
+    // Ask for confirmation
+    QString confirmMessage = deletePhysicalFile ?
+        "Are you sure you want to delete this scan and its physical file? This action cannot be undone." :
+        "Are you sure you want to delete this scan? The physical file will be preserved.";
+
+    bool confirmed = m_view->askForConfirmation("Delete Scan", confirmMessage);
+    if (!confirmed) {
+        return;
+    }
+
+    // Unload scan if it's currently loaded
+    if (m_loadedScans.contains(scanId)) {
+        handleScanUnload(scanId);
+    }
+
+    bool success = m_projectManager->deleteScan(scanId, deletePhysicalFile);
+    if (success) {
+        showInfo("Scan Deletion", "Scan deleted successfully.");
+        m_view->updateStatusBar("Scan deleted");
+    } else {
+        showError("Scan Deletion", "Failed to delete scan. Please try again.");
+    }
+}
+
+void MainPresenter::handleClusterLockToggle(const QString& clusterId, bool lock) {
+    if (!m_projectManager) {
+        showError("Cluster Lock", "Project manager is not available.");
+        return;
+    }
+
+    if (clusterId.isEmpty()) {
+        showError("Cluster Lock", "Invalid cluster selected.");
+        return;
+    }
+
+    bool success = m_projectManager->setClusterLockState(clusterId, lock);
+    if (success) {
+        if (lock) {
+            m_lockedClusters.append(clusterId);
+            showInfo("Cluster Lock", "Cluster locked successfully.");
+            m_view->updateStatusBar("Cluster locked");
+        } else {
+            m_lockedClusters.removeAll(clusterId);
+            showInfo("Cluster Unlock", "Cluster unlocked successfully.");
+            m_view->updateStatusBar("Cluster unlocked");
+        }
+    } else {
+        QString action = lock ? "lock" : "unlock";
+        showError("Cluster Lock", QString("Failed to %1 cluster. Please try again.").arg(action));
+    }
+}
+
+void MainPresenter::handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
+                                              const QString& targetItemId, const QString& targetType) {
+    if (!m_projectManager) {
+        showError("Drag and Drop", "Project manager is not available.");
+        return;
+    }
+
+    if (draggedItems.isEmpty() || targetItemId.isEmpty()) {
+        showError("Drag and Drop", "Invalid drag and drop operation.");
+        return;
+    }
+
+    // Only allow dropping scans onto clusters or project root
+    if (draggedType == "scan" && (targetType == "cluster" || targetType == "project_root")) {
+        int movedCount = 0;
+        for (const QString& scanId : draggedItems) {
+            if (m_projectManager->moveScanToCluster(scanId, targetItemId)) {
+                movedCount++;
+            }
+        }
+
+        if (movedCount > 0) {
+            showInfo("Drag and Drop", QString("Moved %1 scan(s) successfully.").arg(movedCount));
+            m_view->updateStatusBar(QString("Moved %1 scan(s)").arg(movedCount));
+        } else {
+            showError("Drag and Drop", "Failed to move scans. Please try again.");
+        }
+    } else {
+        showError("Drag and Drop", "This drag and drop operation is not supported.");
+    }
 }
