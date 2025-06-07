@@ -208,6 +208,11 @@ set(SOURCES
     src/E57ParserCore.cpp
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 1: 3D Point Cloud Visualization
+    src/rendering/OpenGLRenderer.cpp
+    src/camera/CameraController.cpp
+    src/rendering/LODManager.cpp
+    src/ui/ViewerToolbar.cpp
 )
 
 # Header files
@@ -240,12 +245,20 @@ set(HEADERS
     src/scanimportmanager.h
     src/E57ParserCore.h
     src/ProjectStateService.h
+    # Sprint 1: 3D Point Cloud Visualization
+    src/rendering/OpenGLRenderer.h
+    src/camera/CameraController.h
+    src/rendering/LODManager.h
+    src/ui/ViewerToolbar.h
 )
 
 # Shader files
 set(SHADERS
     shaders/point.vert
     shaders/point.frag
+    # Sprint 1: Enhanced shaders
+    shaders/pointcloud.vert
+    shaders/pointcloud.frag
 )
 
 # Resource files
@@ -500,10 +513,74 @@ if(TARGET GTest::gtest_main)
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
+        # Sprint 1: OpenGL Renderer Tests
+        add_executable(OpenGLRendererTests
+            tests/test_opengl_renderer.cpp
+            src/rendering/OpenGLRenderer.cpp
+        )
+
+        target_link_libraries(OpenGLRendererTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::OpenGL
+            Qt6::OpenGLWidgets
+        )
+
+        target_include_directories(OpenGLRendererTests PRIVATE src)
+        add_test(NAME OpenGLRendererTests COMMAND OpenGLRendererTests)
+
+        # Sprint 1: Camera Controller Tests
+        add_executable(CameraControllerTests
+            tests/test_camera_controller.cpp
+            src/camera/CameraController.cpp
+        )
+
+        target_link_libraries(CameraControllerTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+        )
+
+        target_include_directories(CameraControllerTests PRIVATE src)
+        add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests)
 
     else()
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
+        # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
+        add_executable(OpenGLRendererTests
+            tests/test_opengl_renderer.cpp
+            src/rendering/OpenGLRenderer.cpp
+        )
+
+        target_link_libraries(OpenGLRendererTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::OpenGL
+            Qt6::OpenGLWidgets
+        )
+
+        target_include_directories(OpenGLRendererTests PRIVATE src)
+        add_test(NAME OpenGLRendererTests COMMAND OpenGLRendererTests)
+
+        # Sprint 1: Camera Controller Tests (without mock dependencies)
+        add_executable(CameraControllerTests
+            tests/test_camera_controller.cpp
+            src/camera/CameraController.cpp
+        )
+
+        target_link_libraries(CameraControllerTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+        )
+
+        target_include_directories(CameraControllerTests PRIVATE src)
+        add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests)
     endif()
 
     # Custom target to run all tests
