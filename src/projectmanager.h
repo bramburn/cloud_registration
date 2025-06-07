@@ -172,6 +172,9 @@ public:
     bool moveScanToCluster(const QString &scanId, const QString &clusterId);
     bool moveScansToCluster(const QStringList &scanIds, const QString &clusterId);
 
+    // Sprint 4: Additional cluster methods
+    QStringList getScansInCluster(const QString &clusterId);
+
     // Sprint 2.3 - Cluster locking and enhanced deletion
     bool setClusterLockState(const QString &clusterId, bool isLocked);
     bool getClusterLockState(const QString &clusterId);

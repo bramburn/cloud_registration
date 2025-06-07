@@ -23,6 +23,11 @@ public:
     void cancelLoading();
     bool isLoading() const { return m_isLoading; }
 
+    // Sprint 4: Sidebar integration methods
+    bool loadScan(const QString& scanId);
+    bool unloadScan(const QString& scanId);
+    bool isScanLoaded(const QString& scanId) const;
+
 signals:
     void loadingStarted(const QString& filePath);
     void loadingProgress(int percentage, const QString& stage);
@@ -31,6 +36,7 @@ signals:
 
 private:
     bool m_isLoading = false;
+    QStringList m_loadedScans; // Track loaded scans
 };
 
 #endif // POINTCLOUDLOADMANAGER_H

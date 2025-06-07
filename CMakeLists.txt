@@ -458,13 +458,16 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
-    # Sprint 5: MainPresenter Tests (requires Google Mock)
+    # Sprint 4: MainPresenter Tests (requires Google Mock)
     if(GMOCK_AVAILABLE)
         add_executable(MainPresenterTests
             tests/test_mainpresenter.cpp
             src/MainPresenter.cpp
             src/IE57Parser.cpp
             src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
         )
 
         target_link_libraries(MainPresenterTests
@@ -477,7 +480,9 @@ if(TARGET GTest::gtest_main)
         target_include_directories(MainPresenterTests PRIVATE src)
         add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
 
+
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests)
+
     else()
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
     endif()

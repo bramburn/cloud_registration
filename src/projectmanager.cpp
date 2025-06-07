@@ -502,6 +502,31 @@ bool ProjectManager::moveScansToCluster(const QStringList &scanIds, const QStrin
     return allSuccess;
 }
 
+// Sprint 4: Additional cluster methods
+QStringList ProjectManager::getScansInCluster(const QString &clusterId)
+{
+    QStringList scanIds;
+
+    if (clusterId.isEmpty()) {
+        return scanIds;
+    }
+
+    if (!m_sqliteManager->isConnected()) {
+        qWarning() << "Database not connected";
+        return scanIds;
+    }
+
+    // Get all scans that belong to this cluster
+    QList<ScanInfo> allScans = m_sqliteManager->getAllScans();
+    for (const ScanInfo &scan : allScans) {
+        if (scan.clusterId == clusterId) {
+            scanIds.append(scan.scanId);
+        }
+    }
+
+    return scanIds;
+}
+
 // Sprint 2.3 - Cluster locking and enhanced deletion methods
 bool ProjectManager::setClusterLockState(const QString &clusterId, bool isLocked)
 {
