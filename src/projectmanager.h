@@ -12,9 +12,8 @@
 #include "project.h"
 
 // Forward declarations
-class SQLiteManager;
-class ScanImportManager;
-class ProjectTreeModel;
+class ProjectStateService;
+class RecentProjectsManager;
 
 // Scan metadata structure for database storage - Enhanced for Sprint 2.2
 struct ScanInfo {
@@ -146,17 +145,23 @@ public:
     // New for Sprint 1.2
     bool hasScans(const QString &projectPath);
     QList<ScanInfo> getProjectScans(const QString &projectPath);
-    SQLiteManager* getSQLiteManager() const { return m_sqliteManager; }
-    ScanImportManager* getScanImportManager() const { return m_scanImportManager; }
 
-    // Sprint 3.1 - Enhanced getters
-    QString currentProjectPath() const { return m_currentProjectPath; }
-    ProjectMetadata currentMetadata() const { return m_metadata; }
-    QString lastError() const { return m_lastError; }
-    QString lastDetailedError() const { return m_detailedError; }
+    // Component access (delegated to ProjectStateService)
+    SQLiteManager* getSQLiteManager() const;
+    ScanImportManager* getScanImportManager() const;
+    ProjectTreeModel* treeModel() const;
 
-    // Model access
-    ProjectTreeModel* treeModel() const { return m_treeModel.get(); }
+    // Sprint 3.1 - Enhanced getters (delegated to ProjectStateService)
+    QString currentProjectPath() const;
+    ProjectMetadata currentMetadata() const;
+    QString lastError() const;
+    QString lastDetailedError() const;
+
+    // Recent projects management (delegated to RecentProjectsManager)
+    QStringList getRecentProjects() const;
+    void addRecentProject(const QString& projectPath);
+    void removeRecentProject(const QString& projectPath);
+    void clearRecentProjects();
 
     // New for Sprint 1.3 - Cluster Management
     QString createCluster(const QString &clusterName, const QString &parentClusterId = QString());
@@ -203,50 +208,17 @@ private slots:
     void onValidationTimerTimeout();
 
 private:
-    // Sprint 3.1 - Enhanced persistence operations
-    bool saveProjectMetadataTransactional();
-    bool loadProjectMetadataWithValidation();
-    SaveResult saveProjectDatabaseTransactional();
-    bool loadProjectDatabaseWithValidation();
-
-    // Sprint 3.1 - File validation and recovery
-    void validateLinkedScanFile(const QString &scanId, const QString &filePath, const QString &scanName);
-    bool isFileAccessible(const QString &filePath);
-
-    // Sprint 3.1 - Error handling and validation
-    bool validateProjectDirectory(const QString &projectPath);
-    bool validateJsonStructure(const QString &filePath);
-    bool validateDatabaseIntegrity(const QString &dbPath);
-    void setError(const QString &error, const QString &details = QString());
-
-    // Sprint 3.1 - Backup and recovery
-    bool createBackupFiles();
-    bool restoreFromBackup();
+    // Sprint 2 Decoupling: Facade coordination methods
+    void connectServiceSignals();
 
     // Legacy methods (kept for compatibility)
     bool createProjectMetadata(const QString &projectPath, const QString &projectName);
     QJsonObject readProjectMetadata(const QString &projectPath);
     bool validateDirectoryPermissions(const QString &path, bool requireWrite = false);
-    bool createProjectDatabase(const QString &projectPath);
-    bool initializeDatabaseSchema();
-    void updateProjectMetadata(const QString &projectPath);
 
-    // Sprint 3.1 - Path utilities
-    QString getMetadataFilePath() const;
-    QString getDatabaseFilePath() const;
-    QString getBackupMetadataPath() const;
-    QString getBackupDatabasePath() const;
-
-    SQLiteManager *m_sqliteManager;
-    ScanImportManager *m_scanImportManager;
-    std::unique_ptr<ProjectTreeModel> m_treeModel;
-    std::unique_ptr<QTimer> m_validationTimer;
-
-    ProjectInfo m_currentProject;
-    QString m_currentProjectPath;
-    ProjectMetadata m_metadata;
-    QString m_lastError;
-    QString m_detailedError;
+    // Service instances
+    ProjectStateService* m_projectStateService;
+    RecentProjectsManager* m_recentProjectsManager;
 
     static const QString METADATA_FILENAME;
     static const QString DATABASE_FILENAME;
