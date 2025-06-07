@@ -147,7 +147,7 @@ endif()
 
 # Find Qt6 components - require minimum version 6.5.0 for better Linux compatibility
 # Note: 6.9.0 is preferred on Windows, but 6.5.0+ is acceptable for Linux distributions
-find_package(Qt6 6.5.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
+find_package(Qt6 6.2.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
 
 # Check Qt6 version and warn if using older version
 if(Qt6_VERSION VERSION_LESS "6.9.0")
@@ -159,7 +159,10 @@ endif()
 # find_package(Vulkan REQUIRED)
 
 # Find E57Format library for enhanced E57 parsing
-find_package(E57Format CONFIG REQUIRED)
+# find_package(E57Format CONFIG REQUIRED)  # Temporarily disabled for Sprint 4 testing
+
+# Find Eigen3 library for Sprint 4 alignment algorithms
+find_package(Eigen3 REQUIRED NO_MODULE)
 
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
@@ -205,9 +208,14 @@ set(SOURCES
     src/sqlitemanager.cpp
     src/projecttreemodel.cpp
     src/scanimportmanager.cpp
-    src/E57ParserCore.cpp
+    # src/E57ParserCore.cpp  # Temporarily disabled for Sprint 4 testing
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 4: Manual Alignment Implementation
+    src/algorithms/LeastSquaresAlignment.cpp
+    src/registration/AlignmentEngine.cpp
+    src/registration/ErrorAnalysis.cpp
+    src/ui/AlignmentControlPanel.cpp
 )
 
 # Header files
@@ -238,8 +246,13 @@ set(HEADERS
     src/sqlitemanager.h
     src/projecttreemodel.h
     src/scanimportmanager.h
-    src/E57ParserCore.h
+    # src/E57ParserCore.h  # Temporarily disabled for Sprint 4 testing
     src/ProjectStateService.h
+    # Sprint 4: Manual Alignment Implementation
+    src/algorithms/LeastSquaresAlignment.h
+    src/registration/AlignmentEngine.h
+    src/registration/ErrorAnalysis.h
+    src/ui/AlignmentControlPanel.h
 )
 
 # Shader files
@@ -256,7 +269,7 @@ set(RESOURCES
 # Create the executable
 add_executable(CloudRegistration ${SOURCES} ${HEADERS} ${RESOURCES})
 
-# Link Qt6 libraries and E57Format
+# Link Qt6 libraries, E57Format, and Eigen3
 target_link_libraries(CloudRegistration
     Qt6::Core
     Qt6::Widgets
@@ -265,7 +278,8 @@ target_link_libraries(CloudRegistration
     Qt6::Xml
     Qt6::Sql
     Qt6::Concurrent
-    E57Format
+    # E57Format  # Temporarily disabled for Sprint 4 testing
+    Eigen3::Eigen
 )
 
 # Platform-specific linking
@@ -297,10 +311,10 @@ elseif(APPLE)
 endif()
 
 # Ensure E57Format include directories are available
-get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)
-if(E57_INCLUDE_DIRS)
-    target_include_directories(CloudRegistration PRIVATE ${E57_INCLUDE_DIRS})
-endif()
+# get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)  # Temporarily disabled for Sprint 4 testing
+# if(E57_INCLUDE_DIRS)
+#     target_include_directories(CloudRegistration PRIVATE ${E57_INCLUDE_DIRS})
+# endif()
 
 
 
