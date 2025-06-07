@@ -459,7 +459,25 @@ if(TARGET GTest::gtest_main)
         target_include_directories(MainPresenterTests PRIVATE src)
         add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests)
+        # Sprint 5: Integration Tests (requires Google Mock)
+        add_executable(IntegrationTests
+            tests/test_integration.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/performance_profiler.cpp
+        )
+
+        target_link_libraries(IntegrationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Test
+        )
+
+        target_include_directories(IntegrationTests PRIVATE src)
+        add_test(NAME IntegrationTests COMMAND IntegrationTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests IntegrationTests)
     else()
         set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
     endif()
