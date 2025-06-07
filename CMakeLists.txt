@@ -208,6 +208,14 @@ set(SOURCES
     src/E57ParserCore.cpp
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 2: Registration workflow components
+    src/registration/WorkflowStateMachine.cpp
+    src/registration/Target.cpp
+    src/registration/TargetCorrespondence.cpp
+    src/registration/TargetManager.cpp
+    src/registration/RegistrationProject.cpp
+    src/registration/RegistrationWorkflowWidget.cpp
+    src/ui/WorkflowProgressWidget.cpp
 )
 
 # Header files
@@ -240,6 +248,14 @@ set(HEADERS
     src/scanimportmanager.h
     src/E57ParserCore.h
     src/ProjectStateService.h
+    # Sprint 2: Registration workflow headers
+    src/registration/WorkflowStateMachine.h
+    src/registration/Target.h
+    src/registration/TargetCorrespondence.h
+    src/registration/TargetManager.h
+    src/registration/RegistrationProject.h
+    src/registration/RegistrationWorkflowWidget.h
+    src/ui/WorkflowProgressWidget.h
 )
 
 # Shader files
@@ -393,6 +409,30 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57ParserCoreTests PRIVATE src)
     add_test(NAME E57ParserCoreTests COMMAND E57ParserCoreTests)
 
+    # Sprint 2: Registration Workflow Tests
+    add_executable(RegistrationWorkflowTests
+        tests/test_registration_workflow.cpp
+        src/registration/WorkflowStateMachine.cpp
+        src/registration/Target.cpp
+        src/registration/TargetCorrespondence.cpp
+        src/registration/TargetManager.cpp
+        src/registration/RegistrationProject.cpp
+        src/registration/RegistrationWorkflowWidget.cpp
+        src/ui/WorkflowProgressWidget.cpp
+        src/project.cpp
+    )
+
+    target_link_libraries(RegistrationWorkflowTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
+        Qt6::Test
+    )
+
+    target_include_directories(RegistrationWorkflowTests PRIVATE src)
+    add_test(NAME RegistrationWorkflowTests COMMAND RegistrationWorkflowTests)
+
 
 
 
@@ -500,10 +540,10 @@ if(TARGET GTest::gtest_main)
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
 
     else()
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
     endif()
 
     # Custom target to run all tests
