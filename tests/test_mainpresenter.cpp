@@ -9,6 +9,8 @@
 #include "mocks/MockE57Parser.h"
 #include "mocks/MockE57Writer.h"
 #include "mocks/MockPointCloudViewer.h"
+#include "mocks/MockProjectManager.h"
+#include "mocks/MockPointCloudLoadManager.h"
 
 using ::testing::_;
 using ::testing::Return;
@@ -394,5 +396,203 @@ TEST_F(MainPresenterTest, HandleExitCancelled) {
     // Act: Handle cancelled exit request
     m_presenter->handleExit();
     
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+// ============================================================================
+// Test Case 7: Sprint 4 - Sidebar Integration Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleClusterCreation) {
+    // Arrange: Set up project manager mock
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto* projectManager = mockProjectManager.get();
+    m_presenter->setProjectManager(projectManager);
+
+    const QString clusterName = "Test Cluster";
+    const QString parentClusterId = "parent-123";
+    const QString newClusterId = "cluster-456";
+
+    EXPECT_CALL(*projectManager, createCluster(clusterName, parentClusterId))
+        .Times(1)
+        .WillOnce(Return(newClusterId));
+
+    m_view->verifyInfoDisplayed("Cluster Creation", QString("Cluster '%1' created successfully.").arg(clusterName));
+    m_view->verifyStatusUpdated(QString("Created cluster: %1").arg(clusterName));
+
+    // Act: Handle cluster creation
+    m_presenter->handleClusterCreation(clusterName, parentClusterId);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleClusterCreationFailure) {
+    // Arrange: Set up project manager mock to return empty string (failure)
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto* projectManager = mockProjectManager.get();
+    m_presenter->setProjectManager(projectManager);
+
+    const QString clusterName = "Test Cluster";
+    const QString parentClusterId = "parent-123";
+
+    EXPECT_CALL(*projectManager, createCluster(clusterName, parentClusterId))
+        .Times(1)
+        .WillOnce(Return(QString())); // Return empty string to indicate failure
+
+    m_view->verifyErrorDisplayed("Cluster Creation", "Failed to create cluster. Please try again.");
+
+    // Act: Handle cluster creation
+    m_presenter->handleClusterCreation(clusterName, parentClusterId);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleClusterRename) {
+    // Arrange: Set up project manager mock
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto* projectManager = mockProjectManager.get();
+    m_presenter->setProjectManager(projectManager);
+
+    const QString clusterId = "cluster-123";
+    const QString newName = "Renamed Cluster";
+
+    EXPECT_CALL(*projectManager, renameCluster(clusterId, newName))
+        .Times(1)
+        .WillOnce(Return(true));
+
+    m_view->verifyInfoDisplayed("Cluster Rename", QString("Cluster renamed to '%1' successfully.").arg(newName));
+    m_view->verifyStatusUpdated(QString("Renamed cluster to: %1").arg(newName));
+
+    // Act: Handle cluster rename
+    m_presenter->handleClusterRename(clusterId, newName);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleClusterDeletion) {
+    // Arrange: Set up project manager mock
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto* projectManager = mockProjectManager.get();
+    m_presenter->setProjectManager(projectManager);
+
+    const QString clusterId = "cluster-123";
+    const bool deletePhysicalFiles = false;
+
+    // Set up confirmation dialog
+    m_view->setupConfirmationDialog(true);
+
+    EXPECT_CALL(*projectManager, deleteCluster(clusterId, deletePhysicalFiles))
+        .Times(1)
+        .WillOnce(Return(true));
+
+    m_view->verifyConfirmationAsked("Delete Cluster",
+        "Are you sure you want to delete this cluster? The physical files will be preserved.");
+    m_view->verifyInfoDisplayed("Cluster Deletion", "Cluster deleted successfully.");
+    m_view->verifyStatusUpdated("Cluster deleted");
+
+    // Act: Handle cluster deletion
+    m_presenter->handleClusterDeletion(clusterId, deletePhysicalFiles);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleScanLoad) {
+    // Arrange: Set up load manager mock
+    auto mockLoadManager = std::make_unique<MockPointCloudLoadManager>();
+    auto* loadManager = mockLoadManager.get();
+    m_presenter->setPointCloudLoadManager(loadManager);
+
+    const QString scanId = "scan-123";
+
+    EXPECT_CALL(*loadManager, loadScan(scanId))
+        .Times(1)
+        .WillOnce(Return(true));
+
+    m_view->verifyInfoDisplayed("Scan Load", "Scan loaded successfully.");
+    m_view->verifyStatusUpdated(QString("Loaded scan: %1").arg(scanId));
+
+    // Act: Handle scan load
+    m_presenter->handleScanLoad(scanId);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleScanLoadFailure) {
+    // Arrange: Set up load manager mock to fail
+    auto mockLoadManager = std::make_unique<MockPointCloudLoadManager>();
+    auto* loadManager = mockLoadManager.get();
+    m_presenter->setPointCloudLoadManager(loadManager);
+
+    const QString scanId = "scan-123";
+
+    EXPECT_CALL(*loadManager, loadScan(scanId))
+        .Times(1)
+        .WillOnce(Return(false));
+
+    m_view->verifyErrorDisplayed("Scan Load", "Failed to load scan. Please try again.");
+
+    // Act: Handle scan load
+    m_presenter->handleScanLoad(scanId);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleClusterLoad) {
+    // Arrange: Set up both managers
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto mockLoadManager = std::make_unique<MockPointCloudLoadManager>();
+    auto* projectManager = mockProjectManager.get();
+    auto* loadManager = mockLoadManager.get();
+
+    m_presenter->setProjectManager(projectManager);
+    m_presenter->setPointCloudLoadManager(loadManager);
+
+    const QString clusterId = "cluster-123";
+    const QStringList scanIds = {"scan-1", "scan-2", "scan-3"};
+
+    EXPECT_CALL(*projectManager, getScansInCluster(clusterId))
+        .Times(1)
+        .WillOnce(Return(scanIds));
+
+    // Expect load calls for each scan
+    for (const QString& scanId : scanIds) {
+        EXPECT_CALL(*loadManager, loadScan(scanId))
+            .Times(1)
+            .WillOnce(Return(true));
+    }
+
+    m_view->verifyInfoDisplayed("Cluster Load", QString("Loaded %1 scans from cluster.").arg(scanIds.size()));
+    m_view->verifyStatusUpdated(QString("Loaded %1 scans from cluster").arg(scanIds.size()));
+
+    // Act: Handle cluster load
+    m_presenter->handleClusterLoad(clusterId);
+
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleDragDropOperation) {
+    // Arrange: Set up project manager mock
+    auto mockProjectManager = std::make_unique<MockProjectManager>();
+    auto* projectManager = mockProjectManager.get();
+    m_presenter->setProjectManager(projectManager);
+
+    const QStringList draggedItems = {"scan-1", "scan-2"};
+    const QString draggedType = "scan";
+    const QString targetItemId = "cluster-123";
+    const QString targetType = "cluster";
+
+    // Expect move calls for each scan
+    for (const QString& scanId : draggedItems) {
+        EXPECT_CALL(*projectManager, moveScanToCluster(scanId, targetItemId))
+            .Times(1)
+            .WillOnce(Return(true));
+    }
+
+    m_view->verifyInfoDisplayed("Drag and Drop", QString("Moved %1 scan(s) successfully.").arg(draggedItems.size()));
+    m_view->verifyStatusUpdated(QString("Moved %1 scan(s)").arg(draggedItems.size()));
+
+    // Act: Handle drag and drop
+    m_presenter->handleDragDropOperation(draggedItems, draggedType, targetItemId, targetType);
+
     // Assert: Verify expectations are met (handled by Google Mock)
 }

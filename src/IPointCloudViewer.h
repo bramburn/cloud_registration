@@ -269,6 +269,20 @@ public:
      * @param threshold Error threshold in pixels
      */
     virtual void setScreenSpaceErrorThreshold(float threshold) = 0;
+
+    // --- Sprint 4: Focus Methods ---
+
+    /**
+     * @brief Focus the camera on a specific scan
+     * @param scanId ID of the scan to focus on
+     */
+    virtual void focusOnScan(const QString& scanId) = 0;
+
+    /**
+     * @brief Focus the camera on all scans in a cluster
+     * @param clusterId ID of the cluster to focus on
+     */
+    virtual void focusOnCluster(const QString& clusterId) = 0;
 };
 
 #endif // IPOINTCLOUDVIEWER_H

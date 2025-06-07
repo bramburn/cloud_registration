@@ -11,6 +11,8 @@ class IMainView;
 class IE57Parser;
 class IE57Writer;
 class IPointCloudViewer;
+class ProjectManager;
+class PointCloudLoadManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
@@ -48,6 +50,18 @@ public:
      * @brief Initialize the presenter and set up connections
      */
     void initialize();
+
+    /**
+     * @brief Set the project manager (Sprint 4)
+     * @param projectManager Pointer to project manager
+     */
+    void setProjectManager(ProjectManager* projectManager);
+
+    /**
+     * @brief Set the point cloud load manager (Sprint 4)
+     * @param loadManager Pointer to load manager
+     */
+    void setPointCloudLoadManager(PointCloudLoadManager* loadManager);
 
 public slots:
     /**
@@ -97,6 +111,83 @@ public slots:
      * @brief Handle application exit request
      */
     void handleExit();
+
+    // Sprint 4: Sidebar-related handlers
+    /**
+     * @brief Handle cluster creation request from sidebar
+     * @param clusterName Name of the new cluster
+     * @param parentClusterId ID of parent cluster (empty for root level)
+     */
+    void handleClusterCreation(const QString& clusterName, const QString& parentClusterId = QString());
+
+    /**
+     * @brief Handle cluster renaming request from sidebar
+     * @param clusterId ID of cluster to rename
+     * @param newName New name for the cluster
+     */
+    void handleClusterRename(const QString& clusterId, const QString& newName);
+
+    /**
+     * @brief Handle cluster deletion request from sidebar
+     * @param clusterId ID of cluster to delete
+     * @param deletePhysicalFiles Whether to delete physical files
+     */
+    void handleClusterDeletion(const QString& clusterId, bool deletePhysicalFiles = false);
+
+    /**
+     * @brief Handle scan loading request from sidebar
+     * @param scanId ID of scan to load
+     */
+    void handleScanLoad(const QString& scanId);
+
+    /**
+     * @brief Handle scan unloading request from sidebar
+     * @param scanId ID of scan to unload
+     */
+    void handleScanUnload(const QString& scanId);
+
+    /**
+     * @brief Handle cluster loading request from sidebar
+     * @param clusterId ID of cluster to load (all scans)
+     */
+    void handleClusterLoad(const QString& clusterId);
+
+    /**
+     * @brief Handle cluster unloading request from sidebar
+     * @param clusterId ID of cluster to unload (all scans)
+     */
+    void handleClusterUnload(const QString& clusterId);
+
+    /**
+     * @brief Handle point cloud viewing request from sidebar
+     * @param itemId ID of item to view
+     * @param itemType Type of item ("scan" or "cluster")
+     */
+    void handlePointCloudView(const QString& itemId, const QString& itemType);
+
+    /**
+     * @brief Handle scan deletion request from sidebar
+     * @param scanId ID of scan to delete
+     * @param deletePhysicalFile Whether to delete physical file
+     */
+    void handleScanDeletion(const QString& scanId, bool deletePhysicalFile = false);
+
+    /**
+     * @brief Handle cluster lock/unlock request from sidebar
+     * @param clusterId ID of cluster to lock/unlock
+     * @param lock true to lock, false to unlock
+     */
+    void handleClusterLockToggle(const QString& clusterId, bool lock);
+
+    /**
+     * @brief Handle drag and drop operation from sidebar
+     * @param draggedItems List of dragged item IDs
+     * @param draggedType Type of dragged items ("scan" or "cluster")
+     * @param targetItemId ID of target item
+     * @param targetType Type of target item
+     */
+    void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
+                               const QString& targetItemId, const QString& targetType);
 
 private slots:
     /**
@@ -202,6 +293,10 @@ private:
     IE57Writer* m_e57Writer;
     IPointCloudViewer* m_viewer;
 
+    // Sprint 4: Manager pointers (not owned by this class)
+    ProjectManager* m_projectManager;
+    PointCloudLoadManager* m_loadManager;
+
     // Application state
     QString m_currentProjectPath;
     QString m_currentFilePath;
@@ -214,6 +309,10 @@ private:
     size_t m_currentMemoryUsage;
     float m_currentFPS;
     int m_currentVisiblePoints;
+
+    // Sprint 4: Sidebar state management
+    QStringList m_loadedScans;
+    QStringList m_lockedClusters;
 };
 
 #endif // MAINPRESENTER_H
