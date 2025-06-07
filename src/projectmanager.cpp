@@ -1,8 +1,6 @@
 #include "projectmanager.h"
-#include "sqlitemanager.h"
-#include "scanimportmanager.h"
-#include "projecttreemodel.h"
-#include "errordialog.h"
+#include "ProjectStateService.h"
+#include "recentprojectsmanager.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -17,38 +15,56 @@
 
 const QString ProjectManager::METADATA_FILENAME = "project_meta.json";
 const QString ProjectManager::DATABASE_FILENAME = "project_data.sqlite";
-const QString ProjectManager::SCANS_SUBFOLDER = "Scans";
-const QString ProjectManager::CURRENT_FORMAT_VERSION = "1.0.0";
-const QString ProjectManager::BACKUP_SUFFIX = ".bak";
-
 ProjectManager::ProjectManager(QObject *parent)
     : QObject(parent)
-    , m_sqliteManager(new SQLiteManager(this))
-    , m_scanImportManager(new ScanImportManager(this))
-    , m_treeModel(std::make_unique<ProjectTreeModel>())
-    , m_validationTimer(std::make_unique<QTimer>())
+    , m_projectStateService(new ProjectStateService(this))
+    , m_recentProjectsManager(new RecentProjectsManager(this))
 {
-    // Connect scan import manager signals
-    connect(m_scanImportManager, &ScanImportManager::scansImported,
-            this, &ProjectManager::scansImported);
-    connect(m_scanImportManager, &ScanImportManager::importFinished,
-            this, &ProjectManager::projectScansChanged);
-
-    // Set SQLite manager for scan import manager
-    m_scanImportManager->setSQLiteManager(m_sqliteManager);
-
-    // Sprint 3.1 - Setup tree model and validation timer
-    m_treeModel->setSQLiteManager(m_sqliteManager);
-
-    m_validationTimer->setInterval(VALIDATION_INTERVAL_MS);
-    m_validationTimer->setSingleShot(false);
-    connect(m_validationTimer.get(), &QTimer::timeout,
-            this, &ProjectManager::onValidationTimerTimeout);
+    connectServiceSignals();
 }
 
 ProjectManager::~ProjectManager()
 {
-    // SQLiteManager and ScanImportManager will be deleted by QObject parent-child relationship
+    // Services are automatically cleaned up as child QObjects
+}
+
+void ProjectManager::connectServiceSignals() {
+    // Connect ProjectStateService signals to ProjectManager signals
+    connect(m_projectStateService, &ProjectStateService::projectLoaded,
+            this, &ProjectManager::projectLoaded);
+    connect(m_projectStateService, &ProjectStateService::projectSaved,
+            this, &ProjectManager::projectSaved);
+    connect(m_projectStateService, &ProjectStateService::projectScansChanged,
+            this, &ProjectManager::projectScansChanged);
+    connect(m_projectStateService, &ProjectStateService::scansImported,
+            this, [this](const QStringList& scanIds) {
+                // Convert QStringList to QList<ScanInfo> for compatibility
+                QList<ScanInfo> scans;
+                for (const QString& scanId : scanIds) {
+                    ScanInfo scanInfo = m_projectStateService->getTreeModel()->getScanInfo(scanId);
+                    if (scanInfo.isValid()) {
+                        scans.append(scanInfo);
+                    }
+                }
+                emit scansImported(scans);
+            });
+    connect(m_projectStateService, &ProjectStateService::scanFileRelinked,
+            this, &ProjectManager::scanFileRelinked);
+    connect(m_projectStateService, &ProjectStateService::scanFileMissing,
+            this, &ProjectManager::scanFileMissing);
+    connect(m_projectStateService, &ProjectStateService::clusterCreated,
+            this, [this](const QString& clusterId, const QString& clusterName) {
+                ClusterInfo cluster;
+                cluster.clusterId = clusterId;
+                cluster.clusterName = clusterName;
+                emit clusterCreated(cluster);
+            });
+    connect(m_projectStateService, &ProjectStateService::clusterDeleted,
+            this, &ProjectManager::clusterDeleted);
+    connect(m_projectStateService, &ProjectStateService::clusterRenamed,
+            this, &ProjectManager::clusterRenamed);
+    connect(m_projectStateService, &ProjectStateService::scanMovedToCluster,
+            this, &ProjectManager::scanMovedToCluster);
 }
 
 QString ProjectManager::createProject(const QString &name, const QString &basePath)
@@ -336,13 +352,11 @@ void ProjectManager::updateProjectMetadata(const QString &projectPath)
     Q_UNUSED(projectPath)
 }
 
-// New cluster management methods for Sprint 1.3
+// Sprint 2 Decoupling - Delegated cluster management methods
 QString ProjectManager::createCluster(const QString &clusterName, const QString &parentClusterId)
 {
-    if (clusterName.trimmed().isEmpty()) {
-        qWarning() << "Cluster name cannot be empty";
-        return QString();
-    }
+    return m_projectStateService->createCluster(clusterName, parentClusterId);
+}
 
     if (!m_sqliteManager->isConnected()) {
         qWarning() << "Database not connected";
@@ -630,12 +644,10 @@ bool ProjectManager::deleteScan(const QString &scanId, bool deletePhysicalFile)
     return false;
 }
 
-// Sprint 3.1 - Enhanced save/load methods
+// Sprint 2 Decoupling - Delegate to ProjectStateService
 SaveResult ProjectManager::saveProject() {
-    if (m_currentProjectPath.isEmpty()) {
-        setError("No project currently open", "Cannot save without an active project");
-        return SaveResult::UnknownError;
-    }
+    return m_projectStateService->saveProject();
+}
 
     try {
         // Update last modified timestamp
@@ -667,118 +679,73 @@ SaveResult ProjectManager::saveProject() {
 }
 
 ProjectLoadResult ProjectManager::loadProject(const QString& projectPath) {
-    try {
-        m_currentProjectPath = projectPath;
+    SaveResult result = m_projectStateService->loadProject(projectPath);
 
-        // Validate project directory exists
-        if (!validateProjectDirectory(projectPath)) {
-            setError("Project directory does not exist or is not accessible", projectPath);
-            return ProjectLoadResult::UnknownError;
-        }
-
-        // Check and load metadata
-        if (!validateJsonStructure(getMetadataFilePath())) {
-            setError("Project metadata file (project_meta.json) is corrupted or unreadable");
-            return ProjectLoadResult::MetadataCorrupted;
-        }
-
-        if (!loadProjectMetadataWithValidation()) {
-            return ProjectLoadResult::MetadataCorrupted;
-        }
-
-        // Check and load database
-        QString dbPath = getDatabaseFilePath();
-        if (!QFileInfo::exists(dbPath)) {
-            setError("Project database (project_data.sqlite) is missing");
-            return ProjectLoadResult::DatabaseMissing;
-        }
-
-        if (!validateDatabaseIntegrity(dbPath)) {
-            setError("Project database (project_data.sqlite) is corrupted or inaccessible");
-            return ProjectLoadResult::DatabaseCorrupted;
-        }
-
-        if (!loadProjectDatabaseWithValidation()) {
-            return ProjectLoadResult::DatabaseCorrupted;
-        }
-
-        // Start periodic validation of linked files
-        m_validationTimer->start();
-
-        emit projectLoaded(ProjectLoadResult::Success);
-        return ProjectLoadResult::Success;
-
-    } catch (const std::exception& ex) {
-        setError("Exception during load", ex.what());
-        return ProjectLoadResult::UnknownError;
+    // Add to recent projects if successful
+    if (result == SaveResult::Success) {
+        m_recentProjectsManager->addProject(projectPath);
     }
+
+    return static_cast<ProjectLoadResult>(result);
 }
 
-// Sprint 3.1 - File validation and recovery methods
+// Sprint 2 Decoupling - Delegated getter methods
+QString ProjectManager::currentProjectPath() const {
+    return m_projectStateService->currentProjectPath();
+}
+
+ProjectMetadata ProjectManager::currentMetadata() const {
+    return m_projectStateService->currentMetadata();
+}
+
+QString ProjectManager::lastError() const {
+    return m_projectStateService->lastError();
+}
+
+QString ProjectManager::lastDetailedError() const {
+    return m_projectStateService->lastDetailedError();
+}
+
+SQLiteManager* ProjectManager::getSQLiteManager() const {
+    return m_projectStateService->getSQLiteManager();
+}
+
+ScanImportManager* ProjectManager::getScanImportManager() const {
+    return m_projectStateService->getScanImportManager();
+}
+
+ProjectTreeModel* ProjectManager::treeModel() const {
+    return m_projectStateService->getTreeModel();
+}
+
+// Recent projects management (delegated to RecentProjectsManager)
+QStringList ProjectManager::getRecentProjects() const {
+    return m_recentProjectsManager->getRecentProjects();
+}
+
+void ProjectManager::addRecentProject(const QString& projectPath) {
+    m_recentProjectsManager->addProject(projectPath);
+}
+
+void ProjectManager::removeRecentProject(const QString& projectPath) {
+    m_recentProjectsManager->removeProject(projectPath);
+}
+
+void ProjectManager::clearRecentProjects() {
+    m_recentProjectsManager->clearRecentProjects();
+}
+
+// Sprint 2 Decoupling - Delegated file validation and recovery methods
 void ProjectManager::validateAllLinkedFiles() {
-    try {
-        auto scans = m_treeModel->getAllScans();
-
-        for (const auto& scan : scans) {
-            if (scan.importType == "LINKED") {
-                validateLinkedScanFile(scan.scanId, scan.filePathAbsoluteLinked, scan.scanName);
-            }
-        }
-
-    } catch (const std::exception& ex) {
-        setError("Exception during file validation", ex.what());
-    }
-}
-
-void ProjectManager::validateLinkedScanFile(const QString& scanId, const QString& filePath, const QString& scanName) {
-    if (!isFileAccessible(filePath)) {
-        m_treeModel->markScanAsMissing(scanId);
-        emit scanFileMissing(scanId, filePath, scanName);
-    } else {
-        m_treeModel->clearScanMissingFlag(scanId);
-    }
+    m_projectStateService->validateAllLinkedFiles();
 }
 
 bool ProjectManager::relinkScanFile(const QString& scanId, const QString& newFilePath) {
-    try {
-        if (!isFileAccessible(newFilePath)) {
-            setError("New file path is not accessible", newFilePath);
-            return false;
-        }
-
-        if (!m_sqliteManager->updateScanFilePath(scanId, newFilePath)) {
-            setError("Failed to update scan file path in database",
-                    m_sqliteManager->lastError().text());
-            return false;
-        }
-
-        m_treeModel->updateScanFilePath(scanId, newFilePath);
-        m_treeModel->clearScanMissingFlag(scanId);
-
-        emit scanFileRelinked(scanId, newFilePath);
-        return true;
-
-    } catch (const std::exception& ex) {
-        setError("Exception during file relink", ex.what());
-        return false;
-    }
+    return m_projectStateService->relinkScanFile(scanId, newFilePath);
 }
 
 bool ProjectManager::removeMissingScanReference(const QString& scanId) {
-    try {
-        if (!m_sqliteManager->deleteScan(scanId)) {
-            setError("Failed to remove scan from database", m_sqliteManager->lastError().text());
-            return false;
-        }
-
-        m_treeModel->removeScan(scanId);
-        emit scanReferenceRemoved(scanId);
-        return true;
-
-    } catch (const std::exception& ex) {
-        setError("Exception during scan removal", ex.what());
-        return false;
-    }
+    return m_projectStateService->removeMissingScanReference(scanId);
 }
 
 // Sprint 3.1 - Helper methods for validation and error handling

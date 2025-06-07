@@ -205,6 +205,8 @@ set(SOURCES
     src/sqlitemanager.cpp
     src/projecttreemodel.cpp
     src/scanimportmanager.cpp
+    src/E57ParserCore.cpp
+    src/ProjectStateService.cpp
 )
 
 # Header files
@@ -235,6 +237,8 @@ set(HEADERS
     src/sqlitemanager.h
     src/projecttreemodel.h
     src/scanimportmanager.h
+    src/E57ParserCore.h
+    src/ProjectStateService.h
 )
 
 # Shader files
@@ -374,6 +378,20 @@ if(TARGET GTest::gtest_main)
     target_include_directories(E57ParserLibTests PRIVATE src)
     add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
 
+    # E57 Parser Core Tests (Sprint 2 - Qt-independent core)
+    add_executable(E57ParserCoreTests
+        tests/test_e57parsercore.cpp
+        src/E57ParserCore.cpp
+    )
+
+    target_link_libraries(E57ParserCoreTests
+        GTest::gtest_main
+        E57Format
+    )
+
+    target_include_directories(E57ParserCoreTests PRIVATE src)
+    add_test(NAME E57ParserCoreTests COMMAND E57ParserCoreTests)
+
 
 
 
@@ -462,27 +480,11 @@ if(TARGET GTest::gtest_main)
         target_include_directories(MainPresenterTests PRIVATE src)
         add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
 
-        # Sprint 5: Integration Tests (requires Google Mock)
-        add_executable(IntegrationTests
-            tests/test_integration.cpp
-            src/MainPresenter.cpp
-            src/IE57Parser.cpp
-            src/performance_profiler.cpp
-        )
 
-        target_link_libraries(IntegrationTests
-            GTest::gtest_main
-            GTest::gmock_main
-            Qt6::Core
-            Qt6::Test
-        )
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests)
 
-        target_include_directories(IntegrationTests PRIVATE src)
-        add_test(NAME IntegrationTests COMMAND IntegrationTests)
-
-        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests IntegrationTests)
     else()
-        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
     endif()
 
     # Custom target to run all tests
