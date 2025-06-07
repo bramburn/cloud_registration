@@ -51,13 +51,63 @@ CloudRegistration is a comprehensive desktop application for loading, visualizin
 - **OpenGL**: Version 3.3 or later
 - **Memory**: 8GB RAM minimum, 16GB+ recommended for large datasets
 
-### **Dependencies (Managed via vcpkg)**
+### **Linux (Fully Supported)**
+- **Operating System**: Ubuntu 20.04+, Fedora 35+, Arch Linux, or compatible (64-bit)
+- **Qt6**: Version 6.5.0 or later (6.9.0+ recommended)
+  - QtCore, QtWidgets, QtGui, QtOpenGLWidgets
+  - QtXml, QtSql, QtConcurrent, QtTest
+- **Compilers**: GCC 8+ or Clang 7+
+- **CMake**: Version 3.16 or later
+- **Build System**: Ninja (recommended) or Make
+- **OpenGL**: Version 3.3 or later
+- **Memory**: 8GB RAM minimum, 16GB+ recommended for large datasets
+
+### **Dependencies**
 - **libE57Format**: E57 file format support
 - **Xerces-C**: XML parsing for E57 files
 - **Google Test**: Unit testing framework
 - **Vulkan SDK**: Advanced graphics support (optional)
+- **Boost**: System and filesystem libraries (Linux)
+- **Mesa**: OpenGL implementation (Linux)
 
-## Windows Setup Guide
+## Quick Start
+
+### **Linux (Recommended for Development)**
+```bash
+# Clone the repository
+git clone https://github.com/bramburn/cloud_registration.git
+cd cloud_registration
+
+# Run automated setup (installs dependencies, configures, and builds)
+./setup.sh
+
+# Or use the Linux build script for more control
+./scripts/build-linux.sh --help
+```
+
+### **Windows Setup**
+See [Windows Setup Guide](docs/WINDOWS_SETUP_GUIDE.md) for detailed instructions.
+
+## Platform-Specific Setup Guides
+
+### **Linux Setup Guide**
+For detailed Linux setup instructions, see [Linux Setup Guide](docs/LINUX_SETUP_GUIDE.md).
+
+**Quick Linux Setup:**
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build qt6-base-dev libgtest-dev
+
+# Fedora/RHEL
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y cmake ninja-build qt6-qtbase-devel gtest-devel
+
+# Build project
+./setup.sh
+```
+
+### **Windows Setup Guide**
 
 ### **Prerequisites Installation**
 

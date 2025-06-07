@@ -98,20 +98,36 @@ int main(int argc, char *argv[])
     qDebug() << "Qt Runtime Version:" << qVersion();
     qDebug() << "Platform:" << QGuiApplication::platformName();
 
-    // Check for Qt DLLs in the application directory
+    // Check for Qt libraries in the application directory (platform-specific)
     QString appDir = QCoreApplication::applicationDirPath();
-    qDebug() << "Checking for Qt DLLs in:" << appDir;
+    qDebug() << "Checking for Qt libraries in:" << appDir;
 
-    QStringList requiredDlls = {
+#ifdef Q_OS_WIN
+    QStringList requiredLibs = {
         "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "Qt6OpenGL.dll", "Qt6OpenGLWidgets.dll"
     };
+    QString libExtension = ".dll";
+#elif defined(Q_OS_LINUX)
+    QStringList requiredLibs = {
+        "libQt6Core.so.6", "libQt6Gui.so.6", "libQt6Widgets.so.6", "libQt6OpenGL.so.6", "libQt6OpenGLWidgets.so.6"
+    };
+    QString libExtension = ".so";
+#elif defined(Q_OS_MACOS)
+    QStringList requiredLibs = {
+        "libQt6Core.6.dylib", "libQt6Gui.6.dylib", "libQt6Widgets.6.dylib", "libQt6OpenGL.6.dylib", "libQt6OpenGLWidgets.6.dylib"
+    };
+    QString libExtension = ".dylib";
+#else
+    QStringList requiredLibs;
+    QString libExtension = "";
+#endif
 
-    for (const QString& dll : requiredDlls) {
-        QString dllPath = appDir + "/" + dll;
-        if (QFile::exists(dllPath)) {
-            qDebug() << "Found:" << dll;
+    for (const QString& lib : requiredLibs) {
+        QString libPath = appDir + "/" + lib;
+        if (QFile::exists(libPath)) {
+            qDebug() << "Found:" << lib;
         } else {
-            qWarning() << "Missing:" << dll;
+            qDebug() << "Not found locally:" << lib << "(may be system-installed)";
         }
     }
 
