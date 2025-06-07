@@ -221,6 +221,11 @@ set(SOURCES
     src/registration/RegistrationProject.cpp
     src/registration/RegistrationWorkflowWidget.cpp
     src/ui/WorkflowProgressWidget.cpp
+    # Sprint 3: Target Detection and Registration
+    src/detection/TargetDetectionBase.cpp
+    src/detection/SphereDetector.cpp
+    src/detection/NaturalPointSelector.cpp
+    src/ui/TargetDetectionDialog.cpp
 )
 
 # Header files
@@ -266,6 +271,11 @@ set(HEADERS
     src/registration/RegistrationProject.h
     src/registration/RegistrationWorkflowWidget.h
     src/ui/WorkflowProgressWidget.h
+    # Sprint 3: Target Detection and Registration Headers
+    src/detection/TargetDetectionBase.h
+    src/detection/SphereDetector.h
+    src/detection/NaturalPointSelector.h
+    src/ui/TargetDetectionDialog.h
 )
 
 # Shader files
@@ -585,7 +595,65 @@ if(TARGET GTest::gtest_main)
         target_include_directories(CameraControllerTests PRIVATE src)
         add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests)
+        # Sprint 3: Target Detection and Registration Tests
+        add_executable(TargetTests
+            tests/test_target.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetTests PRIVATE src)
+        add_test(NAME TargetTests COMMAND TargetTests)
+
+        add_executable(TargetManagerTests
+            tests/test_targetmanager.cpp
+            src/registration/TargetManager.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetManagerTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetManagerTests PRIVATE src)
+        add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+        add_executable(SphereDetectorTests
+            tests/test_spheredetector.cpp
+            src/detection/SphereDetector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(SphereDetectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(SphereDetectorTests PRIVATE src)
+        add_test(NAME SphereDetectorTests COMMAND SphereDetectorTests)
+
+        add_executable(NaturalPointSelectorTests
+            tests/test_naturalpointselector.cpp
+            src/detection/NaturalPointSelector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(NaturalPointSelectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(NaturalPointSelectorTests PRIVATE src)
+        add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests)
 
     else()
         # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
@@ -620,7 +688,65 @@ if(TARGET GTest::gtest_main)
         target_include_directories(CameraControllerTests PRIVATE src)
         add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests)
+        # Sprint 3: Target Detection and Registration Tests (without mock dependencies)
+        add_executable(TargetTests
+            tests/test_target.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetTests PRIVATE src)
+        add_test(NAME TargetTests COMMAND TargetTests)
+
+        add_executable(TargetManagerTests
+            tests/test_targetmanager.cpp
+            src/registration/TargetManager.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetManagerTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetManagerTests PRIVATE src)
+        add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+        add_executable(SphereDetectorTests
+            tests/test_spheredetector.cpp
+            src/detection/SphereDetector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(SphereDetectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(SphereDetectorTests PRIVATE src)
+        add_test(NAME SphereDetectorTests COMMAND SphereDetectorTests)
+
+        add_executable(NaturalPointSelectorTests
+            tests/test_naturalpointselector.cpp
+            src/detection/NaturalPointSelector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(NaturalPointSelectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(NaturalPointSelectorTests PRIVATE src)
+        add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests)
     endif()
 
     # Custom target to run all tests
