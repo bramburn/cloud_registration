@@ -11,22 +11,18 @@
 #include <QTimer>
 #include <QThread>
 #include "IE57Parser.h"
-
-// Forward declarations to avoid including E57Format.h in header
-namespace e57 {
-    class ImageFile;
-    class StructureNode;
-    class CompressedVectorNode;
-}
+#include "E57ParserCore.h"
 
 /**
- * @brief E57ParserLib - A wrapper class for libE57Format library
+ * @brief E57ParserLib - Qt adapter for E57ParserCore
  *
- * This class provides a simplified interface to the libE57Format library
- * for opening E57 files, extracting metadata, and reading point cloud data.
+ * This class provides a Qt-compatible interface to the E57ParserCore library.
+ * It acts as a thin adapter that wraps the core parsing functionality and
+ * provides Qt signals/slots integration for the main application.
  * Implements Sprint 1-5 requirements for E57 library integration with MainWindow compatibility.
  *
  * Sprint 1 Decoupling: Now implements IE57Parser interface for loose coupling.
+ * Sprint 2 Decoupling: Refactored to delegate core parsing to E57ParserCore.
  */
 class E57ParserLib : public IE57Parser {
     Q_OBJECT
@@ -138,24 +134,24 @@ private slots:
     void performParsing();
 
 private:
-    // Core parsing functionality
-    bool openE57File(const QString& filePath);
-    void closeE57File();
-    std::vector<PointData> extractPointDataFromScan(int scanIndex, const LoadingSettings& settings);
+    // Qt adapter functionality
+    void setupForThreading();
     std::vector<float> convertToXYZVector(const std::vector<PointData>& pointData);
 
     // Progress tracking
     void updateProgress(int percentage, const QString& stage);
+    void onCoreProgress(int percentage, const std::string& stage);
 
     // Error handling
     void handleE57Exception(const std::exception& ex, const QString& context);
     QString translateE57Error(const QString& technicalError);
 
-    // Threading support
-    void setupForThreading();
+    // Data conversion helpers
+    PointData convertCorePointData(const CorePointData& corePoint);
+    CoreLoadingSettings convertLoadingSettings(const LoadingSettings& qtSettings);
 
     // Data members
-    std::unique_ptr<e57::ImageFile> m_imageFile;
+    std::unique_ptr<E57ParserCore> m_parserCore;
     QString m_currentFilePath;
     LoadingSettings m_currentSettings;
     mutable QString m_lastError;
@@ -170,69 +166,9 @@ private:
     QStringList m_scanNames;
     int m_totalScans = 0;
 
-    // Sprint 2: Point data storage and metadata
-    std::vector<float> m_points;
-
-    // Prototype information for current scan (enhanced for Sprint 3)
-    struct PrototypeInfo {
-        // XYZ coordinates (Sprint 2)
-        bool hasCartesianX = false;
-        bool hasCartesianY = false;
-        bool hasCartesianZ = false;
-        bool isDoublePrec = false;
-        std::string xFieldName = "cartesianX";
-        std::string yFieldName = "cartesianY";
-        std::string zFieldName = "cartesianZ";
-
-        // Intensity data (Sprint 3)
-        bool hasIntensity = false;
-        std::string intensityFieldName = "intensity";
-        std::string intensityDataType; // "float", "integer", "scaledInteger"
-
-        // Color data (Sprint 3)
-        bool hasColorRed = false;
-        bool hasColorGreen = false;
-        bool hasColorBlue = false;
-        std::string colorRedFieldName = "colorRed";
-        std::string colorGreenFieldName = "colorGreen";
-        std::string colorBlueFieldName = "colorBlue";
-        std::string colorDataType; // "integer", "scaledInteger"
-    };
-    PrototypeInfo m_prototypeInfo;
-
-    // Sprint 3: Intensity and color limits for normalization
-    struct DataLimits {
-        double intensityMin = 0.0;
-        double intensityMax = 1.0;
-        double colorRedMin = 0.0;
-        double colorRedMax = 255.0;
-        double colorGreenMin = 0.0;
-        double colorGreenMax = 255.0;
-        double colorBlueMin = 0.0;
-        double colorBlueMax = 255.0;
-        bool hasIntensityLimits = false;
-        bool hasColorLimits = false;
-    };
-    DataLimits m_dataLimits;
-
     // Helper methods
     void clearError() const;
     void setError(const std::string& error) const;
-
-    // Sprint 2: Point data extraction helpers
-    bool accessFirstScanData(e57::StructureNode& scanHeader);
-    bool inspectPointPrototype(const e57::StructureNode& scanHeader);
-    bool extractUncompressedXYZData(const e57::StructureNode& scanHeader);
-    void validatePrototypeFields(const e57::StructureNode& prototype);
-
-    // Sprint 3: Enhanced point data extraction helpers
-    bool inspectEnhancedPrototype(const e57::StructureNode& scanHeader);
-    bool extractDataLimits(const e57::StructureNode& scanHeader);
-    bool extractEnhancedPointData(const e57::StructureNode& scanHeader, std::vector<PointData>& points);
-
-    // Sprint 3: Normalization helpers
-    float normalizeIntensity(float rawValue) const;
-    uint8_t normalizeColorChannel(float rawValue, double minVal, double maxVal) const;
 };
 
 #endif // E57PARSERLIB_H

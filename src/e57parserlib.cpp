@@ -1,6 +1,5 @@
 #include "e57parserlib.h"
 #include "performance_profiler.h"  // Sprint 2.2: Performance profiling
-#include <E57Format/E57Format.h>
 #include <sstream>
 #include <QString>
 #include <QDebug>
@@ -10,13 +9,20 @@
 #include <random>
 
 E57ParserLib::E57ParserLib(QObject *parent)
-    : IE57Parser(parent), m_imageFile(nullptr), m_totalScans(0)
+    : IE57Parser(parent), m_parserCore(std::make_unique<E57ParserCore>()), m_totalScans(0)
 {
     setupForThreading();
+
+    // Set up progress callback for the core parser
+    m_parserCore->setProgressCallback([this](int percentage, const std::string& stage) {
+        onCoreProgress(percentage, stage);
+    });
 }
 
 E57ParserLib::~E57ParserLib() {
-    closeE57File();
+    if (m_parserCore) {
+        m_parserCore->closeFile();
+    }
 }
 
 // MainWindow-compatible interface methods
@@ -34,7 +40,7 @@ void E57ParserLib::startParsing(const QString& filePath, const LoadingSettings& 
         return;
     }
 
-    if (!isValidE57File(filePath)) {
+    if (!E57ParserCore::isValidE57File(filePath.toStdString())) {
         QString errorMsg = "Invalid E57 file format: " + filePath;
         emit parsingFinished(false, errorMsg, std::vector<float>());
         return;
@@ -106,95 +112,47 @@ int E57ParserLib::getScanCount(const QString& filePath) {
 
 bool E57ParserLib::openFile(const std::string& filePath) {
     try {
-        closeFile();
         clearError();
-        
-        // Create new ImageFile instance
-        m_imageFile = std::make_unique<e57::ImageFile>(filePath, "r");
-        
-        if (!m_imageFile->isOpen()) {
-            setError("Failed to open file handle");
+
+        if (!m_parserCore->openFile(filePath)) {
+            setError(m_parserCore->getLastError());
             return false;
         }
-        
+
+        qDebug() << "E57ParserLib::openFile - Successfully opened:" << QString::fromStdString(filePath);
         return true;
-        
-    } catch (const e57::E57Exception& ex) {
-        setError(std::string("E57 Exception: ") + ex.what());
-        return false;
+
     } catch (const std::exception& ex) {
-        setError(std::string("Standard exception: ") + ex.what());
+        setError("Exception opening file: " + std::string(ex.what()));
         return false;
     }
 }
 
 void E57ParserLib::closeFile() {
-    if (m_imageFile) {
-        try {
-            if (m_imageFile->isOpen()) {
-                m_imageFile->close();
-            }
-        } catch (const e57::E57Exception& ex) {
-            // Log error but don't throw in destructor path
-            setError(std::string("E57 Exception during close: ") + ex.what());
-        }
-        m_imageFile.reset();
+    if (m_parserCore) {
+        m_parserCore->closeFile();
     }
 }
 
 std::string E57ParserLib::getGuid() const {
-    if (!m_imageFile || !m_imageFile->isOpen()) {
+    if (!m_parserCore) {
         return "";
     }
-    
-    try {
-        e57::StructureNode root = m_imageFile->root();
-        if (root.isDefined("guid")) {
-            e57::StringNode guidNode = static_cast<e57::StringNode>(root.get("guid"));
-            return guidNode.value();
-        }
-    } catch (const e57::E57Exception&) {
-        // Return empty string on error
-    }
-    
-    return "";
+    return m_parserCore->getGuid();
 }
 
 std::pair<int, int> E57ParserLib::getVersion() const {
-    if (!m_imageFile || !m_imageFile->isOpen()) {
+    if (!m_parserCore) {
         return {0, 0};
     }
-
-    try {
-        // Get version from root structure
-        e57::StructureNode root = m_imageFile->root();
-        if (root.isDefined("formatName")) {
-            // For now, return a default version since the API doesn't expose version directly
-            return {1, 0}; // Default E57 version
-        }
-    } catch (const e57::E57Exception&) {
-        return {0, 0};
-    }
-
-    return {0, 0};
+    return m_parserCore->getVersion();
 }
 
 int E57ParserLib::getScanCount() const {
-    if (!m_imageFile || !m_imageFile->isOpen()) {
+    if (!m_parserCore) {
         return 0;
     }
-    
-    try {
-        e57::StructureNode root = m_imageFile->root();
-        if (root.isDefined("/data3D")) {
-            e57::VectorNode data3D = static_cast<e57::VectorNode>(root.get("/data3D"));
-            return static_cast<int>(data3D.childCount());
-        }
-    } catch (const e57::E57Exception&) {
-        // Return 0 on error
-    }
-    
-    return 0;
+    return m_parserCore->getScanCount();
 }
 
 // Sprint 4: Multi-scan support enhancement
@@ -272,7 +230,7 @@ E57ParserLib::ScanMetadata E57ParserLib::getScanMetadata(int scanIndex) const {
 // Removed duplicate getLastError() method - using QString version above
 
 bool E57ParserLib::isOpen() const {
-    return m_imageFile && m_imageFile->isOpen();
+    return m_parserCore && m_parserCore->isOpen();
 }
 
 void E57ParserLib::clearError() const {
@@ -283,6 +241,41 @@ void E57ParserLib::clearError() const {
 void E57ParserLib::setError(const std::string& error) const {
     QMutexLocker locker(&m_errorMutex);
     m_lastError = QString::fromStdString(error);
+}
+
+// Sprint 2 Decoupling - Adapter methods for E57ParserCore integration
+void E57ParserLib::onCoreProgress(int percentage, const std::string& stage) {
+    updateProgress(percentage, QString::fromStdString(stage));
+}
+
+PointData E57ParserLib::convertCorePointData(const CorePointData& corePoint) {
+    PointData qtPoint;
+    qtPoint.x = corePoint.x;
+    qtPoint.y = corePoint.y;
+    qtPoint.z = corePoint.z;
+    qtPoint.intensity = corePoint.intensity;
+    qtPoint.hasIntensity = corePoint.hasIntensity;
+    qtPoint.red = corePoint.red;
+    qtPoint.green = corePoint.green;
+    qtPoint.blue = corePoint.blue;
+    qtPoint.hasColor = corePoint.hasColor;
+    return qtPoint;
+}
+
+CoreLoadingSettings E57ParserLib::convertLoadingSettings(const LoadingSettings& qtSettings) {
+    CoreLoadingSettings coreSettings;
+    coreSettings.maxPoints = qtSettings.maxPoints;
+    coreSettings.loadIntensity = qtSettings.loadIntensity;
+    coreSettings.loadColor = qtSettings.loadColor;
+    coreSettings.voxelSize = qtSettings.voxelSize;
+    coreSettings.enableSpatialFilter = qtSettings.enableSpatialFilter;
+    coreSettings.filterMinX = qtSettings.filterMinX;
+    coreSettings.filterMaxX = qtSettings.filterMaxX;
+    coreSettings.filterMinY = qtSettings.filterMinY;
+    coreSettings.filterMaxY = qtSettings.filterMaxY;
+    coreSettings.filterMinZ = qtSettings.filterMinZ;
+    coreSettings.filterMaxZ = qtSettings.filterMaxZ;
+    return coreSettings;
 }
 
 // Sprint 2: Point data extraction methods

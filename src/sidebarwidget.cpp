@@ -18,8 +18,6 @@
 SidebarWidget::SidebarWidget(QWidget *parent)
     : QTreeView(parent)
     , m_model(nullptr)
-    , m_projectManager(nullptr)
-    , m_loadManager(nullptr)
     , m_contextMenu(nullptr)
     , m_contextItem(nullptr)
 {
@@ -95,29 +93,9 @@ void SidebarWidget::setSQLiteManager(SQLiteManager *manager)
     m_model->setSQLiteManager(manager);
 }
 
-void SidebarWidget::setProjectManager(ProjectManager *manager)
-{
-    m_projectManager = manager;
-}
-
-void SidebarWidget::setPointCloudLoadManager(PointCloudLoadManager *manager)
-{
-    m_loadManager = manager;
-
-    // Connect signals to load manager
-    if (m_loadManager) {
-        connect(this, &SidebarWidget::loadScanRequested,
-                m_loadManager, &PointCloudLoadManager::onLoadScanRequested);
-        connect(this, &SidebarWidget::unloadScanRequested,
-                m_loadManager, &PointCloudLoadManager::onUnloadScanRequested);
-        connect(this, &SidebarWidget::loadClusterRequested,
-                m_loadManager, &PointCloudLoadManager::onLoadClusterRequested);
-        connect(this, &SidebarWidget::unloadClusterRequested,
-                m_loadManager, &PointCloudLoadManager::onUnloadClusterRequested);
-        connect(this, &SidebarWidget::viewPointCloudRequested,
-                m_loadManager, &PointCloudLoadManager::onViewPointCloudRequested);
-    }
-}
+// Sprint 4: Removed setter methods - SidebarWidget now only emits signals
+// void setProjectManager(ProjectManager *manager);
+// void setPointCloudLoadManager(PointCloudLoadManager *manager);
 
 void SidebarWidget::refreshFromDatabase()
 {
@@ -239,7 +217,7 @@ void SidebarWidget::createContextMenu()
 
 void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
 {
-    if (!m_contextMenu || !m_projectManager) {
+    if (!m_contextMenu) {
         return;
     }
 
@@ -254,61 +232,16 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
         QString itemId = m_model->getItemId(m_contextItem);
 
         if (itemType == "scan") {
-            // Sprint 2.2: Enhanced context-aware menu for scans
-            if (m_loadManager) {
-                LoadedState state = m_model->getScanLoadedState(itemId);
-
-                // Sprint 2.2: Context-aware actions based on loaded state
-                switch (state) {
-                    case LoadedState::Unloaded:
-                        // Only show load actions for unloaded scans
-                        m_loadScanAction->setEnabled(true);
-                        m_unloadScanAction->setEnabled(false);
-                        m_contextMenu->addAction(m_loadScanAction);
-                        m_contextMenu->addAction(m_preprocessScanAction);
-                        break;
-                    case LoadedState::Loaded:
-                        // Only show unload actions for loaded scans
-                        m_loadScanAction->setEnabled(false);
-                        m_unloadScanAction->setEnabled(true);
-                        m_contextMenu->addAction(m_unloadScanAction);
-                        m_contextMenu->addAction(m_optimizeScanAction);
-                        m_contextMenu->addMenu(m_advancedMenu);
-                        break;
-                    case LoadedState::Processing:
-                        // Limited options during processing - disable load/unload
-                        m_loadScanAction->setEnabled(false);
-                        m_unloadScanAction->setEnabled(false);
-                        m_contextMenu->addAction("Cancel Processing")->setEnabled(false);
-                        break;
-                    case LoadedState::Error:
-                        // Allow retry for error state
-                        m_loadScanAction->setEnabled(true);
-                        m_unloadScanAction->setEnabled(false);
-                        m_contextMenu->addAction("Retry Load");
-                        m_contextMenu->addAction("View Error Details");
-                        break;
-                    case LoadedState::Cached:
-                        // Allow restore or unload for cached state
-                        m_loadScanAction->setEnabled(true);
-                        m_unloadScanAction->setEnabled(true);
-                        m_contextMenu->addAction("Restore to Memory");
-                        m_contextMenu->addAction(m_unloadScanAction);
-                        break;
-                    default:
-                        // Default to allowing load
-                        m_loadScanAction->setEnabled(true);
-                        m_unloadScanAction->setEnabled(false);
-                        m_contextMenu->addAction(m_loadScanAction);
-                        break;
-                }
-
-                m_contextMenu->addSeparator();
-                m_contextMenu->addAction(m_viewPointCloudAction);
-                m_contextMenu->addSeparator();
-                // Sprint 2.3 - Add delete scan action
-                m_contextMenu->addAction(m_deleteScanAction);
-            }
+            // Sprint 4: Simplified scan context menu - no manager dependencies
+            m_contextMenu->addAction(m_loadScanAction);
+            m_contextMenu->addAction(m_unloadScanAction);
+            m_contextMenu->addAction(m_preprocessScanAction);
+            m_contextMenu->addAction(m_optimizeScanAction);
+            m_contextMenu->addMenu(m_advancedMenu);
+            m_contextMenu->addSeparator();
+            m_contextMenu->addAction(m_viewPointCloudAction);
+            m_contextMenu->addSeparator();
+            m_contextMenu->addAction(m_deleteScanAction);
         } else if (itemType == "project_root" || itemType == "cluster") {
             // Right-clicked on project root or cluster
             m_contextMenu->addAction(m_createClusterAction);
@@ -317,34 +250,25 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
                 m_contextMenu->addAction(m_createSubClusterAction);
                 m_contextMenu->addSeparator();
 
-                // Enhanced load/unload actions for clusters
-                if (m_loadManager) {
-                    m_contextMenu->addAction(m_loadClusterAction);
-                    m_contextMenu->addAction(m_unloadClusterAction);
-                    m_contextMenu->addSeparator();
+                // Sprint 4: Simplified cluster context menu - no manager dependencies
+                m_contextMenu->addAction(m_loadClusterAction);
+                m_contextMenu->addAction(m_unloadClusterAction);
+                m_contextMenu->addSeparator();
 
-                    // Sprint 2.1: Batch operations
-                    m_contextMenu->addAction(m_batchLoadAction);
-                    m_contextMenu->addAction(m_batchUnloadAction);
-                    m_contextMenu->addSeparator();
+                // Sprint 2.1: Batch operations
+                m_contextMenu->addAction(m_batchLoadAction);
+                m_contextMenu->addAction(m_batchUnloadAction);
+                m_contextMenu->addSeparator();
 
-                    m_contextMenu->addAction(m_viewPointCloudAction);
-                    m_contextMenu->addSeparator();
-                }
+                m_contextMenu->addAction(m_viewPointCloudAction);
+                m_contextMenu->addSeparator();
 
-                // Sprint 2.3 - Add lock/unlock actions based on current state
-                if (m_projectManager) {
-                    bool isLocked = m_projectManager->getClusterLockState(itemId);
-                    if (isLocked) {
-                        m_contextMenu->addAction(m_unlockClusterAction);
-                    } else {
-                        m_contextMenu->addAction(m_lockClusterAction);
-                    }
-                    m_contextMenu->addSeparator();
-                }
+                // Sprint 4: Always show lock/unlock actions - MainPresenter will handle state
+                m_contextMenu->addAction(m_lockClusterAction);
+                m_contextMenu->addAction(m_unlockClusterAction);
+                m_contextMenu->addSeparator();
 
                 m_contextMenu->addAction(m_renameClusterAction);
-                // Sprint 2.3 - Replace old delete with recursive delete
                 m_contextMenu->addAction(m_deleteClusterRecursiveAction);
             }
         }
@@ -389,7 +313,7 @@ void SidebarWidget::dragMoveEvent(QDragMoveEvent *event)
 void SidebarWidget::dropEvent(QDropEvent *event)
 {
     QStandardItem *targetItem = getItemAt(event->position().toPoint());
-    if (!targetItem || !m_projectManager) {
+    if (!targetItem) {
         event->ignore();
         return;
     }
@@ -403,21 +327,13 @@ void SidebarWidget::dropEvent(QDropEvent *event)
         return;
     }
 
-    // Get target cluster ID (empty for project root)
-    QString targetClusterId = (targetType == "cluster") ? targetId : QString();
-
     if (event->mimeData()->hasFormat("application/x-scan-ids")) {
         // Handle scan drop
         QByteArray mimeData = event->mimeData()->data("application/x-scan-ids");
         QStringList scanIds = QString::fromUtf8(mimeData).split(',', Qt::SkipEmptyParts);
 
-        for (const QString &scanId : scanIds) {
-            if (m_projectManager->moveScanToCluster(scanId, targetClusterId)) {
-                m_model->moveScanToCluster(scanId, targetClusterId);
-                emit scanMovedToCluster(scanId, targetClusterId);
-            }
-        }
-
+        // Sprint 4: Emit signal instead of executing business logic
+        emit dragDropOperationRequested(scanIds, "scan", targetId, targetType);
         event->acceptProposedAction();
     } else {
         event->ignore();
@@ -469,10 +385,6 @@ void SidebarWidget::startDrag(Qt::DropActions supportedActions)
 // Context menu action slots
 void SidebarWidget::onCreateCluster()
 {
-    if (!m_projectManager) {
-        return;
-    }
-
     QString clusterName = promptForClusterName("Create New Cluster");
     if (clusterName.isEmpty()) {
         return;
@@ -486,16 +398,13 @@ void SidebarWidget::onCreateCluster()
         }
     }
 
-    QString clusterId = m_projectManager->createCluster(clusterName, parentClusterId);
-    if (!clusterId.isEmpty()) {
-        // The model will be updated via signals from ProjectManager
-        qDebug() << "Cluster created successfully:" << clusterName;
-    }
+    // Sprint 4: Emit signal instead of executing business logic
+    emit clusterCreationRequested(clusterName, parentClusterId);
 }
 
 void SidebarWidget::onCreateSubCluster()
 {
-    if (!m_projectManager || !m_contextItem) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -504,21 +413,19 @@ void SidebarWidget::onCreateSubCluster()
         return;
     }
 
+    QString parentClusterId = m_model->getItemId(m_contextItem);
     QString clusterName = promptForClusterName("Create New Sub-Cluster");
     if (clusterName.isEmpty()) {
         return;
     }
-
-    QString parentClusterId = m_model->getItemId(m_contextItem);
-    QString clusterId = m_projectManager->createCluster(clusterName, parentClusterId);
-    if (!clusterId.isEmpty()) {
-        qDebug() << "Sub-cluster created successfully:" << clusterName;
-    }
+    
+    // Sprint 4: Emit signal instead of executing business logic
+    emit clusterCreationRequested(clusterName, parentClusterId);
 }
 
 void SidebarWidget::onRenameCluster()
 {
-    if (!m_projectManager || !m_contextItem) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -535,14 +442,13 @@ void SidebarWidget::onRenameCluster()
         return;
     }
 
-    if (m_projectManager->renameCluster(clusterId, newName)) {
-        qDebug() << "Cluster renamed successfully:" << currentName << "to" << newName;
-    }
+    // Sprint 4: Emit signal instead of executing business logic
+    emit clusterRenameRequested(clusterId, newName);
 }
 
 void SidebarWidget::onDeleteCluster()
 {
-    if (!m_projectManager || !m_contextItem) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -552,20 +458,10 @@ void SidebarWidget::onDeleteCluster()
     }
 
     QString clusterId = m_model->getItemId(m_contextItem);
-    QString clusterName = m_contextItem->text();
 
-    int ret = QMessageBox::question(this, "Delete Cluster",
-                                   QString("Are you sure you want to delete the cluster '%1'?\n\n"
-                                          "All scans in this cluster will be moved to the project root.\n"
-                                          "All sub-clusters will also be deleted.").arg(clusterName),
-                                   QMessageBox::Yes | QMessageBox::No,
-                                   QMessageBox::No);
-
-    if (ret == QMessageBox::Yes) {
-        if (m_projectManager->deleteCluster(clusterId)) {
-            qDebug() << "Cluster deleted successfully:" << clusterName;
-        }
-    }
+    // Sprint 4: Emit signal instead of executing business logic
+    // The confirmation dialog will be handled by MainPresenter
+    emit clusterDeletionRequested(clusterId);
 }
 
 // Helper methods
@@ -610,7 +506,7 @@ bool SidebarWidget::canDropOn(QStandardItem *item, const QString &draggedType)
 // New slot implementations for Sprint 2.1
 void SidebarWidget::onLoadScan()
 {
-    if (!m_contextItem || !m_loadManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -625,7 +521,7 @@ void SidebarWidget::onLoadScan()
 
 void SidebarWidget::onUnloadScan()
 {
-    if (!m_contextItem || !m_loadManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -640,7 +536,7 @@ void SidebarWidget::onUnloadScan()
 
 void SidebarWidget::onLoadCluster()
 {
-    if (!m_contextItem || !m_loadManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -655,7 +551,7 @@ void SidebarWidget::onLoadCluster()
 
 void SidebarWidget::onUnloadCluster()
 {
-    if (!m_contextItem || !m_loadManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -670,7 +566,7 @@ void SidebarWidget::onUnloadCluster()
 
 void SidebarWidget::onViewPointCloud()
 {
-    if (!m_contextItem || !m_loadManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -685,7 +581,7 @@ void SidebarWidget::onViewPointCloud()
 // Sprint 2.3 - New slot implementations
 void SidebarWidget::onLockCluster()
 {
-    if (!m_contextItem || !m_projectManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -700,7 +596,7 @@ void SidebarWidget::onLockCluster()
 
 void SidebarWidget::onUnlockCluster()
 {
-    if (!m_contextItem || !m_projectManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -715,7 +611,7 @@ void SidebarWidget::onUnlockCluster()
 
 void SidebarWidget::onDeleteScan()
 {
-    if (!m_contextItem || !m_projectManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -725,34 +621,15 @@ void SidebarWidget::onDeleteScan()
     }
 
     QString scanId = m_model->getItemId(m_contextItem);
-    QString scanName = m_contextItem->text();
 
-    // Get scan info to check import type
-    ScanInfo scan = m_projectManager->getSQLiteManager()->getScanById(scanId);
-    if (!scan.isValid()) {
-        QMessageBox::warning(this, "Error", "Could not retrieve scan information.");
-        return;
-    }
-
-    QString message = QString("Are you sure you want to delete scan '%1'?\nThis action cannot be undone.")
-                     .arg(scanName);
-
-    ConfirmationDialog dialog("Delete Scan", message, this);
-
-    // Add option to delete physical file for copied/moved scans
-    if (scan.importType == "COPIED" || scan.importType == "MOVED") {
-        dialog.addPhysicalFileOption("Also delete the physical scan file from the project folder?");
-    }
-
-    if (dialog.exec() == QDialog::Accepted) {
-        bool deletePhysicalFile = dialog.deletePhysicalFiles();
-        emit deleteScanRequested(scanId, deletePhysicalFile);
-    }
+    // Sprint 4: Emit signal instead of executing business logic
+    // The confirmation dialog and scan info retrieval will be handled by MainPresenter
+    emit deleteScanRequested(scanId, false); // Default to not deleting physical file
 }
 
 void SidebarWidget::onDeleteClusterRecursive()
 {
-    if (!m_contextItem || !m_projectManager) {
+    if (!m_contextItem) {
         return;
     }
 
@@ -762,27 +639,10 @@ void SidebarWidget::onDeleteClusterRecursive()
     }
 
     QString clusterId = m_model->getItemId(m_contextItem);
-    QString clusterName = m_contextItem->text();
 
-    QString message = QString("Are you sure you want to delete cluster '%1' and all its contents?\n"
-                             "This will delete all sub-clusters and scans within this cluster.\n"
-                             "This action cannot be undone.")
-                     .arg(clusterName);
-
-    ConfirmationDialog dialog("Delete Cluster", message, this);
-
-    // Check if cluster contains copied/moved scans
-    QStringList scanPaths = m_projectManager->getSQLiteManager()->getClusterScanPaths(clusterId, m_currentProjectPath);
-    bool hasCopiedMovedScans = !scanPaths.isEmpty();
-
-    if (hasCopiedMovedScans) {
-        dialog.addPhysicalFileOption("Also delete physical scan files for copied/moved scans?");
-    }
-
-    if (dialog.exec() == QDialog::Accepted) {
-        bool deletePhysicalFiles = dialog.deletePhysicalFiles();
-        emit deleteClusterRequested(clusterId, deletePhysicalFiles);
-    }
+    // Sprint 4: Emit signal instead of executing business logic
+    // The confirmation dialog and scan path checking will be handled by MainPresenter
+    emit deleteClusterRequested(clusterId, false); // Default to not deleting physical files
 }
 
 // Sprint 2.1: Enhanced operation slot implementations
