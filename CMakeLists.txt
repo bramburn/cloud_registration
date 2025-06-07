@@ -26,9 +26,33 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
-# User Story 3: Fix encoding issues for GCC/Clang compilers
+# Configure GCC/Clang compilers (Linux/macOS)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # User Story 3: Fix encoding issues - enforce UTF-8 for source and execution
     add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
+
+    # Enable high warning level
+    add_compile_options(-Wall -Wextra -Wpedantic)
+
+    # Enable debug information in all builds
+    add_compile_options(-g)
+
+    # Enable optimizations for Release builds
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-O3 -DNDEBUG)
+        # Enable modern CPU optimizations if supported
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+        if(COMPILER_SUPPORTS_MARCH_NATIVE)
+            add_compile_options(-march=native)
+        endif()
+    endif()
+
+    # Enable additional security features on Linux
+    if(UNIX AND NOT APPLE)
+        add_compile_options(-fstack-protector-strong -D_FORTIFY_SOURCE=2)
+        add_link_options(-Wl,-z,relro -Wl,-z,now)
+    endif()
 endif()
 
 # Set C++ standard
@@ -50,26 +74,55 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/Debug)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/lib/Release)
 
 # Set Qt6 path if installed in custom location
-if(WIN32 AND NOT DEFINED Qt6_DIR)
+if(NOT DEFINED Qt6_DIR)
     # First check environment variable
     if(DEFINED ENV{Qt6_DIR} AND EXISTS $ENV{Qt6_DIR})
         set(Qt6_DIR $ENV{Qt6_DIR})
         message(STATUS "Using Qt6 from environment variable: ${Qt6_DIR}")
     else()
-        # Try common Qt6 installation paths - prioritize Qt 6.9.0
-        set(QT_POSSIBLE_PATHS
-            "C:/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
-            "C:/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
-            "C:/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
-            "C:/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
-            "C:/Qt/6.5.3/msvc2019_64/lib/cmake/Qt6"
-            "C:/Qt/6.5.0/msvc2019_64/lib/cmake/Qt6"
-            "C:/Qt/6.5.0/msvc2022_64/lib/cmake/Qt6"
-            "$ENV{PROGRAMFILES}/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
-            "$ENV{PROGRAMFILES}/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
-            "$ENV{PROGRAMFILES}/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
-            "$ENV{PROGRAMFILES}/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
-        )
+        # Platform-specific Qt6 path detection
+        if(WIN32)
+            # Try common Qt6 installation paths on Windows - prioritize Qt 6.9.0
+            set(QT_POSSIBLE_PATHS
+                "C:/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
+                "C:/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
+                "C:/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
+                "C:/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
+                "C:/Qt/6.5.3/msvc2019_64/lib/cmake/Qt6"
+                "C:/Qt/6.5.0/msvc2019_64/lib/cmake/Qt6"
+                "C:/Qt/6.5.0/msvc2022_64/lib/cmake/Qt6"
+                "$ENV{PROGRAMFILES}/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6"
+                "$ENV{PROGRAMFILES}/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6"
+                "$ENV{PROGRAMFILES}/Qt/6.7.0/msvc2022_64/lib/cmake/Qt6"
+                "$ENV{PROGRAMFILES}/Qt/6.6.0/msvc2022_64/lib/cmake/Qt6"
+            )
+        elseif(UNIX AND NOT APPLE)
+            # Try common Qt6 installation paths on Linux
+            set(QT_POSSIBLE_PATHS
+                "/usr/lib/x86_64-linux-gnu/cmake/Qt6"
+                "/usr/lib64/cmake/Qt6"
+                "/usr/local/lib/cmake/Qt6"
+                "/opt/Qt/6.9.0/gcc_64/lib/cmake/Qt6"
+                "/opt/Qt/6.8.0/gcc_64/lib/cmake/Qt6"
+                "/opt/Qt/6.7.0/gcc_64/lib/cmake/Qt6"
+                "/opt/Qt/6.6.0/gcc_64/lib/cmake/Qt6"
+                "/opt/Qt/6.5.3/gcc_64/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.9.0/gcc_64/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.8.0/gcc_64/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.7.0/gcc_64/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.6.0/gcc_64/lib/cmake/Qt6"
+            )
+        elseif(APPLE)
+            # Try common Qt6 installation paths on macOS
+            set(QT_POSSIBLE_PATHS
+                "/usr/local/opt/qt6/lib/cmake/Qt6"
+                "/opt/homebrew/opt/qt6/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.9.0/macos/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.8.0/macos/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.7.0/macos/lib/cmake/Qt6"
+                "$ENV{HOME}/Qt/6.6.0/macos/lib/cmake/Qt6"
+            )
+        endif()
 
         foreach(QT_PATH ${QT_POSSIBLE_PATHS})
             if(EXISTS ${QT_PATH})
@@ -80,13 +133,27 @@ if(WIN32 AND NOT DEFINED Qt6_DIR)
         endforeach()
 
         if(NOT DEFINED Qt6_DIR)
-            message(WARNING "Qt6 not found in common locations. Please set Qt6_DIR manually.")
+            message(WARNING "Qt6 not found in common locations. Please set Qt6_DIR manually or install Qt6.")
+            if(UNIX AND NOT APPLE)
+                message(STATUS "On Ubuntu/Debian: sudo apt-get install qt6-base-dev")
+                message(STATUS "On Fedora/RHEL: sudo dnf install qt6-qtbase-devel")
+                message(STATUS "On Arch: sudo pacman -S qt6-base")
+            elseif(APPLE)
+                message(STATUS "On macOS: brew install qt6")
+            endif()
         endif()
     endif()
 endif()
 
-# Find Qt6 components - require minimum version 6.9.0
-find_package(Qt6 6.9.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
+# Find Qt6 components - require minimum version 6.5.0 for better Linux compatibility
+# Note: 6.9.0 is preferred on Windows, but 6.5.0+ is acceptable for Linux distributions
+find_package(Qt6 6.5.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
+
+# Check Qt6 version and warn if using older version
+if(Qt6_VERSION VERSION_LESS "6.9.0")
+    message(WARNING "Qt6 version ${Qt6_VERSION} detected. Version 6.9.0+ is recommended for optimal performance.")
+    message(STATUS "Current version should work but some features may be limited.")
+endif()
 
 # Find Vulkan SDK
 # find_package(Vulkan REQUIRED)
@@ -178,6 +245,34 @@ target_link_libraries(CloudRegistration
     Qt6::Concurrent
     E57Format
 )
+
+# Platform-specific linking
+if(UNIX AND NOT APPLE)
+    # Link additional libraries required on Linux
+    target_link_libraries(CloudRegistration
+        pthread
+        dl
+    )
+
+    # Set RPATH for better library loading on Linux
+    set_target_properties(CloudRegistration PROPERTIES
+        INSTALL_RPATH_USE_LINK_PATH TRUE
+        BUILD_WITH_INSTALL_RPATH FALSE
+        INSTALL_RPATH "\$ORIGIN:\$ORIGIN/../lib"
+    )
+elseif(APPLE)
+    # macOS-specific linking
+    target_link_libraries(CloudRegistration
+        "-framework OpenGL"
+        "-framework Cocoa"
+    )
+
+    # Set RPATH for macOS
+    set_target_properties(CloudRegistration PROPERTIES
+        INSTALL_RPATH "@executable_path;@executable_path/../lib"
+        BUILD_WITH_INSTALL_RPATH FALSE
+    )
+endif()
 
 # Ensure E57Format include directories are available
 get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)
