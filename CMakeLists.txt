@@ -440,13 +440,16 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
-    # Sprint 5: MainPresenter Tests (requires Google Mock)
+    # Sprint 4: MainPresenter Tests (requires Google Mock)
     if(GMOCK_AVAILABLE)
         add_executable(MainPresenterTests
             tests/test_mainpresenter.cpp
             src/MainPresenter.cpp
             src/IE57Parser.cpp
             src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
         )
 
         target_link_libraries(MainPresenterTests
