@@ -500,7 +500,33 @@ if(TARGET GTest::gtest_main)
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
+        # Sprint 8: End-to-End Integration Tests
+        add_executable(EndToEndTests
+            tests/integration/end_to_end_testing.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/e57parserlib.cpp
+            src/lasparser.cpp
+            src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
+            src/voxelgridfilter.cpp
+        )
+
+        target_link_libraries(EndToEndTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+            E57Format
+        )
+
+        target_include_directories(EndToEndTests PRIVATE src)
+        add_test(NAME EndToEndTests COMMAND EndToEndTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests EndToEndTests)
 
     else()
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)

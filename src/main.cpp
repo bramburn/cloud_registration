@@ -10,6 +10,9 @@
 #include <QFile>
 #include <QTextStream>
 #include <QGuiApplication>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QFileInfo>
 #include <vector>
 #include "mainwindow.h"
 #include "e57parserlib.h"
@@ -18,62 +21,150 @@
 // Enable logging
 Q_LOGGING_CATEGORY(appLog, "CloudRegistration")
 
-// Global log file
+// Global log file and rotation settings
 static QFile* g_logFile = nullptr;
 static QTextStream* g_logStream = nullptr;
+static QMutex g_logMutex;
+static const qint64 MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
+static QString g_logFilePath;
 
-void messageOutput(QtMsgType type, const QMessageLogContext &/*context*/, const QString &msg)
+void rotateLogFile() {
+    if (!g_logFile) return;
+
+    QFileInfo logInfo(*g_logFile);
+    if (logInfo.size() < MAX_LOG_SIZE) return;
+
+    // Close current log
+    if (g_logStream) {
+        delete g_logStream;
+        g_logStream = nullptr;
+    }
+    if (g_logFile) {
+        g_logFile->close();
+        delete g_logFile;
+        g_logFile = nullptr;
+    }
+
+    // Rotate log files
+    QString basePath = g_logFilePath;
+    QString rotatedPath = basePath + ".1";
+
+    // Remove old rotated log if exists
+    if (QFile::exists(rotatedPath)) {
+        QFile::remove(rotatedPath);
+    }
+
+    // Rename current log to .1
+    QFile::rename(basePath, rotatedPath);
+
+    // Create new log file
+    g_logFile = new QFile(g_logFilePath);
+    if (g_logFile->open(QIODevice::WriteOnly | QIODevice::Append)) {
+        g_logStream = new QTextStream(g_logFile);
+    }
+}
+
+void messageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
+    QMutexLocker locker(&g_logMutex);
+
     QString txt;
+    QString level;
     switch (type) {
     case QtDebugMsg:
-        txt = QString("Debug: %1").arg(msg);
+        txt = QString("DEBUG: %1").arg(msg);
+        level = "DEBUG";
         break;
     case QtWarningMsg:
-        txt = QString("Warning: %1").arg(msg);
+        txt = QString("WARN: %1").arg(msg);
+        level = "WARN";
         break;
     case QtCriticalMsg:
-        txt = QString("Critical: %1").arg(msg);
+        txt = QString("ERROR: %1").arg(msg);
+        level = "ERROR";
         break;
     case QtFatalMsg:
-        txt = QString("Fatal: %1").arg(msg);
+        txt = QString("FATAL: %1").arg(msg);
+        level = "FATAL";
         break;
     case QtInfoMsg:
-        txt = QString("Info: %1").arg(msg);
+        txt = QString("INFO: %1").arg(msg);
+        level = "INFO";
         break;
     }
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
-    QString logLine = QString("[%1] %2").arg(timestamp, txt);
+    QString category = context.category ? QString(context.category) : "default";
+    QString logLine = QString("[%1] [%2] [%3] %4").arg(timestamp, level, category, msg);
 
-    // Write to console
+    // Write to console (only for debug builds or important messages)
+#ifdef QT_DEBUG
     fprintf(stderr, "%s\n", logLine.toLocal8Bit().constData());
+#else
+    if (type >= QtWarningMsg) {
+        fprintf(stderr, "%s\n", logLine.toLocal8Bit().constData());
+    }
+#endif
 
     // Write to file if available
     if (g_logStream) {
-        *g_logStream << logLine << Qt::endl;
-        g_logStream->flush();
+        // Check for log rotation
+        rotateLogFile();
+
+        if (g_logStream) {
+            *g_logStream << logLine << Qt::endl;
+            g_logStream->flush();
+        }
     }
 }
 
 void setupLogging()
 {
-    // Create logs directory in application directory for easier access
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString logFile = appDir + "/CloudRegistration.log";
+    // Determine log directory based on platform and environment
+    QString logDir;
+
+    // Check if we're in a Docker container or have CLOUDREGISTRATION_LOG_DIR set
+    QString envLogDir = qgetenv("CLOUDREGISTRATION_LOG_DIR");
+    if (!envLogDir.isEmpty()) {
+        logDir = envLogDir;
+    } else {
+        // Use platform-appropriate location
+        QString appDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if (appDataDir.isEmpty()) {
+            // Fallback to application directory
+            logDir = QCoreApplication::applicationDirPath() + "/logs";
+        } else {
+            logDir = appDataDir + "/logs";
+        }
+    }
+
+    // Create log directory if it doesn't exist
+    QDir().mkpath(logDir);
+
+    g_logFilePath = logDir + "/CloudRegistration.log";
 
     // Set up file logging
-    g_logFile = new QFile(logFile);
+    g_logFile = new QFile(g_logFilePath);
     if (g_logFile->open(QIODevice::WriteOnly | QIODevice::Append)) {
         g_logStream = new QTextStream(g_logFile);
         qInstallMessageHandler(messageOutput);
 
-        qDebug() << "=== CloudRegistration Started ===" << QDateTime::currentDateTime();
-        qDebug() << "Log file location:" << logFile;
-        qDebug() << "Application directory:" << appDir;
-        qDebug() << "Working directory:" << QDir::currentPath();
+        qInfo() << "=== CloudRegistration Started ===" << QDateTime::currentDateTime();
+        qInfo() << "Version:" << QCoreApplication::applicationVersion();
+        qInfo() << "Log file location:" << g_logFilePath;
+        qInfo() << "Log directory:" << logDir;
+        qInfo() << "Application directory:" << QCoreApplication::applicationDirPath();
+        qInfo() << "Working directory:" << QDir::currentPath();
+        qInfo() << "Data directory:" << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+        // Log system information
+        qInfo() << "Platform:" << QGuiApplication::platformName();
+        qInfo() << "Qt Version:" << QT_VERSION_STR;
+        qInfo() << "Qt Runtime Version:" << qVersion();
+
     } else {
-        fprintf(stderr, "Failed to open log file: %s\n", logFile.toLocal8Bit().constData());
+        fprintf(stderr, "Failed to open log file: %s\n", g_logFilePath.toLocal8Bit().constData());
+        fprintf(stderr, "Continuing without file logging...\n");
     }
 }
 
