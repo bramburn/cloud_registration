@@ -268,7 +268,7 @@ public slots:
 
 signals:
     // --- Data Operation Signals ---
-    
+
     /**
      * @brief Emitted when point cloud loading starts
      */
@@ -292,7 +292,7 @@ signals:
     void pointCloudCleared();
 
     // --- State & Error Signals ---
-    
+
     /**
      * @brief Emitted when the viewer state changes
      * @param newState The new viewer state
@@ -307,7 +307,7 @@ signals:
     void renderingError(const QString& error);
 
     // --- Performance Signals ---
-    
+
     /**
      * @brief Emitted when rendering statistics are updated
      * @param fps Current frame rate

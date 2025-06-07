@@ -215,7 +215,6 @@ set(HEADERS
     src/e57parserlib.h
     src/IE57Parser.h
     src/IE57Writer.h
-    src/IPointCloudViewer.h
     src/IMainView.h
     src/MainPresenter.h
     src/lasparser.h

@@ -16,6 +16,9 @@
 #include "scanimportdialog.h"
 #include "scanimportmanager.h"
 #include "sqlitemanager.h"
+// Sprint 4: MVP Pattern
+#include "MainPresenter.h"
+#include "IPointCloudViewer.h"
 #include <QApplication>
 #include <QThread>
 #include <QTimer>
@@ -92,6 +95,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_ambientIntensitySlider(nullptr)
     , m_ambientIntensityLabel(nullptr)
     , m_currentLightColor(Qt::white)
+    , m_viewerInterface(nullptr)
 {
     qDebug() << "MainWindow constructor started";
 
@@ -99,6 +103,13 @@ MainWindow::MainWindow(QWidget *parent)
         qDebug() << "Setting up UI...";
         setupUI();
         qDebug() << "UI setup completed";
+
+        // Sprint 4: Initialize presenter after UI setup
+        qDebug() << "Initializing presenter...";
+        m_presenter = std::make_unique<MainPresenter>(this, nullptr, nullptr, this);
+        m_presenter->setProjectManager(m_projectManager);
+        m_presenter->initialize();
+        qDebug() << "Presenter initialized";
 
         qDebug() << "Setting up menu bar...";
         setupMenuBar();
@@ -242,6 +253,7 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget *parent)
     , m_minSizeLabel(nullptr)
     , m_maxSizeLabel(nullptr)
     , m_attenuationFactorLabel(nullptr)
+    , m_viewerInterface(nullptr)
 {
     qDebug() << "MainWindow constructor (with injected E57Parser) started";
 
@@ -254,6 +266,13 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget *parent)
         qDebug() << "Setting up UI...";
         setupUI();
         qDebug() << "UI setup completed";
+
+        // Sprint 4: Initialize presenter after UI setup
+        qDebug() << "Initializing presenter...";
+        m_presenter = std::make_unique<MainPresenter>(this, m_e57Parser, nullptr, this);
+        m_presenter->setProjectManager(m_projectManager);
+        m_presenter->initialize();
+        qDebug() << "Presenter initialized";
 
         qDebug() << "Setting up menu bar...";
         setupMenuBar();
@@ -1949,5 +1968,273 @@ void MainWindow::onStatsUpdated(float fps, int visiblePoints)
 
         m_pointsLabel->setText(pointsText);
     }
+}
+
+// IMainView interface implementation
+void MainWindow::setWindowTitle(const QString& title)
+{
+    QMainWindow::setWindowTitle(title);
+}
+
+void MainWindow::updateWindowTitle()
+{
+    if (m_currentProject) {
+        setWindowTitle(QString("Point Cloud Viewer - %1").arg(m_currentProject->projectName()));
+    } else {
+        setWindowTitle("Point Cloud Viewer");
+    }
+}
+
+void MainWindow::updateStatusBar(const QString& text)
+{
+    if (m_statusLabel) {
+        m_statusLabel->setText(text);
+    }
+    statusBar()->showMessage(text, 5000);
+}
+
+void MainWindow::setStatusReady()
+{
+    updateStatusBar("Ready");
+}
+
+void MainWindow::setStatusLoading(const QString& fileName)
+{
+    updateStatusBar(QString("Loading %1...").arg(fileName));
+}
+
+void MainWindow::setStatusLoadSuccess(const QString& fileName, int pointCount)
+{
+    QString message = QString("Loaded %1 (%2 points)").arg(fileName).arg(pointCount);
+    updateStatusBar(message);
+    m_currentPointCount = pointCount;
+}
+
+void MainWindow::setStatusLoadFailed(const QString& fileName, const QString& message)
+{
+    QString errorMsg = QString("Failed to load %1: %2").arg(fileName, message);
+    updateStatusBar(errorMsg);
+}
+
+void MainWindow::setStatusViewChanged(const QString& viewName)
+{
+    updateStatusBar(QString("View changed to %1").arg(viewName));
+}
+
+void MainWindow::displayErrorMessage(const QString& title, const QString& message)
+{
+    QMessageBox::critical(this, title, message);
+}
+
+void MainWindow::displayWarningMessage(const QString& title, const QString& message)
+{
+    QMessageBox::warning(this, title, message);
+}
+
+void MainWindow::displayInfoMessage(const QString& title, const QString& message)
+{
+    QMessageBox::information(this, title, message);
+}
+
+void MainWindow::showProjectHub()
+{
+    if (m_centralStack && m_projectHub) {
+        m_centralStack->setCurrentWidget(m_projectHub);
+    }
+}
+
+void MainWindow::transitionToProjectView(const QString& projectPath)
+{
+    Q_UNUSED(projectPath)
+    if (m_centralStack && m_projectView) {
+        m_centralStack->setCurrentWidget(m_projectView);
+    }
+}
+
+void MainWindow::enableProjectActions(bool enabled)
+{
+    if (m_closeProjectAction) m_closeProjectAction->setEnabled(enabled);
+    if (m_importScansAction) m_importScansAction->setEnabled(enabled);
+}
+
+void MainWindow::showImportGuidance(bool show)
+{
+    if (!m_importGuidanceWidget) {
+        createImportGuidanceWidget();
+    }
+    if (m_importGuidanceWidget) {
+        m_importGuidanceWidget->setVisible(show);
+    }
+}
+
+IPointCloudViewer* MainWindow::getViewer()
+{
+    return m_viewerInterface;
+}
+
+void MainWindow::showProgressDialog(const QString& title, const QString& message)
+{
+    if (!m_progressDialog) {
+        m_progressDialog = new QProgressDialog(this);
+        m_progressDialog->setWindowModality(Qt::WindowModal);
+        m_progressDialog->setMinimumDuration(500);
+        m_progressDialog->setAutoClose(true);
+        m_progressDialog->setAutoReset(false);
+    }
+
+    m_progressDialog->setWindowTitle(title);
+    m_progressDialog->setLabelText(message);
+    m_progressDialog->setValue(0);
+    m_progressDialog->show();
+}
+
+void MainWindow::updateProgressDialog(int percentage, const QString& stage)
+{
+    if (m_progressDialog) {
+        m_progressDialog->setValue(percentage);
+        m_progressDialog->setLabelText(stage);
+    }
+}
+
+void MainWindow::hideProgressDialog()
+{
+    if (m_progressDialog) {
+        m_progressDialog->close();
+        m_progressDialog->deleteLater();
+        m_progressDialog = nullptr;
+    }
+}
+
+void MainWindow::updateMemoryDisplay(size_t totalBytes)
+{
+    onMemoryUsageChanged(totalBytes);
+}
+
+void MainWindow::updatePerformanceStats(float fps, int visiblePoints)
+{
+    onStatsUpdated(fps, visiblePoints);
+}
+
+void MainWindow::setLoadingState(bool isLoading)
+{
+    m_isLoading = isLoading;
+    // Update UI controls based on loading state
+    enableViewControls(!isLoading);
+}
+
+void MainWindow::updateLoadingProgress(int percentage, const QString& stage)
+{
+    if (m_progressBar) {
+        m_progressBar->setValue(percentage);
+        m_progressBar->setVisible(true);
+    }
+    if (m_progressLabel) {
+        m_progressLabel->setText(stage);
+        m_progressLabel->setVisible(true);
+    }
+}
+
+QString MainWindow::showOpenFileDialog(const QString& title, const QString& filter)
+{
+    return QFileDialog::getOpenFileName(this, title, QString(), filter);
+}
+
+QString MainWindow::showOpenProjectDialog()
+{
+    return QFileDialog::getExistingDirectory(this, "Select Project Folder");
+}
+
+QString MainWindow::showSaveFileDialog(const QString& title, const QString& filter)
+{
+    return QFileDialog::getSaveFileName(this, title, QString(), filter);
+}
+
+bool MainWindow::showLoadingSettingsDialog()
+{
+    LoadingSettingsDialog dialog(this);
+    return dialog.exec() == QDialog::Accepted;
+}
+
+bool MainWindow::showCreateProjectDialog(QString& projectName, QString& projectPath)
+{
+    CreateProjectDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        projectName = dialog.projectName().trimmed();
+        projectPath = dialog.projectPath();
+        return true;
+    }
+    return false;
+}
+
+bool MainWindow::showScanImportDialog()
+{
+    if (!m_currentProject) {
+        return false;
+    }
+
+    ScanImportDialog dialog(this);
+    return dialog.exec() == QDialog::Accepted;
+}
+
+void MainWindow::refreshScanList()
+{
+    if (m_sidebar) {
+        m_sidebar->refreshFromDatabase();
+    }
+}
+
+
+
+void MainWindow::enableViewControls(bool enabled)
+{
+    if (m_topViewAction) m_topViewAction->setEnabled(enabled);
+    if (m_leftViewAction) m_leftViewAction->setEnabled(enabled);
+    if (m_rightViewAction) m_rightViewAction->setEnabled(enabled);
+    if (m_bottomViewAction) m_bottomViewAction->setEnabled(enabled);
+}
+
+void MainWindow::updateViewControlsState()
+{
+    bool hasData = m_viewer && m_viewer->hasPointCloudData();
+    enableViewControls(hasData);
+}
+
+bool MainWindow::isProjectOpen() const
+{
+    return m_currentProject != nullptr;
+}
+
+QString MainWindow::getCurrentProjectPath() const
+{
+    return m_currentProject ? m_currentProject->projectPath() : QString();
+}
+
+Project* MainWindow::getCurrentProject() const
+{
+    return m_currentProject;
+}
+
+void MainWindow::prepareForShutdown()
+{
+    // Cancel any active operations
+    if (m_presenter) {
+        m_presenter->handleApplicationShutdown();
+    }
+}
+
+void MainWindow::cleanupResources()
+{
+    // Cleanup progress dialog
+    hideProgressDialog();
+
+    // Cleanup viewer
+    if (m_viewer) {
+        m_viewer->clearPointCloud();
+    }
+
+    // Cleanup any active threads
+    if (m_parserThread && m_parserThread->isRunning()) {
+        m_parserThread->quit();
+        m_parserThread->wait(3000);
     }
 }

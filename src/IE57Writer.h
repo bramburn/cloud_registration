@@ -11,7 +11,7 @@
  */
 struct Point3D {
     double x, y, z;
-    
+
     Point3D() : x(0.0), y(0.0), z(0.0) {}
     Point3D(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
 };
@@ -64,12 +64,12 @@ struct ScanData {
 
 /**
  * @brief IE57Writer - Abstract interface for E57 file writing
- * 
+ *
  * This interface defines the contract for all E57 writer implementations.
  * It enables loose coupling between the writing logic and the rest of the application,
  * allowing for easy testing with mock implementations and future substitution
  * of different E57 writing libraries.
- * 
+ *
  * Sprint 2 Decoupling Requirements:
  * - Provides abstraction layer for E57 writing operations
  * - Enables dependency injection and polymorphic usage
@@ -149,7 +149,7 @@ public:
      * @param creationDateTime Creation date/time (if empty, current time used)
      * @return true if metadata set successfully, false otherwise
      */
-    virtual bool setFileMetadata(const QString& guid = QString(), 
+    virtual bool setFileMetadata(const QString& guid = QString(),
                                 const QString& description = QString(),
                                 const QString& creationDateTime = QString()) = 0;
 

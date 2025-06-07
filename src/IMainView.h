@@ -11,12 +11,12 @@ class IPointCloudViewer;
 
 /**
  * @brief IMainView - Abstract interface for the main application window
- * 
+ *
  * This interface defines the contract for the main view component of the application.
  * It enables loose coupling between the presentation logic (MainPresenter) and the
  * UI implementation (MainWindow), allowing for easy testing with mock implementations
  * and future substitution of different UI frameworks.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Provides abstraction layer for main window UI operations
  * - Enables dependency injection and polymorphic usage
