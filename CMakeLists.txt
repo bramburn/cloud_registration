@@ -208,6 +208,11 @@ set(SOURCES
     src/E57ParserCore.cpp
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 7: Performance Optimization & UI Polish
+    src/performance/MemoryManager.cpp
+    src/performance/ParallelProcessing.cpp
+    src/ui/UIThemeManager.cpp
+    src/ui/UserPreferences.cpp
 )
 
 # Header files
@@ -240,6 +245,11 @@ set(HEADERS
     src/scanimportmanager.h
     src/E57ParserCore.h
     src/ProjectStateService.h
+    # Sprint 7: Performance Optimization & UI Polish
+    src/performance/MemoryManager.h
+    src/performance/ParallelProcessing.h
+    src/ui/UIThemeManager.h
+    src/ui/UserPreferences.h
 )
 
 # Shader files
@@ -500,7 +510,44 @@ if(TARGET GTest::gtest_main)
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
+        # Sprint 7: Performance Optimization Tests
+        add_executable(PerformanceOptimizationTests
+            tests/test_performance_optimization.cpp
+            src/performance/MemoryManager.cpp
+            src/performance/ParallelProcessing.cpp
+        )
+
+        target_link_libraries(PerformanceOptimizationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Test
+            Qt6::Concurrent
+        )
+
+        target_include_directories(PerformanceOptimizationTests PRIVATE src)
+        add_test(NAME PerformanceOptimizationTests COMMAND PerformanceOptimizationTests)
+
+        # Sprint 7: UI Enhancement Tests
+        add_executable(UIEnhancementTests
+            tests/test_ui_enhancement.cpp
+            src/ui/UIThemeManager.cpp
+            src/ui/UserPreferences.cpp
+        )
+
+        target_link_libraries(UIEnhancementTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Widgets
+            Qt6::Gui
+            Qt6::Test
+        )
+
+        target_include_directories(UIEnhancementTests PRIVATE src)
+        add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests PerformanceOptimizationTests UIEnhancementTests)
 
     else()
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
