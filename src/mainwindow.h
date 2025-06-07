@@ -33,6 +33,14 @@ class MainPresenter;
 class IPointCloudViewer;
 struct LasHeaderMetadata;
 
+// Sprint 6: Forward declarations
+class PointCloudExporter;
+class QualityAssessment;
+class PDFReportGenerator;
+class CoordinateSystemManager;
+class ExportDialog;
+struct QualityReport;
+
 class MainWindow : public QMainWindow, public IMainView
 {
     Q_OBJECT
@@ -144,6 +152,14 @@ private slots:
     void onLightColorClicked();
     void onAmbientIntensityChanged(int value);
 
+    // Sprint 6: Export and Quality Assessment slots
+    void onExportPointCloud();
+    void onQualityAssessment();
+    void onGenerateQualityReport();
+    void onCoordinateSystemSettings();
+    void onExportCompleted(const QString& filePath);
+    void onQualityAssessmentCompleted();
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -210,6 +226,12 @@ private:
     QAction *m_leftViewAction;
     QAction *m_rightViewAction;
     QAction *m_bottomViewAction;
+
+    // Sprint 6: Export and Quality Assessment actions
+    QAction *m_exportPointCloudAction;
+    QAction *m_qualityAssessmentAction;
+    QAction *m_generateReportAction;
+    QAction *m_coordinateSystemAction;
 
     // Sprint 1.2: Import guidance widgets
     QWidget *m_importGuidanceWidget;
@@ -287,6 +309,13 @@ private:
 
     // Interface pointer for viewer (Sprint 3 decoupling)
     IPointCloudViewer* m_viewerInterface;
+
+    // Sprint 6: Export and Quality Assessment components
+    std::unique_ptr<PointCloudExporter> m_exporter;
+    std::unique_ptr<QualityAssessment> m_qualityAssessment;
+    std::unique_ptr<PDFReportGenerator> m_reportGenerator;
+    std::unique_ptr<CoordinateSystemManager> m_crsManager;
+    QualityReport* m_lastQualityReport;
 };
 
 #endif // MAINWINDOW_H

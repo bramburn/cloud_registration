@@ -7,6 +7,9 @@
 #include <QVector3D>
 #include <vector>
 
+// Forward declaration for Sprint 6
+struct Point;
+
 /**
  * @brief ViewerState - Enumeration of possible viewer states
  */
@@ -212,6 +215,12 @@ public:
      * @return Global offset vector
      */
     virtual QVector3D getGlobalOffset() const = 0;
+
+    /**
+     * @brief Get the current point cloud data for export/analysis
+     * @return Vector of Point structures containing current data
+     */
+    virtual std::vector<Point> getCurrentPointCloudData() const = 0;
 
     // --- Performance Monitoring ---
 

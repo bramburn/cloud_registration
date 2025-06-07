@@ -19,6 +19,12 @@
 // Sprint 4: MVP Pattern
 #include "MainPresenter.h"
 #include "IPointCloudViewer.h"
+// Sprint 6: Export and Quality Assessment includes
+#include "export/PointCloudExporter.h"
+#include "quality/QualityAssessment.h"
+#include "quality/PDFReportGenerator.h"
+#include "crs/CoordinateSystemManager.h"
+#include "ui/ExportDialog.h"
 #include <QApplication>
 #include <QThread>
 #include <QTimer>
@@ -97,6 +103,12 @@ MainWindow::MainWindow(QWidget *parent)
     , m_ambientIntensityLabel(nullptr)
     , m_currentLightColor(Qt::white)
     , m_viewerInterface(nullptr)
+    // Sprint 6: Initialize export and quality components
+    , m_exporter(nullptr)
+    , m_qualityAssessment(nullptr)
+    , m_reportGenerator(nullptr)
+    , m_crsManager(nullptr)
+    , m_lastQualityReport(nullptr)
 {
     qDebug() << "MainWindow constructor started";
 
@@ -111,6 +123,31 @@ MainWindow::MainWindow(QWidget *parent)
         m_presenter->setProjectManager(m_projectManager);
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
+
+        // Sprint 6: Initialize export and quality assessment components
+        qDebug() << "Initializing Sprint 6 components...";
+        m_exporter = std::make_unique<PointCloudExporter>(this);
+        m_qualityAssessment = std::make_unique<QualityAssessment>(this);
+        m_reportGenerator = std::make_unique<PDFReportGenerator>(this);
+        m_crsManager = std::make_unique<CoordinateSystemManager>(this);
+
+        // Connect Sprint 6 signals
+        connect(m_exporter.get(), &PointCloudExporter::exportCompleted,
+                this, [this](const ExportResult& result) {
+                    if (result.success) {
+                        onExportCompleted(result.outputPath);
+                    } else {
+                        QMessageBox::critical(this, "Export Failed", result.errorMessage);
+                    }
+                });
+
+        connect(m_qualityAssessment.get(), &QualityAssessment::assessmentCompleted,
+                this, [this](const QualityReport& report) {
+                    m_lastQualityReport = new QualityReport(report);
+                    onQualityAssessmentCompleted();
+                });
+
+        qDebug() << "Sprint 6 components initialized";
 
         qDebug() << "Setting up menu bar...";
         setupMenuBar();
@@ -475,6 +512,15 @@ void MainWindow::setupMenuBar()
 
     fileMenu->addSeparator();
 
+    // Sprint 6: Export menu items
+    m_exportPointCloudAction = fileMenu->addAction("&Export Point Cloud...");
+    m_exportPointCloudAction->setShortcut(QKeySequence("Ctrl+E"));
+    m_exportPointCloudAction->setEnabled(false);
+    m_exportPointCloudAction->setStatusTip("Export point cloud to various formats");
+    connect(m_exportPointCloudAction, &QAction::triggered, this, &MainWindow::onExportPointCloud);
+
+    fileMenu->addSeparator();
+
     QAction *exitAction = new QAction("E&xit", this);
     exitAction->setShortcut(QKeySequence::Quit);
     exitAction->setStatusTip("Exit the application");
@@ -507,6 +553,27 @@ void MainWindow::setupMenuBar()
     m_bottomViewAction->setStatusTip("Switch to bottom view");
     connect(m_bottomViewAction, &QAction::triggered, this, &MainWindow::onBottomViewClicked);
     viewMenu->addAction(m_bottomViewAction);
+
+    // Sprint 6: Create Quality menu
+    QMenu *qualityMenu = menuBar()->addMenu("&Quality");
+
+    m_qualityAssessmentAction = qualityMenu->addAction("&Assess Registration Quality");
+    m_qualityAssessmentAction->setShortcut(QKeySequence("Ctrl+Q"));
+    m_qualityAssessmentAction->setEnabled(false);
+    m_qualityAssessmentAction->setStatusTip("Assess point cloud registration quality");
+    connect(m_qualityAssessmentAction, &QAction::triggered, this, &MainWindow::onQualityAssessment);
+
+    m_generateReportAction = qualityMenu->addAction("&Generate Quality Report...");
+    m_generateReportAction->setShortcut(QKeySequence("Ctrl+R"));
+    m_generateReportAction->setEnabled(false);
+    m_generateReportAction->setStatusTip("Generate PDF quality assessment report");
+    connect(m_generateReportAction, &QAction::triggered, this, &MainWindow::onGenerateQualityReport);
+
+    qualityMenu->addSeparator();
+
+    m_coordinateSystemAction = qualityMenu->addAction("&Coordinate System Settings...");
+    m_coordinateSystemAction->setStatusTip("Configure coordinate reference systems");
+    connect(m_coordinateSystemAction, &QAction::triggered, this, &MainWindow::onCoordinateSystemSettings);
 
     // Create Help menu
     QMenu *helpMenu = menuBar()->addMenu("&Help");
@@ -761,6 +828,21 @@ void MainWindow::onLoadingFinished(bool success, const QString& message)
 {
     cleanupProgressDialog();
     updateUIAfterParsing(success, message);
+
+    // Sprint 6: Enable export and quality assessment when data is loaded
+    if (success && m_viewer) {
+        std::vector<Point> currentData = m_viewer->getCurrentPointCloudData();
+        bool hasData = !currentData.empty();
+
+        if (m_exportPointCloudAction) {
+            m_exportPointCloudAction->setEnabled(hasData);
+        }
+        if (m_qualityAssessmentAction) {
+            m_qualityAssessmentAction->setEnabled(hasData);
+        }
+
+        qDebug() << "Sprint 6: Export and quality actions enabled:" << hasData;
+    }
 }
 
 void MainWindow::onParsingProgressUpdated(int percentage, const QString &stage)
@@ -2386,4 +2468,151 @@ void MainWindow::performBatchOperation(const QString& operation, const QStringLi
     if (m_sidebar) {
         emit m_sidebar->batchOperationRequested(operation, scanIds);
     }
+}
+
+// Sprint 6: Export and Quality Assessment slot implementations
+
+void MainWindow::onExportPointCloud()
+{
+    if (!m_viewer || !m_exporter) {
+        QMessageBox::warning(this, "Export Error", "Export functionality not available");
+        return;
+    }
+
+    // Get current point cloud data from viewer
+    std::vector<Point> pointCloudData = m_viewer->getCurrentPointCloudData();
+    if (pointCloudData.empty()) {
+        QMessageBox::information(this, "No Data", "No point cloud data available for export");
+        return;
+    }
+
+    // Create and show export dialog
+    ExportDialog dialog(this);
+    dialog.setPointCloudData(pointCloudData);
+
+    // Set default options
+    ExportOptions defaultOptions;
+    defaultOptions.projectName = m_currentFileName.isEmpty() ? "Untitled" : m_currentFileName;
+    defaultOptions.description = QString("Exported from %1").arg(QApplication::applicationName());
+    dialog.setDefaultOptions(defaultOptions);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        qDebug() << "Export dialog accepted, starting export...";
+        setStatusMessage("Exporting point cloud...");
+    }
+}
+
+void MainWindow::onQualityAssessment()
+{
+    if (!m_viewer || !m_qualityAssessment) {
+        QMessageBox::warning(this, "Quality Assessment Error", "Quality assessment functionality not available");
+        return;
+    }
+
+    // Get current point cloud data
+    std::vector<Point> currentData = m_viewer->getCurrentPointCloudData();
+    if (currentData.empty()) {
+        QMessageBox::information(this, "No Data", "No point cloud data available for quality assessment");
+        return;
+    }
+
+    // For demonstration, assess the quality of the current point cloud
+    // In a real registration workflow, this would compare source and target clouds
+    setStatusMessage("Performing quality assessment...");
+
+    QualityMetrics metrics = m_qualityAssessment->assessPointCloudQuality(currentData);
+
+    QString qualityInfo = QString(
+        "Point Cloud Quality Assessment\n\n"
+        "Total Points: %1\n"
+        "Average Density: %2 points/voxel\n"
+        "Density Variation: %3\n"
+        "Planarity: %4\n"
+        "Sphericity: %5\n"
+        "Linearity: %6"
+    ).arg(metrics.totalPoints)
+     .arg(metrics.averagePointDensity, 0, 'f', 2)
+     .arg(metrics.densityVariation, 0, 'f', 3)
+     .arg(metrics.planarity, 0, 'f', 3)
+     .arg(metrics.sphericity, 0, 'f', 3)
+     .arg(metrics.linearity, 0, 'f', 3);
+
+    QMessageBox::information(this, "Quality Assessment Results", qualityInfo);
+
+    // Enable report generation
+    m_generateReportAction->setEnabled(true);
+    setStatusMessage("Quality assessment completed");
+}
+
+void MainWindow::onGenerateQualityReport()
+{
+    if (!m_reportGenerator || !m_lastQualityReport) {
+        QMessageBox::warning(this, "Report Error", "No quality assessment data available for report generation");
+        return;
+    }
+
+    QString outputPath = QFileDialog::getSaveFileName(
+        this,
+        "Save Quality Report",
+        QString("%1_quality_report.pdf").arg(m_currentFileName),
+        "PDF Files (*.pdf);;All Files (*)"
+    );
+
+    if (outputPath.isEmpty()) {
+        return;
+    }
+
+    ReportOptions options;
+    options.outputPath = outputPath;
+    options.projectName = m_currentFileName.isEmpty() ? "Untitled Project" : m_currentFileName;
+    options.companyName = "FARO Technologies";
+    options.operatorName = QApplication::applicationName();
+    options.includeCharts = true;
+    options.includeRecommendations = true;
+    options.includeDetailedMetrics = true;
+
+    setStatusMessage("Generating quality report...");
+
+    bool success = m_reportGenerator->generateReport(*m_lastQualityReport, options);
+
+    if (success) {
+        QMessageBox::information(this, "Report Generated",
+                               QString("Quality report saved to:\n%1").arg(outputPath));
+        setStatusMessage("Quality report generated successfully");
+    } else {
+        QMessageBox::critical(this, "Report Error",
+                            QString("Failed to generate report: %1").arg(m_reportGenerator->getLastError()));
+        setStatusMessage("Report generation failed");
+    }
+}
+
+void MainWindow::onCoordinateSystemSettings()
+{
+    if (!m_crsManager) {
+        QMessageBox::warning(this, "CRS Error", "Coordinate system manager not available");
+        return;
+    }
+
+    QStringList availableCRS = m_crsManager->getAvailableCRS();
+
+    QString crsInfo = QString(
+        "Available Coordinate Reference Systems:\n\n%1\n\n"
+        "Current coordinate transformations are managed automatically during export.\n"
+        "Custom CRS can be added through the coordinate system manager."
+    ).arg(availableCRS.join("\n"));
+
+    QMessageBox::information(this, "Coordinate System Information", crsInfo);
+}
+
+void MainWindow::onExportCompleted(const QString& filePath)
+{
+    QMessageBox::information(this, "Export Successful",
+                           QString("Point cloud exported successfully to:\n%1").arg(filePath));
+    setStatusMessage("Export completed successfully");
+}
+
+void MainWindow::onQualityAssessmentCompleted()
+{
+    setStatusMessage("Quality assessment completed");
+    m_generateReportAction->setEnabled(true);
 }
