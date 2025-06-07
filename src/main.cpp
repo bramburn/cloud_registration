@@ -13,6 +13,10 @@
 #include <vector>
 #include "mainwindow.h"
 #include "e57parserlib.h"
+#include "registration/WorkflowStateMachine.h"
+#include "registration/Target.h"
+#include "registration/TargetCorrespondence.h"
+#include "registration/RegistrationProject.h"
 
 
 // Enable logging
@@ -91,7 +95,19 @@ int main(int argc, char *argv[])
 
     // Register custom types for thread-safe signal/slot communication
     qRegisterMetaType<std::vector<float>>("std::vector<float>");
-    qDebug() << "Registered custom types";
+
+    // Register Sprint 2 registration workflow types
+    qRegisterMetaType<RegistrationStep>("RegistrationStep");
+    qRegisterMetaType<Target*>("Target*");
+    qRegisterMetaType<SphereTarget*>("SphereTarget*");
+    qRegisterMetaType<CheckerboardTarget*>("CheckerboardTarget*");
+    qRegisterMetaType<NaturalPointTarget*>("NaturalPointTarget*");
+    qRegisterMetaType<TargetCorrespondence>("TargetCorrespondence");
+    qRegisterMetaType<ScanInfo>("ScanInfo");
+    qRegisterMetaType<RegistrationProject::RegistrationResult>("RegistrationProject::RegistrationResult");
+    qRegisterMetaType<RegistrationProject::RegistrationState>("RegistrationProject::RegistrationState");
+
+    qDebug() << "Registered custom types including registration workflow types";
 
     // Log Qt and system information
     qDebug() << "Qt Version:" << QT_VERSION_STR;

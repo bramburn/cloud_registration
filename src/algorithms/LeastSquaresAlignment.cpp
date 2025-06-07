@@ -1,202 +1,180 @@
 #include "LeastSquaresAlignment.h"
+#include <Eigen/SVD>
+#include <Eigen/Dense>
 #include <QDebug>
-#include <QQuaternion>
 #include <cmath>
-#include <algorithm>
 
 QMatrix4x4 LeastSquaresAlignment::computeTransformation(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences) {
-    
-    if (correspondences.size() < 3) {
-        qWarning() << "LeastSquaresAlignment: Need at least 3 correspondences, got" << correspondences.size();
-        return QMatrix4x4();
+    const QList<QPair<QVector3D, QVector3D>>& correspondences)
+{
+    // Validate input
+    if (!validateCorrespondences(correspondences)) {
+        qWarning() << "Invalid correspondences for transformation computation";
+        return QMatrix4x4(); // Return identity matrix
     }
     
-    // Use Horn's method by default as it's more stable
-    return hornMethod(correspondences);
-}
-
-QMatrix4x4 LeastSquaresAlignment::computeTransformationSVD(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences) {
+    qDebug() << "Computing transformation for" << correspondences.size() << "correspondences";
     
-    if (correspondences.size() < 3) {
-        qWarning() << "LeastSquaresAlignment: Need at least 3 correspondences, got" << correspondences.size();
-        return QMatrix4x4();
+    // Extract source and target points
+    QList<QVector3D> sourcePoints, targetPoints;
+    for (const auto& pair : correspondences) {
+        sourcePoints.append(pair.first);
+        targetPoints.append(pair.second);
     }
     
-    return svdMethod(correspondences);
-}
-
-QMatrix4x4 LeastSquaresAlignment::computeWeightedTransformation(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences,
-    const QList<float>& weights) {
-    
-    if (correspondences.size() != weights.size()) {
-        qWarning() << "LeastSquaresAlignment: Correspondences and weights size mismatch";
-        return QMatrix4x4();
+    // Check for degenerate cases
+    if (arePointsCollinear(sourcePoints) || arePointsCollinear(targetPoints)) {
+        qWarning() << "Collinear points detected - transformation may be unstable";
     }
     
-    if (correspondences.size() < 3) {
-        qWarning() << "LeastSquaresAlignment: Need at least 3 correspondences, got" << correspondences.size();
-        return QMatrix4x4();
-    }
+    // Calculate centroids
+    QVector3D sourceCentroid = calculateCentroid(sourcePoints);
+    QVector3D targetCentroid = calculateCentroid(targetPoints);
     
-    // For now, use unweighted version - weighted implementation can be added later
-    qDebug() << "LeastSquaresAlignment: Weighted transformation not yet implemented, using unweighted";
-    return hornMethod(correspondences);
-}
-
-QMatrix4x4 LeastSquaresAlignment::hornMethod(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences) {
+    qDebug() << "Source centroid:" << sourceCentroid;
+    qDebug() << "Target centroid:" << targetCentroid;
     
-    // Compute centroids
-    auto centroids = computeCentroids(correspondences);
-    QVector3D sourceCentroid = centroids.first;
-    QVector3D targetCentroid = centroids.second;
-    
-    // Center the points
-    QList<QPair<QVector3D, QVector3D>> centeredCorrespondences;
-    centeredCorrespondences.reserve(correspondences.size());
+    // Compute covariance matrix H
+    Eigen::Matrix3f H = Eigen::Matrix3f::Zero();
     
     for (const auto& pair : correspondences) {
+        // Center points by subtracting centroids
         QVector3D centeredSource = pair.first - sourceCentroid;
         QVector3D centeredTarget = pair.second - targetCentroid;
-        centeredCorrespondences.append(qMakePair(centeredSource, centeredTarget));
-    }
-    
-    // Compute cross-covariance matrix H
-    float H[3][3] = {{0}};
-    
-    for (const auto& pair : centeredCorrespondences) {
-        const QVector3D& p = pair.first;   // source
-        const QVector3D& q = pair.second;  // target
         
-        H[0][0] += p.x() * q.x();
-        H[0][1] += p.x() * q.y();
-        H[0][2] += p.x() * q.z();
-        H[1][0] += p.y() * q.x();
-        H[1][1] += p.y() * q.y();
-        H[1][2] += p.y() * q.z();
-        H[2][0] += p.z() * q.x();
-        H[2][1] += p.z() * q.y();
-        H[2][2] += p.z() * q.z();
+        // Convert to Eigen vectors
+        Eigen::Vector3f srcVec(centeredSource.x(), centeredSource.y(), centeredSource.z());
+        Eigen::Vector3f tgtVec(centeredTarget.x(), centeredTarget.y(), centeredTarget.z());
+        
+        // Accumulate outer product: H += src * tgt^T
+        H += srcVec * tgtVec.transpose();
     }
     
-    // Compute the symmetric matrix N
-    float N[4][4];
-    float Sxx = H[0][0], Sxy = H[0][1], Sxz = H[0][2];
-    float Syx = H[1][0], Syy = H[1][1], Syz = H[1][2];
-    float Szx = H[2][0], Szy = H[2][1], Szz = H[2][2];
+    qDebug() << "Covariance matrix H computed";
     
-    N[0][0] = Sxx + Syy + Szz;
-    N[0][1] = Syz - Szy;
-    N[0][2] = Szx - Sxz;
-    N[0][3] = Sxy - Syx;
+    // Perform SVD decomposition: H = U * S * V^T
+    Eigen::JacobiSVD<Eigen::Matrix3f> svd(H, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::Matrix3f U = svd.matrixU();
+    Eigen::Matrix3f V = svd.matrixV();
     
-    N[1][0] = Syz - Szy;
-    N[1][1] = Sxx - Syy - Szz;
-    N[1][2] = Sxy + Syx;
-    N[1][3] = Szx + Sxz;
+    qDebug() << "SVD decomposition completed";
     
-    N[2][0] = Szx - Sxz;
-    N[2][1] = Sxy + Syx;
-    N[2][2] = -Sxx + Syy - Szz;
-    N[2][3] = Syz + Szy;
+    // Calculate rotation matrix R = V * U^T
+    Eigen::Matrix3f R = V * U.transpose();
     
-    N[3][0] = Sxy - Syx;
-    N[3][1] = Szx + Sxz;
-    N[3][2] = Syz + Szy;
-    N[3][3] = -Sxx - Syy + Szz;
+    // Handle reflection case: if det(R) < 0, correct by negating last column of V
+    if (R.determinant() < 0) {
+        qDebug() << "Reflection case detected - correcting rotation matrix";
+        V.col(2) *= -1;
+        R = V * U.transpose();
+    }
     
-    // For simplicity, use a basic eigenvalue computation
-    // In a production system, you'd use a proper eigenvalue solver
-    // For now, we'll use a simplified approach that works for most cases
+    // Calculate translation vector t = centroid_target - R * centroid_source
+    Eigen::Vector3f srcCentroidEigen(sourceCentroid.x(), sourceCentroid.y(), sourceCentroid.z());
+    Eigen::Vector3f tgtCentroidEigen(targetCentroid.x(), targetCentroid.y(), targetCentroid.z());
+    Eigen::Vector3f t = tgtCentroidEigen - R * srcCentroidEigen;
     
-    // Find the largest eigenvalue and corresponding eigenvector
-    // This is a simplified implementation - for production use a proper eigenvalue solver
-    QQuaternion rotation = QQuaternion::fromRotationMatrix(QMatrix3x3(
-        H[0][0], H[0][1], H[0][2],
-        H[1][0], H[1][1], H[1][2],
-        H[2][0], H[2][1], H[2][2]
-    ).transposed());
-    
-    rotation.normalize();
-    
-    // Compute translation
-    QMatrix3x3 rotMatrix = rotation.toRotationMatrix();
-    QVector3D rotatedSourceCentroid = rotMatrix * sourceCentroid;
-    QVector3D translation = targetCentroid - rotatedSourceCentroid;
-    
-    // Build transformation matrix
-    QMatrix4x4 transform;
-    transform.setToIdentity();
-    
-    // Set rotation part
+    qDebug() << "Rotation and translation computed";
+
+    // Convert Eigen matrices to arrays for assembleTransformationMatrix
+    float rotationArray[9];
+    float translationArray[3];
+
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-            transform(i, j) = rotMatrix(i, j);
+            rotationArray[i * 3 + j] = R(i, j);
+        }
+        translationArray[i] = t(i);
+    }
+
+    // Assemble and return transformation matrix
+    return assembleTransformationMatrix(rotationArray, translationArray);
+}
+
+QVector3D LeastSquaresAlignment::calculateCentroid(const QList<QVector3D>& points)
+{
+    if (points.isEmpty()) {
+        return QVector3D(0, 0, 0);
+    }
+    
+    QVector3D centroid(0, 0, 0);
+    for (const QVector3D& point : points) {
+        centroid += point;
+    }
+    
+    return centroid / static_cast<float>(points.size());
+}
+
+bool LeastSquaresAlignment::validateCorrespondences(
+    const QList<QPair<QVector3D, QVector3D>>& correspondences)
+{
+    // Need at least 3 correspondences for 3D transformation
+    if (correspondences.size() < 3) {
+        qWarning() << "Insufficient correspondences:" << correspondences.size() << "< 3";
+        return false;
+    }
+    
+    // Check for duplicate points
+    for (int i = 0; i < correspondences.size(); ++i) {
+        for (int j = i + 1; j < correspondences.size(); ++j) {
+            float srcDist = correspondences[i].first.distanceToPoint(correspondences[j].first);
+            float tgtDist = correspondences[i].second.distanceToPoint(correspondences[j].second);
+            
+            if (srcDist < MINIMUM_POINT_SEPARATION || tgtDist < MINIMUM_POINT_SEPARATION) {
+                qWarning() << "Duplicate or very close points detected at indices" << i << "and" << j;
+                return false;
+            }
         }
     }
     
-    // Set translation part
-    transform(0, 3) = translation.x();
-    transform(1, 3) = translation.y();
-    transform(2, 3) = translation.z();
+    return true;
+}
+
+bool LeastSquaresAlignment::arePointsCollinear(const QList<QVector3D>& points)
+{
+    if (points.size() < 3) {
+        return true; // Less than 3 points are always collinear
+    }
     
+    // Check if all points lie on the same line
+    QVector3D v1 = points[1] - points[0];
+    v1.normalize();
+    
+    for (int i = 2; i < points.size(); ++i) {
+        QVector3D v2 = points[i] - points[0];
+        v2.normalize();
+        
+        // Cross product magnitude indicates deviation from collinearity
+        QVector3D cross = QVector3D::crossProduct(v1, v2);
+        if (cross.length() > COLLINEARITY_THRESHOLD) {
+            return false; // Found non-collinear point
+        }
+    }
+    
+    return true; // All points are collinear
+}
+
+QMatrix4x4 LeastSquaresAlignment::assembleTransformationMatrix(
+    const float rotation[9],
+    const float translation[3])
+{
+    QMatrix4x4 transform;
+    transform.setToIdentity();
+    
+    // Set rotation part (top-left 3x3)
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) {
+            transform(row, col) = rotation[row * 3 + col];
+        }
+    }
+
+    // Set translation part (top-right 3x1)
+    transform(0, 3) = translation[0];
+    transform(1, 3) = translation[1];
+    transform(2, 3) = translation[2];
+    
+    // Bottom row is already [0, 0, 0, 1] from setToIdentity()
+    
+    qDebug() << "Transformation matrix assembled successfully";
     return transform;
-}
-
-QMatrix4x4 LeastSquaresAlignment::svdMethod(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences) {
-    
-    // Compute centroids
-    auto centroids = computeCentroids(correspondences);
-    QVector3D sourceCentroid = centroids.first;
-    QVector3D targetCentroid = centroids.second;
-    
-    // For now, fall back to Horn's method
-    // A full SVD implementation would require a matrix library like Eigen
-    qDebug() << "LeastSquaresAlignment: SVD method not fully implemented, using Horn's method";
-    return hornMethod(correspondences);
-}
-
-QPair<QVector3D, QVector3D> LeastSquaresAlignment::computeCentroids(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences) {
-    
-    QVector3D sourceCentroid(0, 0, 0);
-    QVector3D targetCentroid(0, 0, 0);
-    
-    for (const auto& pair : correspondences) {
-        sourceCentroid += pair.first;
-        targetCentroid += pair.second;
-    }
-    
-    float count = static_cast<float>(correspondences.size());
-    sourceCentroid /= count;
-    targetCentroid /= count;
-    
-    return qMakePair(sourceCentroid, targetCentroid);
-}
-
-QPair<QVector3D, QVector3D> LeastSquaresAlignment::computeWeightedCentroids(
-    const QList<QPair<QVector3D, QVector3D>>& correspondences,
-    const QList<float>& weights) {
-    
-    QVector3D sourceCentroid(0, 0, 0);
-    QVector3D targetCentroid(0, 0, 0);
-    float totalWeight = 0.0f;
-    
-    for (int i = 0; i < correspondences.size(); ++i) {
-        float weight = weights[i];
-        sourceCentroid += correspondences[i].first * weight;
-        targetCentroid += correspondences[i].second * weight;
-        totalWeight += weight;
-    }
-    
-    if (totalWeight > 0.0f) {
-        sourceCentroid /= totalWeight;
-        targetCentroid /= totalWeight;
-    }
-    
-    return qMakePair(sourceCentroid, targetCentroid);
 }

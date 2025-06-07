@@ -1,256 +1,222 @@
 #include "AlignmentEngine.h"
 #include "../algorithms/LeastSquaresAlignment.h"
-#include "../ui/ICPProgressWidget.h"
 #include <QDebug>
-#include <QApplication>
+#include <QElapsedTimer>
 
 AlignmentEngine::AlignmentEngine(QObject* parent)
     : QObject(parent)
-    , m_currentRMSError(0.0f)
-    , m_manualRMSError(0.0f)
-    , m_icpAlgorithm(nullptr)
-    , m_currentAlgorithmType(ICPAlgorithmType::PointToPoint)
-    , m_progressWidget(nullptr)
-    , m_hasValidAlignment(false)
-    , m_icpInProgress(false) {
-    
-    m_currentTransform.setToIdentity();
-    
-    // Create progress widget
-    m_progressWidget = new ICPProgressWidget();
-    connect(m_progressWidget, &ICPProgressWidget::computationCompleted,
-            this, &AlignmentEngine::onProgressWidgetClosed);
+    , m_computationTimer(new QTimer(this))
+{
+    // Initialize current result
+    m_currentResult.transformation.setToIdentity();
+    m_currentResult.state = AlignmentState::Idle;
+    m_currentResult.message = "No correspondences defined";
+
+    // Setup computation timer for async processing
+    m_computationTimer->setSingleShot(true);
+    m_computationTimer->setInterval(COMPUTATION_DELAY_MS);
+    connect(m_computationTimer, &QTimer::timeout, this, &AlignmentEngine::performAlignment);
+
+    qDebug() << "AlignmentEngine initialized";
 }
 
-AlignmentEngine::~AlignmentEngine() {
-    if (m_icpAlgorithm) {
-        m_icpAlgorithm->cancel();
-    }
-    
-    if (m_progressWidget) {
-        m_progressWidget->deleteLater();
-    }
-}
-
-void AlignmentEngine::setCorrespondences(const QList<QPair<QVector3D, QVector3D>>& correspondences) {
+void AlignmentEngine::setCorrespondences(const QList<QPair<QVector3D, QVector3D>>& correspondences)
+{
     m_correspondences = correspondences;
     
-    if (m_correspondences.size() >= 3) {
-        recomputeAlignment();
+    qDebug() << "Correspondences set:" << m_correspondences.size() << "pairs";
+    
+    emit correspondencesChanged(m_correspondences.size());
+    triggerRecomputeIfEnabled();
+}
+
+void AlignmentEngine::addCorrespondence(const QVector3D& sourcePoint, const QVector3D& targetPoint)
+{
+    m_correspondences.append(qMakePair(sourcePoint, targetPoint));
+    
+    qDebug() << "Correspondence added. Total:" << m_correspondences.size();
+    
+    emit correspondencesChanged(m_correspondences.size());
+    triggerRecomputeIfEnabled();
+}
+
+void AlignmentEngine::removeCorrespondence(int index)
+{
+    if (index >= 0 && index < m_correspondences.size()) {
+        m_correspondences.removeAt(index);
+        
+        qDebug() << "Correspondence removed at index" << index << ". Remaining:" << m_correspondences.size();
+        
+        emit correspondencesChanged(m_correspondences.size());
+        triggerRecomputeIfEnabled();
     } else {
-        m_hasValidAlignment = false;
-        m_currentTransform.setToIdentity();
-        m_currentRMSError = 0.0f;
+        qWarning() << "Invalid correspondence index for removal:" << index;
+    }
+}
+
+void AlignmentEngine::clearCorrespondences()
+{
+    m_correspondences.clear();
+    
+    // Reset to idle state
+    m_currentResult.transformation.setToIdentity();
+    m_currentResult.state = AlignmentState::Idle;
+    m_currentResult.message = "No correspondences defined";
+    m_currentResult.errorStats = ErrorAnalysis::ErrorStatistics();
+    
+    qDebug() << "All correspondences cleared";
+    
+    emit correspondencesChanged(0);
+    emit alignmentResultUpdated(m_currentResult);
+    emit alignmentStateChanged(AlignmentState::Idle, "No correspondences defined");
+    emit transformationUpdated(m_currentResult.transformation);
+    emit qualityMetricsUpdated(0.0f);
+}
+
+void AlignmentEngine::recomputeAlignment()
+{
+    if (m_computationPending) {
+        // Restart timer to debounce rapid requests
+        m_computationTimer->start();
+        return;
+    }
+    
+    m_computationPending = true;
+    m_computationTimer->start();
+    
+    qDebug() << "Alignment recomputation requested";
+}
+
+void AlignmentEngine::performAlignment()
+{
+    m_computationPending = false;
+    
+    QElapsedTimer timer;
+    timer.start();
+    
+    qDebug() << "Starting alignment computation with" << m_correspondences.size() << "correspondences";
+    
+    // Validate correspondences
+    if (!validateCorrespondences()) {
+        return; // Error state already set by validateCorrespondences()
+    }
+    
+    updateAlignmentState(AlignmentState::Computing, "Computing transformation...");
+    
+    try {
+        // Compute transformation using least-squares alignment
+        QMatrix4x4 transformation = LeastSquaresAlignment::computeTransformation(m_correspondences);
         
-        emit transformationUpdated(m_currentTransform);
-        emit qualityMetricsUpdated(m_currentRMSError, m_correspondences.size());
-    }
-    
-    qDebug() << "AlignmentEngine: Set" << correspondences.size() << "correspondences";
-}
-
-void AlignmentEngine::recomputeAlignment() {
-    if (m_correspondences.size() < 3) {
-        qWarning() << "AlignmentEngine: Need at least 3 correspondences for alignment, got" 
-                   << m_correspondences.size();
-        return;
-    }
-    
-    // Compute transformation using least squares alignment
-    m_currentTransform = LeastSquaresAlignment::computeTransformation(m_correspondences);
-    
-    // Calculate RMS error
-    calculateManualAlignmentError();
-    
-    m_hasValidAlignment = true;
-    
-    // Emit updates
-    emit transformationUpdated(m_currentTransform);
-    emit qualityMetricsUpdated(m_currentRMSError, m_correspondences.size());
-    
-    qDebug() << "AlignmentEngine: Recomputed alignment with RMS error:" << m_currentRMSError;
-}
-
-void AlignmentEngine::runICP(const std::vector<float>& sourcePoints,
-                            const std::vector<float>& targetPoints,
-                            ICPAlgorithmType algorithmType,
-                            const ICPParams& params,
-                            bool showProgress) {
-    
-    if (m_icpInProgress) {
-        qWarning() << "AlignmentEngine: ICP already in progress";
-        return;
-    }
-    
-    if (sourcePoints.empty() || targetPoints.empty()) {
-        emit errorOccurred("Cannot run ICP on empty point clouds");
-        return;
-    }
-    
-    if (sourcePoints.size() % 3 != 0 || targetPoints.size() % 3 != 0) {
-        emit errorOccurred("Point cloud data must be in x,y,z format");
-        return;
-    }
-    
-    qDebug() << "AlignmentEngine: Starting ICP with" << (sourcePoints.size() / 3) 
-             << "source points and" << (targetPoints.size() / 3) << "target points";
-    
-    // Create ICP algorithm
-    m_icpAlgorithm = createICPAlgorithm(algorithmType);
-    if (!m_icpAlgorithm) {
-        emit errorOccurred("Failed to create ICP algorithm");
-        return;
-    }
-    
-    m_currentAlgorithmType = algorithmType;
-    m_currentICPParams = params;
-    m_icpInProgress = true;
-    
-    // Connect ICP signals
-    connect(m_icpAlgorithm.get(), &ICPRegistration::progressUpdated,
-            this, &AlignmentEngine::onICPProgressUpdated);
-    connect(m_icpAlgorithm.get(), &ICPRegistration::computationFinished,
-            this, &AlignmentEngine::onICPFinished);
-    
-    // Show progress widget if requested
-    if (showProgress && m_progressWidget) {
-        m_progressWidget->startMonitoring(m_icpAlgorithm.get(), params.maxIterations);
-    }
-    
-    // Create point clouds
-    PointCloud source(sourcePoints);
-    PointCloud target(targetPoints);
-    
-    // Use current transformation as initial guess, or identity if no manual alignment
-    QMatrix4x4 initialGuess = m_hasValidAlignment ? m_currentTransform : QMatrix4x4();
-    
-    // Store manual RMS for improvement calculation
-    m_manualRMSError = m_currentRMSError;
-    
-    // Emit start signal
-    emit icpStarted(algorithmType, params.maxIterations);
-    
-    // Start ICP computation (this will run and emit signals)
-    qDebug() << "AlignmentEngine: Starting" << algorithmTypeToString(algorithmType) 
-             << "ICP with initial guess";
-    
-    // Note: The compute method will run and emit progress signals
-    // The actual computation happens asynchronously through the signal/slot mechanism
-    m_icpAlgorithm->compute(source, target, initialGuess, params);
-}
-
-void AlignmentEngine::cancelICP() {
-    if (m_icpAlgorithm && m_icpInProgress) {
-        qDebug() << "AlignmentEngine: Cancelling ICP computation";
-        m_icpAlgorithm->cancel();
-    }
-}
-
-bool AlignmentEngine::isICPRunning() const {
-    return m_icpInProgress && m_icpAlgorithm && m_icpAlgorithm->isRunning();
-}
-
-void AlignmentEngine::onICPProgressUpdated(int iteration, float rmsError, const QMatrix4x4& transformation) {
-    // Update current state with ICP progress
-    m_currentTransform = transformation;
-    m_currentRMSError = rmsError;
-    
-    // Emit updates
-    emit transformationUpdated(transformation);
-    emit qualityMetricsUpdated(rmsError, m_correspondences.size());
-    
-    qDebug() << "AlignmentEngine: ICP iteration" << iteration << "RMS error:" << rmsError;
-}
-
-void AlignmentEngine::onICPFinished(bool success, const QMatrix4x4& finalTransformation,
-                                   float finalRMSError, int iterations) {
-    
-    m_icpInProgress = false;
-    
-    if (success) {
-        // Update final transformation
-        m_currentTransform = finalTransformation;
-        m_currentRMSError = finalRMSError;
-        m_hasValidAlignment = true;
-        
-        // Calculate improvement
-        float improvementPercent = 0.0f;
-        if (m_manualRMSError > 0.0f) {
-            improvementPercent = ((m_manualRMSError - finalRMSError) / m_manualRMSError) * 100.0f;
+        // Validate computed transformation
+        if (!ErrorAnalysis::validateTransformation(transformation)) {
+            updateAlignmentState(AlignmentState::Error, "Invalid transformation computed");
+            return;
         }
         
-        // Emit final updates
-        emit transformationUpdated(finalTransformation);
-        emit qualityMetricsUpdated(finalRMSError, m_correspondences.size());
-        emit icpFinished(true, finalTransformation, finalRMSError, iterations, improvementPercent);
+        // Calculate comprehensive error statistics
+        ErrorAnalysis::ErrorStatistics errorStats = 
+            ErrorAnalysis::calculateErrorStatistics(m_correspondences, transformation);
         
-        qDebug() << "AlignmentEngine: ICP completed successfully. Final RMS:" << finalRMSError
-                 << "Improvement:" << improvementPercent << "%";
-    } else {
-        emit icpFinished(false, finalTransformation, finalRMSError, iterations, 0.0f);
-        qDebug() << "AlignmentEngine: ICP failed or was cancelled";
-    }
-    
-    // Clean up
-    if (m_icpAlgorithm) {
-        disconnect(m_icpAlgorithm.get(), nullptr, this, nullptr);
-        m_icpAlgorithm.reset();
-    }
-}
-
-void AlignmentEngine::onProgressWidgetClosed(bool success, const QString& message) {
-    Q_UNUSED(success)
-    Q_UNUSED(message)
-    
-    if (m_progressWidget) {
-        m_progressWidget->stopMonitoring();
-    }
-}
-
-void AlignmentEngine::calculateManualAlignmentError() {
-    if (m_correspondences.empty()) {
-        m_currentRMSError = 0.0f;
-        return;
-    }
-    
-    float sumSquaredErrors = 0.0f;
-    int validCount = 0;
-    
-    for (const auto& pair : m_correspondences) {
-        QVector3D transformedSource = m_currentTransform.map(pair.first);
-        QVector3D error = transformedSource - pair.second;
-        sumSquaredErrors += error.lengthSquared();
-        validCount++;
-    }
-    
-    if (validCount > 0) {
-        m_currentRMSError = std::sqrt(sumSquaredErrors / validCount);
-    } else {
-        m_currentRMSError = 0.0f;
+        // Update result
+        m_currentResult.transformation = transformation;
+        m_currentResult.errorStats = errorStats;
+        m_currentResult.computationTimeMs = timer.elapsed();
+        
+        // Check quality thresholds
+        if (errorStats.meetsQualityThresholds(m_rmsThreshold, m_maxErrorThreshold)) {
+            m_currentResult.state = AlignmentState::Valid;
+            m_currentResult.message = QString("Alignment computed successfully (RMS: %1 mm)")
+                                     .arg(errorStats.rmsError, 0, 'f', 3);
+        } else {
+            m_currentResult.state = AlignmentState::Valid; // Still valid, just poor quality
+            m_currentResult.message = QString("Alignment computed with poor quality (RMS: %1 mm)")
+                                     .arg(errorStats.rmsError, 0, 'f', 3);
+        }
+        
+        qDebug() << "Alignment computation completed in" << m_currentResult.computationTimeMs << "ms";
+        qDebug() << "RMS error:" << errorStats.rmsError << "mm";
+        
+        // Emit signals for real-time update
+        emit transformationUpdated(transformation);
+        emit qualityMetricsUpdated(errorStats.rmsError);
+        emit alignmentResultUpdated(m_currentResult);
+        emit alignmentStateChanged(m_currentResult.state, m_currentResult.message);
+        
+    } catch (const std::exception& e) {
+        QString errorMsg = QString("Alignment computation failed: %1").arg(e.what());
+        updateAlignmentState(AlignmentState::Error, errorMsg);
+        qCritical() << errorMsg;
+    } catch (...) {
+        QString errorMsg = "Unknown error during alignment computation";
+        updateAlignmentState(AlignmentState::Error, errorMsg);
+        qCritical() << errorMsg;
     }
 }
 
-std::unique_ptr<ICPRegistration> AlignmentEngine::createICPAlgorithm(ICPAlgorithmType type) {
-    switch (type) {
-        case ICPAlgorithmType::PointToPoint:
-            return std::make_unique<ICPRegistration>();
+bool AlignmentEngine::validateCorrespondences() const
+{
+    if (m_correspondences.size() < MIN_CORRESPONDENCES) {
+        QString message = QString("Insufficient correspondences: %1 < %2")
+                         .arg(m_correspondences.size()).arg(MIN_CORRESPONDENCES);
+        
+        const_cast<AlignmentEngine*>(this)->updateAlignmentState(AlignmentState::Insufficient, message);
+        return false;
+    }
+    
+    // Check for duplicate or very close points
+    for (int i = 0; i < m_correspondences.size(); ++i) {
+        for (int j = i + 1; j < m_correspondences.size(); ++j) {
+            float srcDist = m_correspondences[i].first.distanceToPoint(m_correspondences[j].first);
+            float tgtDist = m_correspondences[i].second.distanceToPoint(m_correspondences[j].second);
             
-        case ICPAlgorithmType::PointToPlane:
-            return std::make_unique<PointToPlaneICP>();
-            
-        default:
-            qWarning() << "AlignmentEngine: Unknown ICP algorithm type";
-            return nullptr;
+            if (srcDist < 0.001f || tgtDist < 0.001f) { // 1mm minimum separation
+                QString message = QString("Duplicate correspondences detected at indices %1 and %2")
+                                 .arg(i).arg(j);
+                const_cast<AlignmentEngine*>(this)->updateAlignmentState(AlignmentState::Error, message);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+void AlignmentEngine::updateAlignmentState(AlignmentState state, const QString& message)
+{
+    m_currentResult.state = state;
+    m_currentResult.message = message;
+    
+    // Reset transformation and metrics for error states
+    if (state == AlignmentState::Error || state == AlignmentState::Insufficient) {
+        m_currentResult.transformation.setToIdentity();
+        m_currentResult.errorStats = ErrorAnalysis::ErrorStatistics();
+        
+        emit transformationUpdated(m_currentResult.transformation);
+        emit qualityMetricsUpdated(0.0f);
+    }
+    
+    emit alignmentResultUpdated(m_currentResult);
+    emit alignmentStateChanged(state, message);
+    
+    qDebug() << "Alignment state updated:" << static_cast<int>(state) << "-" << message;
+}
+
+void AlignmentEngine::triggerRecomputeIfEnabled()
+{
+    if (m_autoRecompute) {
+        recomputeAlignment();
     }
 }
 
-QString AlignmentEngine::algorithmTypeToString(ICPAlgorithmType type) const {
-    switch (type) {
-        case ICPAlgorithmType::PointToPoint:
-            return "Point-to-Point";
-        case ICPAlgorithmType::PointToPlane:
-            return "Point-to-Plane";
-        default:
-            return "Unknown";
+void AlignmentEngine::setQualityThresholds(float rmsThreshold, float maxErrorThreshold)
+{
+    m_rmsThreshold = rmsThreshold;
+    m_maxErrorThreshold = maxErrorThreshold;
+    
+    qDebug() << "Quality thresholds updated - RMS:" << rmsThreshold << "mm, Max:" << maxErrorThreshold << "mm";
+    
+    // Revalidate current result if available
+    if (m_currentResult.state == AlignmentState::Valid) {
+        triggerRecomputeIfEnabled();
     }
 }

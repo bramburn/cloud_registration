@@ -1,157 +1,218 @@
-#ifndef ALIGNMENTENGINE_H
-#define ALIGNMENTENGINE_H
+#pragma once
 
 #include <QObject>
 #include <QMatrix4x4>
 #include <QVector3D>
 #include <QList>
 #include <QPair>
-#include <memory>
-#include "../algorithms/ICPRegistration.h"
-#include "../algorithms/PointToPlaneICP.h"
-
-class ICPProgressWidget;
+#include <QTimer>
+#include "ErrorAnalysis.h"
 
 /**
- * @brief High-level alignment coordination and workflow management
+ * @brief AlignmentEngine - High-level coordination for manual alignment workflow
  * 
- * The AlignmentEngine orchestrates the complete registration workflow,
- * integrating manual alignment with automatic ICP refinement. It manages
- * algorithm selection, parameter configuration, and provides a unified
- * interface for the registration system.
+ * This class orchestrates the manual alignment process by managing correspondence
+ * points, computing transformations, and providing real-time feedback. It serves
+ * as the central coordinator between the UI, algorithms, and visualization components.
+ * 
+ * Sprint 4 Requirements:
+ * - Manages correspondence point pairs for alignment
+ * - Provides real-time transformation computation and preview
+ * - Emits quality metrics for immediate user feedback
+ * - Supports incremental correspondence addition/removal
+ * - Integrates with PointCloudViewerWidget for dynamic visualization
+ * - Maintains alignment history for undo/redo functionality
  */
-class AlignmentEngine : public QObject {
+class AlignmentEngine : public QObject
+{
     Q_OBJECT
 
 public:
     /**
-     * @brief Available ICP algorithm types
+     * @brief Alignment state enumeration
      */
-    enum class ICPAlgorithmType {
-        PointToPoint,    ///< Standard point-to-point ICP
-        PointToPlane     ///< Point-to-plane ICP (requires normals)
+    enum class AlignmentState {
+        Idle,           ///< No correspondences defined
+        Insufficient,   ///< Less than 3 correspondences
+        Computing,      ///< Transformation computation in progress
+        Valid,          ///< Valid transformation computed
+        Error           ///< Error in computation
     };
 
+    /**
+     * @brief Alignment result structure
+     */
+    struct AlignmentResult {
+        QMatrix4x4 transformation;                    ///< Computed transformation matrix
+        ErrorAnalysis::ErrorStatistics errorStats;   ///< Comprehensive error analysis
+        AlignmentState state = AlignmentState::Idle;  ///< Current alignment state
+        QString message;                              ///< Status or error message
+        qint64 computationTimeMs = 0;                 ///< Computation time in milliseconds
+        
+        /**
+         * @brief Check if alignment result is valid for application
+         * @return true if transformation can be safely applied
+         */
+        bool isValid() const { return state == AlignmentState::Valid; }
+    };
+
+public:
     explicit AlignmentEngine(QObject* parent = nullptr);
-    ~AlignmentEngine();
+    virtual ~AlignmentEngine() = default;
+
+    // --- Correspondence Management ---
 
     /**
-     * @brief Set correspondence points for manual alignment
-     * @param correspondences List of point correspondences (source, target)
+     * @brief Set complete list of correspondence pairs
+     * @param correspondences List of (source, target) point pairs
      */
     void setCorrespondences(const QList<QPair<QVector3D, QVector3D>>& correspondences);
 
     /**
-     * @brief Recompute manual alignment from current correspondences
+     * @brief Add a single correspondence pair
+     * @param sourcePoint Point in source scan
+     * @param targetPoint Corresponding point in target scan
+     */
+    void addCorrespondence(const QVector3D& sourcePoint, const QVector3D& targetPoint);
+
+    /**
+     * @brief Remove correspondence at specified index
+     * @param index Index of correspondence to remove
+     */
+    void removeCorrespondence(int index);
+
+    /**
+     * @brief Clear all correspondences
+     */
+    void clearCorrespondences();
+
+    /**
+     * @brief Get current correspondence list
+     * @return List of correspondence pairs
+     */
+    const QList<QPair<QVector3D, QVector3D>>& getCorrespondences() const { return m_correspondences; }
+
+    // --- Alignment Computation ---
+
+    /**
+     * @brief Trigger alignment computation with current correspondences
+     * 
+     * Computes transformation and emits signals for real-time update.
+     * Computation is performed asynchronously to maintain UI responsiveness.
      */
     void recomputeAlignment();
 
     /**
-     * @brief Run ICP refinement on point clouds
-     * @param sourcePoints Source point cloud data (x,y,z interleaved)
-     * @param targetPoints Target point cloud data (x,y,z interleaved)
-     * @param algorithmType Type of ICP algorithm to use
-     * @param params ICP algorithm parameters
-     * @param showProgress Whether to show progress dialog
+     * @brief Get the most recent alignment result
+     * @return Current alignment result with transformation and quality metrics
      */
-    void runICP(const std::vector<float>& sourcePoints,
-                const std::vector<float>& targetPoints,
-                ICPAlgorithmType algorithmType = ICPAlgorithmType::PointToPoint,
-                const ICPParams& params = ICPParams(),
-                bool showProgress = true);
-
-    /**
-     * @brief Cancel currently running ICP computation
-     */
-    void cancelICP();
-
-    /**
-     * @brief Check if ICP is currently running
-     */
-    bool isICPRunning() const;
+    const AlignmentResult& getCurrentResult() const { return m_currentResult; }
 
     /**
      * @brief Get current transformation matrix
+     * @return 4x4 transformation matrix (identity if no valid alignment)
      */
-    QMatrix4x4 getCurrentTransformation() const { return m_currentTransform; }
+    QMatrix4x4 getCurrentTransformation() const { return m_currentResult.transformation; }
 
     /**
      * @brief Get current RMS error
+     * @return RMS error in mm (0 if no valid alignment)
      */
-    float getCurrentRMSError() const { return m_currentRMSError; }
+    float getCurrentRMSError() const { return m_currentResult.errorStats.rmsError; }
+
+    // --- Configuration ---
 
     /**
-     * @brief Get number of correspondences
+     * @brief Enable/disable automatic recomputation on correspondence changes
+     * @param enabled If true, alignment recomputes automatically when correspondences change
      */
-    int getCorrespondenceCount() const { return m_correspondences.size(); }
+    void setAutoRecompute(bool enabled) { m_autoRecompute = enabled; }
+
+    /**
+     * @brief Check if auto-recomputation is enabled
+     * @return true if automatic recomputation is enabled
+     */
+    bool isAutoRecompute() const { return m_autoRecompute; }
+
+    /**
+     * @brief Set quality thresholds for validation
+     * @param rmsThreshold Maximum acceptable RMS error (mm)
+     * @param maxErrorThreshold Maximum acceptable individual error (mm)
+     */
+    void setQualityThresholds(float rmsThreshold, float maxErrorThreshold);
 
 signals:
     /**
-     * @brief Emitted when transformation is updated (manual or ICP)
-     * @param transformation New transformation matrix
+     * @brief Emitted when transformation is updated
+     * @param transform New transformation matrix
      */
-    void transformationUpdated(const QMatrix4x4& transformation);
+    void transformationUpdated(const QMatrix4x4& transform);
 
     /**
      * @brief Emitted when quality metrics are updated
-     * @param rmsError Current RMS error
-     * @param correspondenceCount Number of correspondences used
+     * @param rmsError Current RMS error in mm
      */
-    void qualityMetricsUpdated(float rmsError, int correspondenceCount);
+    void qualityMetricsUpdated(float rmsError);
 
     /**
-     * @brief Emitted when ICP computation starts
-     * @param algorithmType Type of ICP algorithm being used
-     * @param maxIterations Maximum number of iterations
+     * @brief Emitted when complete alignment result is available
+     * @param result Complete alignment result with all metrics
      */
-    void icpStarted(ICPAlgorithmType algorithmType, int maxIterations);
+    void alignmentResultUpdated(const AlignmentResult& result);
 
     /**
-     * @brief Emitted when ICP computation completes
-     * @param success True if ICP converged successfully
-     * @param finalTransformation Final transformation matrix
-     * @param finalRMSError Final RMS error
-     * @param iterations Number of iterations performed
-     * @param improvementPercent Percentage improvement in RMS error
+     * @brief Emitted when alignment state changes
+     * @param state New alignment state
+     * @param message Status message
      */
-    void icpFinished(bool success, const QMatrix4x4& finalTransformation,
-                    float finalRMSError, int iterations, float improvementPercent);
+    void alignmentStateChanged(AlignmentState state, const QString& message);
 
     /**
-     * @brief Emitted when an error occurs
-     * @param message Error message
+     * @brief Emitted when correspondences are modified
+     * @param count New correspondence count
      */
-    void errorOccurred(const QString& message);
+    void correspondencesChanged(int count);
 
 private slots:
-    void onICPProgressUpdated(int iteration, float rmsError, const QMatrix4x4& transformation);
-    void onICPFinished(bool success, const QMatrix4x4& finalTransformation,
-                      float finalRMSError, int iterations);
-    void onProgressWidgetClosed(bool success, const QString& message);
+    /**
+     * @brief Perform actual alignment computation (called by timer for async execution)
+     */
+    void performAlignment();
 
 private:
-    void calculateManualAlignmentError();
-    std::unique_ptr<ICPRegistration> createICPAlgorithm(ICPAlgorithmType type);
-    QString algorithmTypeToString(ICPAlgorithmType type) const;
+    /**
+     * @brief Validate correspondences before computation
+     * @return true if correspondences are valid for alignment
+     */
+    bool validateCorrespondences() const;
+
+    /**
+     * @brief Update alignment state and emit appropriate signals
+     * @param state New alignment state
+     * @param message Status message
+     */
+    void updateAlignmentState(AlignmentState state, const QString& message = QString());
+
+    /**
+     * @brief Trigger recomputation if auto-recompute is enabled
+     */
+    void triggerRecomputeIfEnabled();
 
 private:
-    // Manual alignment data
-    QList<QPair<QVector3D, QVector3D>> m_correspondences;
-    QMatrix4x4 m_currentTransform;
-    float m_currentRMSError;
-    float m_manualRMSError;
+    // Core data
+    QList<QPair<QVector3D, QVector3D>> m_correspondences;  ///< Current correspondence pairs
+    AlignmentResult m_currentResult;                       ///< Most recent alignment result
 
-    // ICP computation
-    std::unique_ptr<ICPRegistration> m_icpAlgorithm;
-    ICPAlgorithmType m_currentAlgorithmType;
-    ICPParams m_currentICPParams;
-    
-    // Progress monitoring
-    ICPProgressWidget* m_progressWidget;
-    
-    // State tracking
-    bool m_hasValidAlignment;
-    bool m_icpInProgress;
+    // Configuration
+    bool m_autoRecompute = true;                          ///< Auto-recompute on changes
+    float m_rmsThreshold = 5.0f;                          ///< RMS error threshold (mm)
+    float m_maxErrorThreshold = 10.0f;                    ///< Max individual error threshold (mm)
+
+    // Async computation
+    QTimer* m_computationTimer;                           ///< Timer for async computation
+    bool m_computationPending = false;                    ///< Computation request pending
+
+    // Constants
+    static constexpr int COMPUTATION_DELAY_MS = 100;      ///< Delay before computation (ms)
+    static constexpr int MIN_CORRESPONDENCES = 3;         ///< Minimum correspondences required
 };
-
-#endif // ALIGNMENTENGINE_H
