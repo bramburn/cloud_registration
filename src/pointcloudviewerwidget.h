@@ -20,26 +20,64 @@
 #include "octree.h"
 #include "screenspaceerror.h"
 #include "pointdata.h"
+#include "IPointCloudViewer.h"
 
-class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
+class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
     Q_OBJECT
 
 public:
-    enum class ViewerState {
-        Idle,
-        Loading,
-        DisplayingData,
-        LoadFailed
-    };
-
     explicit PointCloudViewerWidget(QWidget *parent = nullptr);
     ~PointCloudViewerWidget();
 
-    // Public interface
-    void loadPointCloud(const std::vector<float>& points);
-    void clearPointCloud();
-    void setState(ViewerState state, const QString &message = "");
+    // IPointCloudViewer interface implementation
+    void loadPointCloud(const std::vector<float>& points) override;
+    void clearPointCloud() override;
+    void addPointCloudData(const std::vector<float>& additionalPoints) override;
+    void setState(ViewerState state, const QString& message = "") override;
+    ViewerState getState() const override;
+
+    void setPointSize(float size) override;
+    void setBackgroundColor(const QColor& color) override;
+    void setShowGrid(bool show) override;
+    void setShowAxes(bool show) override;
+
+    void setLODEnabled(bool enabled) override;
+    bool isLODEnabled() const override;
+
+    void setRenderWithColor(bool enabled) override;
+    void setRenderWithIntensity(bool enabled) override;
+    bool isRenderingWithColor() const override;
+    bool isRenderingWithIntensity() const override;
+
+    void setTopView() override;
+    void setLeftView() override;
+    void setRightView() override;
+    void setBottomView() override;
+    void setFrontView() override;
+    void setBackView() override;
+    void setIsometricView() override;
+
+    bool hasData() const override;
+    size_t pointCount() const override;
+
+    void setMinPointSize(float size) override;
+    void setMaxPointSize(float size) override;
+    void setAttenuationEnabled(bool enabled) override;
+    void setAttenuationFactor(float factor) override;
+
+    void setSplattingEnabled(bool enabled) override;
+    void setLightingEnabled(bool enabled) override;
+    void setLightDirection(const QVector3D& direction) override;
+    void setLightColor(const QColor& color) override;
+    void setAmbientIntensity(float intensity) override;
+
+    void onLoadingStarted() override;
+    void onLoadingProgress(int percentage, const QString& stage) override;
+    void onLoadingFinished(bool success, const QString& message) override;
+
+    size_t getMemoryUsage() const override;
+    void optimizeMemory() override;
 
     // Coordinate transformation access (User Story 3)
     QVector3D getGlobalOffset() const { return m_globalOffset; }
@@ -59,8 +97,6 @@ public:
     void simulateZoomCamera(float factor);
 
     // Sprint R1: LOD system controls
-    void setLODEnabled(bool enabled);
-    bool isLODEnabled() const { return m_lodEnabled; }
     void setLODDistances(float distance1, float distance2);
     void getLODDistances(float& distance1, float& distance2) const;
 
@@ -70,15 +106,7 @@ public:
     size_t getOctreeNodeCount() const;
 
 public slots:
-    // View control slots
-    void setTopView();
-    void setLeftView();
-    void setRightView();
-    void setBottomView();
-
-    // Sprint 2.3: Loading feedback slots
-    void onLoadingStarted();
-    void onLoadingProgress(int percentage, const QString &stage);
+    // Legacy loading feedback slot (for backward compatibility)
     void onLoadingFinished(bool success, const QString &message,
                           const std::vector<float> &points);
 
@@ -92,17 +120,8 @@ public slots:
     void setCullScreenSpaceErrorThreshold(float threshold);
 
     // Sprint R3: Attribute rendering and point size attenuation slots (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
-    void setRenderWithColor(bool enabled);
-    void setRenderWithIntensity(bool enabled);
     void setPointSizeAttenuationEnabled(bool enabled);
     void setPointSizeAttenuationParams(float minSize, float maxSize, float factor);
-
-    // Sprint R4: Splatting and lighting slots (Task R4.3.2)
-    void setSplattingEnabled(bool enabled);
-    void setLightingEnabled(bool enabled);
-    void setLightDirection(const QVector3D& direction);
-    void setLightColor(const QColor& color);
-    void setAmbientIntensity(float intensity);
 
 signals:
     // Sprint 2.2: Performance monitoring signals

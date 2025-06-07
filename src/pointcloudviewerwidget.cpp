@@ -2304,4 +2304,157 @@ void PointCloudViewerWidget::emitPerformanceStats()
     // Emit performance statistics signal
     emit statsUpdated(m_fps, visiblePoints);
 }
+
+// IPointCloudViewer interface implementation
+void PointCloudViewerWidget::addPointCloudData(const std::vector<float>& additionalPoints)
+{
+    if (additionalPoints.empty()) {
+        return;
+    }
+
+    // Append new points to existing data
+    m_pointData.insert(m_pointData.end(), additionalPoints.begin(), additionalPoints.end());
+    m_pointCount = static_cast<int>(m_pointData.size() / 6); // Assuming XYZ RGB format
+
+    // Update buffers and recalculate bounding box
+    calculateBoundingBox();
+    fitCameraToPointCloud();
+
+    // Update OpenGL buffers
+    makeCurrent();
+    prepareVertexData(m_visiblePoints);
+    doneCurrent();
+
+    update();
+}
+
+ViewerState PointCloudViewerWidget::getState() const
+{
+    return m_currentState;
+}
+
+void PointCloudViewerWidget::setPointSize(float size)
+{
+    m_pointSize = size;
+    update();
+}
+
+void PointCloudViewerWidget::setBackgroundColor(const QColor& color)
+{
+    makeCurrent();
+    glClearColor(color.redF(), color.greenF(), color.blueF(), color.alphaF());
+    doneCurrent();
+    update();
+}
+
+void PointCloudViewerWidget::setShowGrid(bool show)
+{
+    // Grid functionality not implemented yet
+    Q_UNUSED(show)
+}
+
+void PointCloudViewerWidget::setShowAxes(bool show)
+{
+    // Axes functionality not implemented yet
+    Q_UNUSED(show)
+}
+
+bool PointCloudViewerWidget::isRenderingWithColor() const
+{
+    return m_renderWithColor;
+}
+
+bool PointCloudViewerWidget::isRenderingWithIntensity() const
+{
+    return m_renderWithIntensity;
+}
+
+void PointCloudViewerWidget::setFrontView()
+{
+    m_cameraYaw = 0.0f;
+    m_cameraPitch = 0.0f;
+    updateCamera();
+    update();
+}
+
+void PointCloudViewerWidget::setBackView()
+{
+    m_cameraYaw = 180.0f;
+    m_cameraPitch = 0.0f;
+    updateCamera();
+    update();
+}
+
+void PointCloudViewerWidget::setIsometricView()
+{
+    m_cameraYaw = 45.0f;
+    m_cameraPitch = -35.264f; // Isometric angle
+    updateCamera();
+    update();
+}
+
+bool PointCloudViewerWidget::hasData() const
+{
+    return m_hasData;
+}
+
+size_t PointCloudViewerWidget::pointCount() const
+{
+    return static_cast<size_t>(m_pointCount);
+}
+
+void PointCloudViewerWidget::setMinPointSize(float size)
+{
+    m_minPointSize = size;
+    update();
+}
+
+void PointCloudViewerWidget::setMaxPointSize(float size)
+{
+    m_maxPointSize = size;
+    update();
+}
+
+void PointCloudViewerWidget::setAttenuationEnabled(bool enabled)
+{
+    m_pointSizeAttenuationEnabled = enabled;
+    update();
+}
+
+void PointCloudViewerWidget::setAttenuationFactor(float factor)
+{
+    m_attenuationFactor = factor;
+    update();
+}
+
+void PointCloudViewerWidget::onLoadingFinished(bool success, const QString& message)
+{
+    if (success) {
+        setState(ViewerState::DisplayingData, message);
+    } else {
+        setState(ViewerState::LoadFailed, message);
+    }
+}
+
+size_t PointCloudViewerWidget::getMemoryUsage() const
+{
+    size_t usage = 0;
+    usage += m_pointData.size() * sizeof(float);
+    usage += m_vertexData.size() * sizeof(VertexData);
+    usage += m_visiblePoints.size() * sizeof(PointFullData);
+    return usage;
+}
+
+void PointCloudViewerWidget::optimizeMemory()
+{
+    // Shrink vectors to fit their actual size
+    m_pointData.shrink_to_fit();
+    m_vertexData.shrink_to_fit();
+    m_visiblePoints.shrink_to_fit();
+
+    // Force garbage collection of octree if needed
+    if (m_octree && !m_hasData) {
+        m_octree.reset(new Octree());
+    }
+}
 }

@@ -9,8 +9,10 @@
 #include <QProgressBar>
 #include <QVBoxLayout>
 #include <vector>
+#include <memory>
 #include "progressmanager.h"
 #include "projectmanager.h"
+#include "IMainView.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
@@ -26,9 +28,11 @@ class QPushButton;
 class QCheckBox;
 class QSlider;
 class QGroupBox;
+class MainPresenter;
+class IPointCloudViewer;
 struct LasHeaderMetadata;
 
-class MainWindow : public QMainWindow
+class MainWindow : public QMainWindow, public IMainView
 {
     Q_OBJECT
 
@@ -37,36 +41,67 @@ public:
     explicit MainWindow(IE57Parser* e57Parser, QWidget *parent = nullptr);
     ~MainWindow();
 
+    // IMainView interface implementation
+    void setWindowTitle(const QString& title) override;
+    void updateWindowTitle() override;
+    void updateStatusBar(const QString& text) override;
+    void setStatusReady() override;
+    void setStatusLoading(const QString& fileName) override;
+    void setStatusLoadSuccess(const QString& fileName, int pointCount) override;
+    void setStatusLoadFailed(const QString& fileName, const QString& message) override;
+    void setStatusViewChanged(const QString& viewName) override;
+    void displayErrorMessage(const QString& title, const QString& message) override;
+    void displayWarningMessage(const QString& title, const QString& message) override;
+    void displayInfoMessage(const QString& title, const QString& message) override;
+    void showProjectHub() override;
+    void transitionToProjectView(const QString& projectPath) override;
+    void enableProjectActions(bool enabled) override;
+    void showImportGuidance(bool show) override;
+    IPointCloudViewer* getViewer() override;
+    void showProgressDialog(const QString& title, const QString& message) override;
+    void updateProgressDialog(int percentage, const QString& stage) override;
+    void hideProgressDialog() override;
+    void updateMemoryDisplay(size_t totalBytes) override;
+    void updatePerformanceStats(float fps, int visiblePoints) override;
+    void setLoadingState(bool isLoading) override;
+    void updateLoadingProgress(int percentage, const QString& stage) override;
+    QString showOpenFileDialog(const QString& title, const QString& filter) override;
+    QString showOpenProjectDialog() override;
+    QString showSaveFileDialog(const QString& title, const QString& filter) override;
+    bool showLoadingSettingsDialog() override;
+    bool showCreateProjectDialog(QString& projectName, QString& projectPath) override;
+    bool showScanImportDialog() override;
+    void refreshScanList() override;
+    void enableViewControls(bool enabled) override;
+    void updateViewControlsState() override;
+    bool isProjectOpen() const override;
+    QString getCurrentProjectPath() const override;
+    Project* getCurrentProject() const override;
+    void prepareForShutdown() override;
+    void cleanupResources() override;
+
 private slots:
-    void onProjectOpened(const QString &projectPath);
-    void showProjectHub();
-    void onFileNewProject();
-    void onFileOpenProject();
-    void closeCurrentProject();
+    // Simplified slots that delegate to presenter
+    void onProjectOpened(const QString &projectPath) { if (m_presenter) m_presenter->handleProjectOpened(projectPath); }
+    void onFileNewProject() { if (m_presenter) m_presenter->handleNewProject(); }
+    void onFileOpenProject() { if (m_presenter) m_presenter->handleOpenProject(); }
+    void closeCurrentProject() { if (m_presenter) m_presenter->handleCloseProject(); }
+    void onImportScans() { if (m_presenter) m_presenter->handleImportScans(); }
 
-    // Sprint 1.2: Scan Import functionality
-    void onImportScans();
-    void onScansImported(const QList<ScanInfo> &scans);
-
-    // Sprint 1.3: E57 scan activation
-    void onScanActivated(const QString& scanId);
-
-    // Legacy point cloud loading slots (for existing functionality)
-    void onOpenFileClicked();
-    void onLoadingFinished(bool success, const QString& message);
-    void onParsingProgressUpdated(int percentage, const QString &stage);
-    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
-    void onLoadingSettingsTriggered();
-    void onLasHeaderParsed(const LasHeaderMetadata& metadata);
-
-    // E57-specific slots
-    void onScanMetadataReceived(int scanCount, const QStringList& scanNames);
-    void onIntensityDataReceived(const std::vector<float>& intensityValues);
-    void onColorDataReceived(const std::vector<uint8_t>& colorValues);
-    void onTopViewClicked();
-    void onLeftViewClicked();
-    void onRightViewClicked();
-    void onBottomViewClicked();
+    void onScanActivated(const QString& scanId) { if (m_presenter) m_presenter->handleScanActivated(scanId); }
+    void onOpenFileClicked() { if (m_presenter) m_presenter->handleOpenFile(); }
+    void onLoadingFinished(bool success, const QString& message) { if (m_presenter) m_presenter->handleLoadingFinished(success, message); }
+    void onParsingProgressUpdated(int percentage, const QString &stage) { if (m_presenter) m_presenter->handleParsingProgressUpdated(percentage, stage); }
+    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points) { if (m_presenter) m_presenter->handleParsingFinished(success, message, points); }
+    void onLoadingSettingsTriggered() { if (m_presenter) m_presenter->handleLoadingSettings(); }
+    void onLasHeaderParsed(const LasHeaderMetadata& metadata) { if (m_presenter) m_presenter->handleLasHeaderParsed(metadata); }
+    void onScanMetadataReceived(int scanCount, const QStringList& scanNames) { if (m_presenter) m_presenter->handleScanMetadataReceived(scanCount, scanNames); }
+    void onIntensityDataReceived(const std::vector<float>& intensityValues) { if (m_presenter) m_presenter->handleIntensityDataReceived(intensityValues); }
+    void onColorDataReceived(const std::vector<uint8_t>& colorValues) { if (m_presenter) m_presenter->handleColorDataReceived(colorValues); }
+    void onTopViewClicked() { if (m_presenter) m_presenter->handleTopViewClicked(); }
+    void onLeftViewClicked() { if (m_presenter) m_presenter->handleLeftViewClicked(); }
+    void onRightViewClicked() { if (m_presenter) m_presenter->handleRightViewClicked(); }
+    void onBottomViewClicked() { if (m_presenter) m_presenter->handleBottomViewClicked(); }
 
     // Sprint 3.2: Point cloud viewing slots
     void onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
@@ -229,6 +264,12 @@ private:
 
     // Current state
     QColor m_currentLightColor;
+
+    // Sprint 4: MVP Pattern - Presenter
+    std::unique_ptr<MainPresenter> m_presenter;
+
+    // Interface pointer for viewer (Sprint 3 decoupling)
+    IPointCloudViewer* m_viewerInterface;
 };
 
 #endif // MAINWINDOW_H

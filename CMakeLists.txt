@@ -198,6 +198,7 @@ set(SOURCES
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
     src/performance_profiler.cpp
+    src/MainPresenter.cpp
 )
 
 # Header files
@@ -218,6 +219,10 @@ set(HEADERS
     src/lasheadermetadata.h
     src/voxelgridfilter.h
     src/performance_profiler.h
+    src/MainPresenter.h
+    src/IMainView.h
+    src/IPointCloudViewer.h
+    src/IE57Writer.h
 )
 
 # Shader files
@@ -395,10 +400,29 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
+    # MainPresenter Tests (Sprint 4)
+    add_executable(MainPresenterTests
+        tests/test_mainpresenter.cpp
+        src/MainPresenter.cpp
+        src/projectmanager.cpp
+        src/project.cpp
+    )
+
+    target_link_libraries(MainPresenterTests
+        GTest::gtest_main
+        GTest::gmock_main
+        Qt6::Core
+        Qt6::Test
+        Qt6::Widgets
+    )
+
+    target_include_directories(MainPresenterTests PRIVATE src)
+    add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
+
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests
+        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests
         COMMENT "Running all unit tests"
     )
 
@@ -416,7 +440,7 @@ if(TARGET GTest::gtest_main)
                 COMMAND ${GENHTML_PATH} -o coverage_html coverage.info.cleaned
                 COMMAND ${CMAKE_COMMAND} -E remove coverage.info coverage.info.cleaned
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests
+                DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests
                 COMMENT "Generating code coverage report"
             )
             message(STATUS "Code coverage target 'coverage' available")
