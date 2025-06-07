@@ -3,17 +3,29 @@
 
 #include <QObject>
 #include <QString>
+#include <QColor>
 #include <QVector3D>
 #include <vector>
 
 /**
- * @brief Abstract interface for 3D point cloud rendering components
- * 
- * This interface defines the contract for all 3D point cloud viewers, enabling
- * loose coupling between the application's core logic and specific rendering
- * implementations. It follows the established decoupling pattern used throughout
- * the CloudRegistration application.
- * 
+ * @brief ViewerState - Enumeration of possible viewer states
+ */
+enum class ViewerState {
+    Empty,       // No point cloud loaded
+    Loading,     // Point cloud is being loaded
+    Ready,       // Point cloud loaded and ready for display
+    Rendering,   // Currently rendering
+    Error        // Error state
+};
+
+/**
+ * @brief IPointCloudViewer - Abstract interface for 3D point cloud rendering
+ *
+ * This interface defines the contract for all point cloud viewer implementations.
+ * It enables loose coupling between the rendering logic and the rest of the application,
+ * allowing for easy testing with mock implementations and future substitution
+ * of different rendering engines.
+ *
  * Sprint 3 Decoupling Requirements:
  * - Provides abstraction layer for 3D rendering operations
  * - Enables dependency injection and polymorphic usage
@@ -21,61 +33,60 @@
  * - Maintains compatibility with existing MainWindow interface
  * - Follows the same pattern as IPointCloudProcessor and IE57Parser
  */
-
-/**
- * @brief Enum defining the possible states of the point cloud viewer
- */
-enum class ViewerState {
-    Idle,           // No data loaded, ready for input
-    Loading,        // Currently loading point cloud data
-    DisplayingData, // Successfully displaying point cloud data
-    LoadFailed      // Failed to load or display data
-};
-
-/**
- * @brief Abstract interface for point cloud viewer components
- * 
- * This interface abstracts the essential operations needed to control a 3D
- * point cloud viewer from the application's main logic. It enables testing
- * with mock implementations and future integration of alternative rendering
- * technologies.
- */
 class IPointCloudViewer : public QObject {
     Q_OBJECT
 
 public:
-    /**
-     * @brief Virtual destructor ensures proper cleanup of derived classes
-     */
+    explicit IPointCloudViewer(QObject *parent = nullptr) : QObject(parent) {}
     virtual ~IPointCloudViewer() = default;
 
-    // Core data operations
+    // --- Data Management ---
+
     /**
-     * @brief Load point cloud data into the viewer
+     * @brief Load point cloud data for rendering
      * @param points Vector of point coordinates (x,y,z interleaved)
      */
     virtual void loadPointCloud(const std::vector<float>& points) = 0;
 
     /**
-     * @brief Clear all point cloud data from the viewer
+     * @brief Clear the currently loaded point cloud
      */
     virtual void clearPointCloud() = 0;
 
+    // --- State Management ---
+
     /**
-     * @brief Set the current state of the viewer with optional message
-     * @param state The new viewer state
-     * @param message Optional status message
+     * @brief Set the viewer state and optional message
+     * @param state New state for the viewer
+     * @param message Optional message associated with the state
      */
     virtual void setState(ViewerState state, const QString& message = "") = 0;
 
-    // View control operations
+    /**
+     * @brief Get the current viewer state
+     * @return Current viewer state
+     */
+    virtual ViewerState getViewerState() const = 0;
+
+    // --- View Control ---
+
+    /**
+     * @brief Reset the camera to fit the loaded point cloud
+     */
+    virtual void resetCamera() = 0;
+
     /**
      * @brief Set the camera to top view
      */
     virtual void setTopView() = 0;
 
     /**
-     * @brief Set the camera to left view
+     * @brief Set the camera to front view
+     */
+    virtual void setFrontView() = 0;
+
+    /**
+     * @brief Set the camera to side/left view
      */
     virtual void setLeftView() = 0;
 
@@ -89,10 +100,43 @@ public:
      */
     virtual void setBottomView() = 0;
 
-    // Level of Detail (LOD) control
+    // --- Rendering Attributes & Quality ---
+
     /**
-     * @brief Enable or disable Level of Detail rendering
-     * @param enabled True to enable LOD, false to disable
+     * @brief Set the point size for rendering
+     * @param size Point size in pixels
+     */
+    virtual void setPointSize(float size) = 0;
+
+    /**
+     * @brief Set the background color
+     * @param color Background color
+     */
+    virtual void setBackgroundColor(const QColor& color) = 0;
+
+    /**
+     * @brief Enable or disable color rendering
+     * @param enabled true to render with color, false for monochrome
+     */
+    virtual void setRenderWithColor(bool enabled) = 0;
+
+    /**
+     * @brief Enable or disable intensity-based rendering
+     * @param enabled true to render with intensity, false for uniform color
+     */
+    virtual void setRenderWithIntensity(bool enabled) = 0;
+
+    /**
+     * @brief Enable or disable splatting rendering
+     * @param enabled true to enable splatting, false for point rendering
+     */
+    virtual void setSplattingEnabled(bool enabled) = 0;
+
+    // --- Level of Detail (LOD) ---
+
+    /**
+     * @brief Enable or disable Level of Detail (LOD) rendering
+     * @param enabled true to enable LOD, false to disable
      */
     virtual void setLODEnabled(bool enabled) = 0;
 
@@ -102,22 +146,11 @@ public:
      */
     virtual bool isLODEnabled() const = 0;
 
-    // Rendering attribute controls
-    /**
-     * @brief Enable or disable color-based rendering
-     * @param enabled True to render with colors, false for default coloring
-     */
-    virtual void setRenderWithColor(bool enabled) = 0;
+    // --- Point Size Attenuation ---
 
     /**
-     * @brief Enable or disable intensity-based rendering
-     * @param enabled True to render with intensity values, false for default
-     */
-    virtual void setRenderWithIntensity(bool enabled) = 0;
-
-    /**
-     * @brief Enable or disable point size attenuation
-     * @param enabled True to enable distance-based point size attenuation
+     * @brief Enable or disable point size attenuation based on distance
+     * @param enabled true to enable attenuation, false for constant size
      */
     virtual void setPointSizeAttenuationEnabled(bool enabled) = 0;
 
@@ -129,33 +162,54 @@ public:
      */
     virtual void setPointSizeAttenuationParams(float minSize, float maxSize, float factor) = 0;
 
-    // State query methods (for testing and debugging)
-    /**
-     * @brief Get the current viewer state
-     * @return Current ViewerState
-     */
-    virtual ViewerState getViewerState() const = 0;
+    // --- Lighting ---
 
     /**
-     * @brief Check if the viewer has point cloud data loaded
-     * @return True if data is loaded, false otherwise
+     * @brief Enable or disable lighting
+     * @param enabled true to enable lighting, false for flat shading
+     */
+    virtual void setLightingEnabled(bool enabled) = 0;
+
+    /**
+     * @brief Set the light direction
+     * @param direction Light direction vector
+     */
+    virtual void setLightDirection(const QVector3D& direction) = 0;
+
+    /**
+     * @brief Set the light color
+     * @param color Light color
+     */
+    virtual void setLightColor(const QColor& color) = 0;
+
+    /**
+     * @brief Set the ambient light intensity
+     * @param intensity Ambient intensity (0.0 to 1.0)
+     */
+    virtual void setAmbientIntensity(float intensity) = 0;
+
+    // --- State & Data Query ---
+
+    /**
+     * @brief Check if point cloud data is loaded
+     * @return true if data is loaded, false otherwise
      */
     virtual bool hasPointCloudData() const = 0;
 
     /**
      * @brief Get the number of points currently loaded
-     * @return Number of points in the current point cloud
+     * @return Number of points
      */
     virtual size_t getPointCount() const = 0;
 
-    // Coordinate transformation access (for advanced operations)
     /**
      * @brief Get the global coordinate offset used for large coordinate handling
      * @return Global offset vector
      */
     virtual QVector3D getGlobalOffset() const = 0;
 
-    // Performance monitoring
+    // --- Performance Monitoring ---
+
     /**
      * @brief Get the current rendering frame rate
      * @return Current FPS
@@ -169,7 +223,8 @@ public:
     virtual size_t getVisiblePointCount() const = 0;
 
 public slots:
-    // Loading feedback slots
+    // --- Loading Feedback Slots ---
+
     /**
      * @brief Slot called when loading operation starts
      */
@@ -189,9 +244,10 @@ public slots:
      * @param points Loaded point data (if successful)
      */
     virtual void onLoadingFinished(bool success, const QString& message,
-                                  const std::vector<float>& points) = 0;
+                                   const std::vector<float>& points) = 0;
 
-    // LOD control slots
+    // --- LOD Control Slots ---
+
     /**
      * @brief Toggle LOD rendering on/off
      * @param enabled True to enable LOD, false to disable
@@ -204,41 +260,20 @@ public slots:
      */
     virtual void setLODSubsampleRate(float rate) = 0;
 
-    // Screen-space error LOD control slots
     /**
      * @brief Set screen-space error threshold for LOD
      * @param threshold Error threshold in pixels
      */
     virtual void setScreenSpaceErrorThreshold(float threshold) = 0;
 
-    /**
-     * @brief Set primary screen-space error threshold
-     * @param threshold Primary threshold in pixels
-     */
-    virtual void setPrimaryScreenSpaceErrorThreshold(float threshold) = 0;
-
-    /**
-     * @brief Set culling screen-space error threshold
-     * @param threshold Culling threshold in pixels
-     */
-    virtual void setCullScreenSpaceErrorThreshold(float threshold) = 0;
-
 signals:
-    // Performance monitoring signals
+    // --- Data Operation Signals ---
+    
     /**
-     * @brief Emitted when rendering statistics are updated
-     * @param fps Current frame rate
-     * @param visiblePoints Number of visible points
+     * @brief Emitted when point cloud loading starts
      */
-    void statsUpdated(float fps, int visiblePoints);
+    void pointCloudLoadingStarted();
 
-    /**
-     * @brief Emitted when a rendering error occurs
-     * @param error Error description
-     */
-    void renderingError(const QString& error);
-
-    // Data operation signals
     /**
      * @brief Emitted when point cloud data is successfully loaded
      * @param points The loaded point data
@@ -256,12 +291,29 @@ signals:
      */
     void pointCloudCleared();
 
+    // --- State & Error Signals ---
+    
     /**
      * @brief Emitted when the viewer state changes
      * @param newState The new viewer state
      * @param message Optional status message
      */
     void stateChanged(ViewerState newState, const QString& message);
+
+    /**
+     * @brief Emitted when a rendering error occurs
+     * @param error Error description
+     */
+    void renderingError(const QString& error);
+
+    // --- Performance Signals ---
+    
+    /**
+     * @brief Emitted when rendering statistics are updated
+     * @param fps Current frame rate
+     * @param visiblePoints Number of visible points
+     */
+    void statsUpdated(float fps, int visiblePoints);
 };
 
 #endif // IPOINTCLOUDVIEWER_H
