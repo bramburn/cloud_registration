@@ -20,34 +20,38 @@
 #include "octree.h"
 #include "screenspaceerror.h"
 #include "pointdata.h"
+#include "IPointCloudViewer.h"
 
-class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions
+class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
     Q_OBJECT
 
 public:
-    enum class ViewerState {
-        Idle,
-        Loading,
-        DisplayingData,
-        LoadFailed
-    };
-
     explicit PointCloudViewerWidget(QWidget *parent = nullptr);
     ~PointCloudViewerWidget();
 
-    // Public interface
-    void loadPointCloud(const std::vector<float>& points);
-    void clearPointCloud();
-    void setState(ViewerState state, const QString &message = "");
+    // IPointCloudViewer interface implementation
+    void loadPointCloud(const std::vector<float>& points) override;
+    void clearPointCloud() override;
+    void setState(ViewerState state, const QString &message = "") override;
+    void setTopView() override;
+    void setLeftView() override;
+    void setRightView() override;
+    void setBottomView() override;
+    void setLODEnabled(bool enabled) override;
+    bool isLODEnabled() const override { return m_lodEnabled; }
+    void setRenderWithColor(bool enabled) override;
+    void setRenderWithIntensity(bool enabled) override;
+    void setPointSizeAttenuationEnabled(bool enabled) override;
+    void setPointSizeAttenuationParams(float minSize, float maxSize, float factor) override;
+    ViewerState getViewerState() const override { return m_currentState; }
+    bool hasPointCloudData() const override { return m_hasData; }
+    size_t getPointCount() const override { return static_cast<size_t>(m_pointCount); }
+    QVector3D getGlobalOffset() const override { return m_globalOffset; }
+    float getCurrentFPS() const override { return m_fps; }
+    size_t getVisiblePointCount() const override { return m_visiblePointCount; }
 
-    // Coordinate transformation access (User Story 3)
-    QVector3D getGlobalOffset() const { return m_globalOffset; }
-
-    // Sprint 3.2: Test helper methods
-    ViewerState getViewerState() const { return m_currentState; }
-    bool hasPointCloudData() const { return m_hasData; }
-    size_t getPointCount() const { return static_cast<size_t>(m_pointCount); }
+    // Additional public methods specific to PointCloudViewerWidget
     float getCameraYaw() const { return m_cameraYaw; }
     float getCameraPitch() const { return m_cameraPitch; }
     QVector3D getCameraTarget() const { return m_cameraTarget; }
@@ -58,44 +62,22 @@ public:
     void simulatePanCamera(const QPoint &start, const QPoint &end);
     void simulateZoomCamera(float factor);
 
-    // Sprint R1: LOD system controls
-    void setLODEnabled(bool enabled);
-    bool isLODEnabled() const { return m_lodEnabled; }
+    // Additional LOD methods not in interface
     void setLODDistances(float distance1, float distance2);
     void getLODDistances(float& distance1, float& distance2) const;
-
-    // Performance monitoring
-    float getCurrentFPS() const { return m_fps; }
-    size_t getVisiblePointCount() const { return m_visiblePointCount; }
     size_t getOctreeNodeCount() const;
 
 public slots:
-    // View control slots
-    void setTopView();
-    void setLeftView();
-    void setRightView();
-    void setBottomView();
-
-    // Sprint 2.3: Loading feedback slots
-    void onLoadingStarted();
-    void onLoadingProgress(int percentage, const QString &stage);
+    // IPointCloudViewer interface slots implementation
+    void onLoadingStarted() override;
+    void onLoadingProgress(int percentage, const QString &stage) override;
     void onLoadingFinished(bool success, const QString &message,
-                          const std::vector<float> &points);
-
-    // Sprint 3.4: LOD control slots
-    void toggleLOD(bool enabled);
-    void setLODSubsampleRate(float rate);
-
-    // Sprint R2: Screen-space error LOD control slots
-    void setScreenSpaceErrorThreshold(float threshold);
-    void setPrimaryScreenSpaceErrorThreshold(float threshold);
-    void setCullScreenSpaceErrorThreshold(float threshold);
-
-    // Sprint R3: Attribute rendering and point size attenuation slots (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
-    void setRenderWithColor(bool enabled);
-    void setRenderWithIntensity(bool enabled);
-    void setPointSizeAttenuationEnabled(bool enabled);
-    void setPointSizeAttenuationParams(float minSize, float maxSize, float factor);
+                          const std::vector<float> &points) override;
+    void toggleLOD(bool enabled) override;
+    void setLODSubsampleRate(float rate) override;
+    void setScreenSpaceErrorThreshold(float threshold) override;
+    void setPrimaryScreenSpaceErrorThreshold(float threshold) override;
+    void setCullScreenSpaceErrorThreshold(float threshold) override;
 
     // Sprint R4: Splatting and lighting slots (Task R4.3.2)
     void setSplattingEnabled(bool enabled);
