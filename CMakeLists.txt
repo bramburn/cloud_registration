@@ -234,6 +234,10 @@ set(SOURCES
     src/registration/AlignmentEngine.cpp
     src/registration/ErrorAnalysis.cpp
     src/ui/AlignmentControlPanel.cpp
+    # Sprint 5: ICP Registration Algorithm
+    src/algorithms/ICPRegistration.cpp
+    src/algorithms/PointToPlaneICP.cpp
+    src/ui/ICPProgressWidget.cpp
 )
 
 # Header files
@@ -289,6 +293,10 @@ set(HEADERS
     src/registration/AlignmentEngine.h
     src/registration/ErrorAnalysis.h
     src/ui/AlignmentControlPanel.h
+    # Sprint 5: ICP Registration Algorithm
+    src/algorithms/ICPRegistration.h
+    src/algorithms/PointToPlaneICP.h
+    src/ui/ICPProgressWidget.h
 )
 
 # Shader files
@@ -576,7 +584,6 @@ if(TARGET GTest::gtest_main)
 
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
-
         # Sprint 1: OpenGL Renderer Tests
         add_executable(OpenGLRendererTests
             tests/test_opengl_renderer.cpp
@@ -667,7 +674,44 @@ if(TARGET GTest::gtest_main)
         target_include_directories(NaturalPointSelectorTests PRIVATE src)
         add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests)
+        # Sprint 5: ICP Registration Tests
+        add_executable(ICPRegistrationTests
+            tests/test_icp_registration.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+            src/registration/AlignmentEngine.cpp
+            src/ui/ICPProgressWidget.cpp
+        )
+
+        target_link_libraries(ICPRegistrationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Widgets
+            Qt6::Test
+        )
+
+        target_include_directories(ICPRegistrationTests PRIVATE src)
+        add_test(NAME ICPRegistrationTests COMMAND ICPRegistrationTests)
+
+        # Sprint 5: Point-to-Plane ICP Tests
+        add_executable(PointToPlaneICPTests
+            tests/test_point_to_plane_icp.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/PointToPlaneICP.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+        )
+
+        target_link_libraries(PointToPlaneICPTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Test
+        )
+
+        target_include_directories(PointToPlaneICPTests PRIVATE src)
+        add_test(NAME PointToPlaneICPTests COMMAND PointToPlaneICPTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests ICPRegistrationTests PointToPlaneICPTests)
 
     else()
         # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
@@ -760,7 +804,24 @@ if(TARGET GTest::gtest_main)
         target_include_directories(NaturalPointSelectorTests PRIVATE src)
         add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests)
+        # Sprint 5: Point-to-Plane ICP Tests (without Google Mock)
+        add_executable(PointToPlaneICPTests
+            tests/test_point_to_plane_icp.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/PointToPlaneICP.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+        )
+
+        target_link_libraries(PointToPlaneICPTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Test
+        )
+
+        target_include_directories(PointToPlaneICPTests PRIVATE src)
+        add_test(NAME PointToPlaneICPTests COMMAND PointToPlaneICPTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests PointToPlaneICPTests)
     endif()
 
     # Custom target to run all tests
