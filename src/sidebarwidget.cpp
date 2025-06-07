@@ -413,13 +413,12 @@ void SidebarWidget::onCreateSubCluster()
         return;
     }
 
+    QString parentClusterId = m_model->getItemId(m_contextItem);
     QString clusterName = promptForClusterName("Create New Sub-Cluster");
     if (clusterName.isEmpty()) {
         return;
     }
-
-    QString parentClusterId = m_model->getItemId(m_contextItem);
-
+    
     // Sprint 4: Emit signal instead of executing business logic
     emit clusterCreationRequested(clusterName, parentClusterId);
 }

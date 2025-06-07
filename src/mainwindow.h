@@ -49,6 +49,7 @@ public:
     void updateStatusBar(const QString& text) override;
     void setWindowTitle(const QString& title) override;
     IPointCloudViewer* getViewer() override;
+    SidebarWidget* getSidebar() override;
     void showProgressDialog(bool show, const QString& title = QString(), const QString& message = QString()) override;
     void updateProgress(int percentage, const QString& message) override;
     void setActionsEnabled(bool enabled) override;
@@ -62,6 +63,16 @@ public:
     QString askForOpenFilePath(const QString& title, const QString& filter) override;
     QString askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
     bool askForConfirmation(const QString& title, const QString& message) override;
+
+    // Sprint 3: Sidebar operation interface methods
+    QString promptForClusterName(const QString& title, const QString& defaultName = QString()) override;
+    void loadScan(const QString& scanId) override;
+    void unloadScan(const QString& scanId) override;
+    void loadCluster(const QString& clusterId) override;
+    void unloadCluster(const QString& clusterId) override;
+    void viewPointCloud(const QString& itemId, const QString& itemType) override;
+    void deleteScan(const QString& scanId, bool deletePhysicalFile) override;
+    void performBatchOperation(const QString& operation, const QStringList& scanIds) override;
 
     // Legacy methods for backward compatibility (non-virtual)
     void updateWindowTitle();

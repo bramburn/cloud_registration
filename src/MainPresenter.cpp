@@ -5,20 +5,25 @@
 #include "IPointCloudViewer.h"
 #include "projectmanager.h"
 #include "pointcloudloadmanager.h"
+#include "scaninfo.h"
+#include "sqlitemanager.h"
 #include <QFileInfo>
 #include <QDir>
+#include <QDebug>
 
 MainPresenter::MainPresenter(IMainView* view,
-                           IE57Parser* e57Parser,
-                           IE57Writer* e57Writer,
-                           QObject* parent)
+                             IE57Parser* e57Parser,
+                             IE57Writer* e57Writer,
+                             ProjectManager* projectManager,
+                             PointCloudLoadManager* loadManager,
+                             QObject* parent)
     : QObject(parent)
     , m_view(view)
     , m_e57Parser(e57Parser)
     , m_e57Writer(e57Writer)
     , m_viewer(nullptr)
-    , m_projectManager(nullptr)
-    , m_loadManager(nullptr)
+    , m_projectManager(projectManager)
+    , m_loadManager(loadManager)
     , m_isFileOpen(false)
     , m_isProjectOpen(false)
     , m_isParsingInProgress(false)
@@ -72,6 +77,40 @@ void MainPresenter::setupConnections() {
     if (m_viewer) {
         connect(m_viewer, &IPointCloudViewer::stateChanged, this, &MainPresenter::onViewerStateChanged);
         connect(m_viewer, &IPointCloudViewer::statsUpdated, this, &MainPresenter::onRenderingStatsUpdated);
+    }
+
+    // Connect sidebar signals if available
+    if (m_view) {
+        auto* sidebar = m_view->getSidebar();
+        if (sidebar) {
+            // Connect cluster operations
+            connect(sidebar, &SidebarWidget::clusterCreationRequested,
+                    this, &MainPresenter::handleClusterCreation);
+            connect(sidebar, &SidebarWidget::clusterRenameRequested,
+                    this, &MainPresenter::handleClusterRename);
+            connect(sidebar, &SidebarWidget::deleteClusterRequested,
+                    this, &MainPresenter::handleClusterDeletion);
+
+            // Connect scan operations
+            connect(sidebar, &SidebarWidget::loadScanRequested,
+                    this, &MainPresenter::handleScanLoad);
+            connect(sidebar, &SidebarWidget::unloadScanRequested,
+                    this, &MainPresenter::handleScanUnload);
+            connect(sidebar, &SidebarWidget::loadClusterRequested,
+                    this, &MainPresenter::handleClusterLoad);
+            connect(sidebar, &SidebarWidget::unloadClusterRequested,
+                    this, &MainPresenter::handleClusterUnload);
+            connect(sidebar, &SidebarWidget::viewPointCloudRequested,
+                    this, &MainPresenter::handlePointCloudView);
+            connect(sidebar, &SidebarWidget::deleteScanRequested,
+                    this, &MainPresenter::handleScanDeletion);
+            
+            // Connect new Sprint 4 operations
+            connect(sidebar, &SidebarWidget::clusterLockToggleRequested,
+                    this, &MainPresenter::handleClusterLockToggle);
+            connect(sidebar, &SidebarWidget::dragDropOperationRequested,
+                    this, &MainPresenter::handleDragDropOperation);
+        }
     }
 }
 
@@ -252,8 +291,8 @@ void MainPresenter::onParsingFinished(bool success, const QString& message, cons
         
         QFileInfo fileInfo(m_currentFilePath);
         m_view->updateStatusBar(QString("Loaded %1 points from %2")
-                               .arg(points.size() / 3)
-                               .arg(fileInfo.fileName()));
+                                .arg(points.size() / 3)
+                                .arg(fileInfo.fileName()));
         
         showInfo("File Opened", message);
     } else {
@@ -664,7 +703,7 @@ void MainPresenter::handleClusterLockToggle(const QString& clusterId, bool lock)
 }
 
 void MainPresenter::handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
-                                          const QString& targetItemId, const QString& targetType) {
+                                              const QString& targetItemId, const QString& targetType) {
     if (!m_projectManager) {
         showError("Drag and Drop", "Project manager is not available.");
         return;
