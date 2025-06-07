@@ -46,10 +46,20 @@ public:
     void setPointSizeAttenuationParams(float minSize, float maxSize, float factor) override;
     ViewerState getViewerState() const override { return m_currentState; }
     bool hasPointCloudData() const override { return m_hasData; }
+    bool hasData() const override { return m_hasData; }
     size_t getPointCount() const override { return static_cast<size_t>(m_pointCount); }
     QVector3D getGlobalOffset() const override { return m_globalOffset; }
     float getCurrentFPS() const override { return m_fps; }
     size_t getVisiblePointCount() const override { return m_visiblePointCount; }
+    void resetCamera() override;
+    void setFrontView() override;
+    void setPointSize(float size) override;
+    void setBackgroundColor(const QColor& color) override;
+    void setSplattingEnabled(bool enabled) override;
+    void setLightingEnabled(bool enabled) override;
+    void setLightDirection(const QVector3D& direction) override;
+    void setLightColor(const QColor& color) override;
+    void setAmbientIntensity(float intensity) override;
 
     // Additional public methods specific to PointCloudViewerWidget
     float getCameraYaw() const { return m_cameraYaw; }
@@ -80,11 +90,7 @@ public slots:
     void setCullScreenSpaceErrorThreshold(float threshold) override;
 
     // Sprint R4: Splatting and lighting slots (Task R4.3.2)
-    void setSplattingEnabled(bool enabled);
-    void setLightingEnabled(bool enabled);
-    void setLightDirection(const QVector3D& direction);
-    void setLightColor(const QColor& color);
-    void setAmbientIntensity(float intensity);
+    // Note: These methods are now declared in the interface implementation above
 
 signals:
     // Sprint 2.2: Performance monitoring signals

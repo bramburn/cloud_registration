@@ -199,6 +199,12 @@ set(SOURCES
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
     src/performance_profiler.cpp
+    src/progressmanager.cpp
+    src/pointcloudloadmanager.cpp
+    src/screenspaceerror.cpp
+    src/sqlitemanager.cpp
+    src/projecttreemodel.cpp
+    src/scanimportmanager.cpp
 )
 
 # Header files
@@ -223,6 +229,12 @@ set(HEADERS
     src/lasheadermetadata.h
     src/voxelgridfilter.h
     src/performance_profiler.h
+    src/progressmanager.h
+    src/pointcloudloadmanager.h
+    src/screenspaceerror.h
+    src/sqlitemanager.h
+    src/projecttreemodel.h
+    src/scanimportmanager.h
 )
 
 # Shader files

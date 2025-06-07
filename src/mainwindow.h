@@ -13,6 +13,7 @@
 #include "progressmanager.h"
 #include "projectmanager.h"
 #include "IPointCloudViewer.h"
+#include "IMainView.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
@@ -42,43 +43,47 @@ public:
     ~MainWindow();
 
     // IMainView interface implementation
-    void setWindowTitle(const QString& title) override;
-    void updateWindowTitle() override;
-    void updateStatusBar(const QString& text) override;
-    void setStatusReady() override;
-    void setStatusLoading(const QString& fileName) override;
-    void setStatusLoadSuccess(const QString& fileName, int pointCount) override;
-    void setStatusLoadFailed(const QString& fileName, const QString& message) override;
-    void setStatusViewChanged(const QString& viewName) override;
     void displayErrorMessage(const QString& title, const QString& message) override;
-    void displayWarningMessage(const QString& title, const QString& message) override;
     void displayInfoMessage(const QString& title, const QString& message) override;
-    void showProjectHub() override;
-    void transitionToProjectView(const QString& projectPath) override;
-    void enableProjectActions(bool enabled) override;
-    void showImportGuidance(bool show) override;
+    void displayWarningMessage(const QString& title, const QString& message) override;
+    void updateStatusBar(const QString& text) override;
+    void setWindowTitle(const QString& title) override;
     IPointCloudViewer* getViewer() override;
-    void showProgressDialog(const QString& title, const QString& message) override;
-    void updateProgressDialog(int percentage, const QString& stage) override;
-    void hideProgressDialog() override;
-    void updateMemoryDisplay(size_t totalBytes) override;
-    void updatePerformanceStats(float fps, int visiblePoints) override;
-    void setLoadingState(bool isLoading) override;
-    void updateLoadingProgress(int percentage, const QString& stage) override;
-    QString showOpenFileDialog(const QString& title, const QString& filter) override;
-    QString showOpenProjectDialog() override;
-    QString showSaveFileDialog(const QString& title, const QString& filter) override;
-    bool showLoadingSettingsDialog() override;
-    bool showCreateProjectDialog(QString& projectName, QString& projectPath) override;
-    bool showScanImportDialog() override;
-    void refreshScanList() override;
-    void enableViewControls(bool enabled) override;
-    void updateViewControlsState() override;
-    bool isProjectOpen() const override;
-    QString getCurrentProjectPath() const override;
-    Project* getCurrentProject() const override;
-    void prepareForShutdown() override;
-    void cleanupResources() override;
+    void showProgressDialog(bool show, const QString& title = QString(), const QString& message = QString()) override;
+    void updateProgress(int percentage, const QString& message) override;
+    void setActionsEnabled(bool enabled) override;
+    void setProjectTitle(const QString& projectName) override;
+    void updateScanList(const QStringList& scanNames) override;
+    void highlightScan(const QString& scanName) override;
+    void showProjectHub() override;
+    void showProjectView() override;
+    void updateMemoryUsage(size_t totalBytes) override;
+    void updateRenderingStats(float fps, int visiblePoints) override;
+    QString askForOpenFilePath(const QString& title, const QString& filter) override;
+    QString askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
+    bool askForConfirmation(const QString& title, const QString& message) override;
+
+    // Legacy methods for backward compatibility (non-virtual)
+    void updateWindowTitle();
+    void hideProgressDialog();
+    void updateMemoryDisplay(size_t totalBytes);
+    void updatePerformanceStats(float fps, int visiblePoints);
+    void setLoadingState(bool isLoading);
+    void updateLoadingProgress(int percentage, const QString& stage);
+    QString showOpenFileDialog(const QString& title, const QString& filter);
+    QString showOpenProjectDialog();
+    QString showSaveFileDialog(const QString& title, const QString& filter);
+    bool showLoadingSettingsDialog();
+    bool showCreateProjectDialog(QString& projectName, QString& projectPath);
+    bool showScanImportDialog();
+    void refreshScanList();
+    void enableViewControls(bool enabled);
+    void updateViewControlsState();
+    bool isProjectOpen() const;
+    QString getCurrentProjectPath() const;
+    Project* getCurrentProject() const;
+    void prepareForShutdown();
+    void cleanupResources();
 
 private slots:
     // Simplified slots that delegate to presenter

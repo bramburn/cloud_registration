@@ -26,18 +26,15 @@ enum class ViewerState {
  * allowing for easy testing with mock implementations and future substitution
  * of different rendering engines.
  *
- * Sprint 3 Decoupling Requirements:
+ * Sprint 1 Decoupling Requirements:
  * - Provides abstraction layer for 3D rendering operations
  * - Enables dependency injection and polymorphic usage
  * - Supports unit testing with mock implementations
  * - Maintains compatibility with existing MainWindow interface
- * - Follows the same pattern as IPointCloudProcessor and IE57Parser
+ * - Does not inherit from QObject to avoid multiple inheritance issues
  */
-class IPointCloudViewer : public QObject {
-    Q_OBJECT
-
+class IPointCloudViewer {
 public:
-    explicit IPointCloudViewer(QObject *parent = nullptr) : QObject(parent) {}
     virtual ~IPointCloudViewer() = default;
 
     // --- Data Management ---
@@ -197,6 +194,14 @@ public:
     virtual bool hasPointCloudData() const = 0;
 
     /**
+     * @brief Check if point cloud data is loaded (legacy method name)
+     * @return true if data is loaded, false otherwise
+     */
+    virtual bool hasData() const = 0;
+
+
+
+    /**
      * @brief Get the number of points currently loaded
      * @return Number of points
      */
@@ -222,23 +227,22 @@ public:
      */
     virtual size_t getVisiblePointCount() const = 0;
 
-public slots:
-    // --- Loading Feedback Slots ---
+    // --- Loading Feedback Methods ---
 
     /**
-     * @brief Slot called when loading operation starts
+     * @brief Method called when loading operation starts
      */
     virtual void onLoadingStarted() = 0;
 
     /**
-     * @brief Slot called during loading to report progress
+     * @brief Method called during loading to report progress
      * @param percentage Progress percentage (0-100)
      * @param stage Current loading stage description
      */
     virtual void onLoadingProgress(int percentage, const QString& stage) = 0;
 
     /**
-     * @brief Slot called when loading operation finishes
+     * @brief Method called when loading operation finishes
      * @param success True if loading succeeded, false if failed
      * @param message Status message
      * @param points Loaded point data (if successful)
@@ -246,7 +250,7 @@ public slots:
     virtual void onLoadingFinished(bool success, const QString& message,
                                    const std::vector<float>& points) = 0;
 
-    // --- LOD Control Slots ---
+    // --- LOD Control Methods ---
 
     /**
      * @brief Toggle LOD rendering on/off
@@ -265,55 +269,6 @@ public slots:
      * @param threshold Error threshold in pixels
      */
     virtual void setScreenSpaceErrorThreshold(float threshold) = 0;
-
-signals:
-    // --- Data Operation Signals ---
-
-    /**
-     * @brief Emitted when point cloud loading starts
-     */
-    void pointCloudLoadingStarted();
-
-    /**
-     * @brief Emitted when point cloud data is successfully loaded
-     * @param points The loaded point data
-     */
-    void pointCloudLoaded(const std::vector<float>& points);
-
-    /**
-     * @brief Emitted when point cloud loading fails
-     * @param error Error description
-     */
-    void pointCloudLoadFailed(const QString& error);
-
-    /**
-     * @brief Emitted when point cloud data is cleared
-     */
-    void pointCloudCleared();
-
-    // --- State & Error Signals ---
-
-    /**
-     * @brief Emitted when the viewer state changes
-     * @param newState The new viewer state
-     * @param message Optional status message
-     */
-    void stateChanged(ViewerState newState, const QString& message);
-
-    /**
-     * @brief Emitted when a rendering error occurs
-     * @param error Error description
-     */
-    void renderingError(const QString& error);
-
-    // --- Performance Signals ---
-
-    /**
-     * @brief Emitted when rendering statistics are updated
-     * @param fps Current frame rate
-     * @param visiblePoints Number of visible points
-     */
-    void statsUpdated(float fps, int visiblePoints);
 };
 
 #endif // IPOINTCLOUDVIEWER_H
