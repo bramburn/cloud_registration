@@ -1,122 +1,194 @@
-Product Requirements Document: Decoupling C++ Components for E57 Point Cloud Processing
-1. Introduction
+Product Requirements Document: Core Component Decoupling
 
-This document outlines the plan for decoupling several key components within the E57 point cloud processing application. The goal is to improve the codebase's modularity, testability, and maintainability by applying the SOLID principles of object-oriented design. These principles encourage creating more understandable, flexible, and maintainable software. This refactoring effort will focus on the following files, which have been identified as having high coupling and complexity:
+Author: Gemini
+Date: June 7, 2024
+Version: 1.0
+1. Introduction & Overview
 
-    tests/test_e57writer_lib.cpp: The test suite for the E57 writer, which is currently tightly bound to the concrete implementation.
+This document outlines the requirements for a significant technical refactoring initiative. The primary goal is to decouple a set of large, monolithic C++ files within the Cloud Registration application. The current state of these files presents challenges in maintainability, testability, and scalability. By breaking them down into smaller, more focused, and loosely-coupled components, we aim to improve the overall health of the codebase, reduce complexity, and increase development velocity for future features.
 
-    src/pointcloudviewerwidget.cpp: The widget responsible for rendering point cloud data, which has business logic intertwined with its presentation logic.
+Target Files for Decoupling:
 
-    src/e57parserlib.cpp: The core library for parsing E57 files, which is directly referenced by multiple components.
+    src/pointcloudviewerwidget.cpp
 
-    src/mainwindow.cpp: The main application window, which acts as a central hub with too many responsibilities.
+    src/mainwindow.cpp
 
-    src/e57writer_lib.cpp: The core library for writing E57 files.
+    src/e57parserlib.cpp
+
+    src/projectmanager.cpp
+
+    src/sidebarwidget.cpp
 
 2. Problem Statement
 
-The current implementation of the E57 point cloud processing application exhibits tight coupling between its components. This tight coupling makes the codebase difficult to maintain, test, and extend. A change in one component, such as a modification to the file parsing logic, can cause a ripple effect of required changes across the user interface, testing framework, and even unrelated business logic. Specifically, the following issues have been identified:
+The identified C++ source files have grown significantly over time, leading to several issues:
 
-    Lack of clear separation of concerns: Components are responsible for multiple, unrelated tasks. For instance, the MainWindow class currently handles not only user interface events but also directly manages file parsing logic, making it difficult to test the parsing functionality independently of the UI.
+    High Coupling & Low Cohesion: Classes have multiple, unrelated responsibilities (e.g., UI logic mixed with business logic, data parsing mixed with state management). This makes the code difficult to understand, modify, and debug.
 
-    High dependency on concrete implementations: Components are directly dependent on other concrete classes, making it difficult to swap out implementations or test components in isolation. This rigid structure prevents us from, for example, easily substituting a different E57 parsing library or mocking the parser for testing purposes.
+    Poor Testability: The monolithic nature of these files makes it nearly impossible to write effective unit tests, leading to a reliance on manual, end-to-end testing which is slow and less reliable.
 
-    Complex and monolithic classes: Some classes have grown to be very large and complex, making them difficult to understand and modify. This increases the cognitive load on developers and raises the risk of introducing bugs when making changes.
+    Increased Risk of Regression: A small change in one part of a large file can have unintended consequences in another, increasing the risk of introducing bugs.
 
-3. Goals
+    Onboarding Difficulty: New developers face a steep learning curve in understanding the complex interactions within these large files.
 
-The primary goals of this decoupling effort are to:
+    Reduced Development Speed: Modifying or extending functionality is slow and cumbersome due to the high cognitive load and complexity of the existing code.
 
-    Improve modularity: Break down the codebase into smaller, more manageable components with well-defined responsibilities. This will result in a system where components can be developed, tested, and replaced independently, reducing development friction and enabling parallel workstreams.
+3. Goals & Objectives
 
-    Enhance testability: Enable unit testing of individual components in isolation. By isolating components, we can write focused unit tests that verify specific functionality, leading to a more robust and reliable application and faster feedback cycles during development.
+The primary objective is to refactor the target files to adhere to modern software design principles, specifically the Single Responsibility Principle (SRP) and Dependency Inversion.
 
-    Increase maintainability: Make the codebase easier to understand, modify, and extend. A well-structured, decoupled codebase is easier for new developers to understand and for existing developers to modify without introducing unintended side effects.
+Key Goals:
 
-    Promote code reuse: Create reusable components that can be shared across different parts of the application. Decoupled components, such as the E57 parser, can be more easily reused in other projects or tools, maximizing the value of the development effort.
+    Reduce Complexity: Break down large classes into smaller, more manageable ones with clear responsibilities.
 
-4. Non-Goals
+    Improve Maintainability: Create a codebase that is easier to read, understand, and modify.
 
-This refactoring effort is strictly focused on architectural improvement and will not:
+    Enhance Testability: Structure the code to allow for comprehensive unit and integration testing.
 
-    Introduce new user-facing features: The primary focus is on improving the existing codebase's internal quality, not adding new functionality from a user's perspective.
+    Increase Code Reusability: Develop modular components that can be reused across the application.
 
-    Change the application's overall architecture fundamentally: The goal is to refactor the existing components by applying SOLID principles, not to redesign the application from the ground up with a completely different architectural pattern.
+    Lower Lines of Code (LOC): Achieve a measurable reduction in LOC for the specified files by eliminating redundancy and improving abstraction.
 
-5. Phases and Sprints
+4. Scope
+In Scope
 
-The decoupling effort will be broken down into the following phases and sprints:
-Phase 1: Core Library Decoupling
-Sprint 1: Decoupling e57parserlib
+    Refactoring the five specified C++ files.
 
-    Goal: Decouple the e57parserlib component from the rest of the application, making it a self-contained, testable unit.
+    Creating new classes, interfaces, and modules to house the decoupled logic.
 
-    Tasks:
+    Implementing design patterns (e.g., Model-View-Presenter, Strategy, Facade) to separate concerns.
 
-        Create an abstract interface (IE57Parser) for the E57 parser. This interface will define the contract for parsing operations, such as openFile(path), getScanCount(), and readPoints(scanIndex).
+    Creating a suite of unit tests for the new, decoupled components.
 
-        Modify the e57parserlib to implement the new IE57Parser interface. This ensures that the existing functionality is preserved while adhering to the new contract.
+    Ensuring the application's external behavior remains unchanged after refactoring.
 
-        Update the rest of the application to use the IE57Parser interface instead of the concrete e57parserlib implementation. This will involve using dependency injection or a factory pattern to provide the concrete parser to classes that need it, breaking the direct compile-time dependency.
+Out of Scope
 
-Sprint 2: Decoupling e57writer_lib
+    Adding any new user-facing features.
 
-    Goal: Decouple the e57writer_lib component from the rest of the application.
+    Changing the existing UI/UX design.
 
-    Tasks:
+    Refactoring files not on the specified list.
 
-        Create an abstract interface (IE57Writer) for the E57 writer. This interface will define methods like createFile(path), addScan(), and writePoints(points).
+    Changing the application's core technology stack (Qt, C++).
 
-        Modify the e57writer_lib to implement the new IE57Writer interface.
+5. Technical Requirements
 
-        Update the rest of the application to depend on the IE57Writer interface, removing direct dependencies on the concrete writer class.
+    The refactored code must be written in C++17 or later.
 
-Phase 2: UI and Application Logic Decoupling
-Sprint 3: Decoupling pointcloudviewerwidget
+    The solution must integrate seamlessly with the existing Qt 6 framework.
 
-    Goal: Decouple the pointcloudviewerwidget component from business logic and data sources.
+    All new, decoupled business logic must be covered by unit tests (e.g., using GTest/GMock).
 
-    Tasks:
+    Interfaces (abstract base classes) must be used to decouple components, particularly between UI and business logic.
 
-        Create an abstract interface (IPointCloudViewer) for the point cloud viewer. This will define methods like loadPointCloud(data) and clear().
+    The refactoring should not result in any performance degradation. Performance benchmarks should be established before and after the refactoring.
 
-        Modify the pointcloudviewerwidget to implement the IPointCloudViewer interface.
+6. Phased Rollout Plan
 
-        Update the rest of the application to interact with the viewer through the IPointCloudViewer interface, promoting a cleaner separation between UI and application logic.
+This project will be executed in three phases, broken down into two-week sprints.
+Phase 1: Foundational Decoupling (4 Weeks)
 
-Sprint 4: Decoupling mainwindow
+    Sprint 1: Interface Abstraction
 
-    Goal: Reduce the complexity of the mainwindow component by delegating responsibilities to other classes.
+        Goal: Create abstractions for the main UI components to break the direct dependency between UI and business logic.
 
-    Tasks:
+        Tasks:
 
-        Create an abstract interface (IMainWindow) for the main window, exposing only the necessary functionality to other components.
+            Define and implement IPointCloudViewer and IMainView interfaces based on the public-facing logic in pointcloudviewerwidget.cpp and mainwindow.cpp.
 
-        Refactor the mainwindow to delegate file parsing, writing, and viewing logic to the newly decoupled components via their interfaces. This will make the MainWindow primarily a coordinator of UI events.
+            Modify MainWindow to interact with the viewer through the IPointCloudViewer interface.
 
-        Update the application's entry point to use the IMainWindow interface where possible.
+            Introduce a MainPresenter to begin mediating between the view and the backend services.
 
-Phase 3: Testing and Validation
-Sprint 5: Decoupling Tests
+    Sprint 2: Parser Refactoring
 
-    Goal: Decouple the automated tests from the concrete component implementations to improve test robustness and maintainability.
+        Goal: Decouple the E57 file parsing logic.
 
-    Tasks:
+        Tasks:
 
-        Update the unit and integration tests to use the new abstract interfaces (IE57Parser, IE57Writer, etc.).
+            Analyze e57parserlib.cpp and identify the core parsing logic versus the Qt-specific wrapper code.
 
-        Create mock implementations of the abstract interfaces for testing purposes. For example, when testing MainWindow, we will provide a mock implementation of the parser interface that returns predefined data, allowing us to test the main window's behavior without needing an actual E57 file.
+            Extract the core parsing logic into a separate, non-Qt-dependent module.
 
-        Ensure that all tests pass after the decoupling effort to verify that no regressions have been introduced.
+            Ensure the E57ParserLib class acts as a thin wrapper that adapts the core parser to the existing IE57Parser interface.
 
-6. Success Metrics
+            Write unit tests for the new core parsing module.
 
-The success of this decoupling effort will be measured by the following metrics:
+Phase 2: Component Separation (4 Weeks)
 
-    Code coverage: We will aim for a code coverage of at least 80% for the decoupled components, which is a significant increase from the current state. This ensures that the new, more testable architecture is actually being tested effectively.
+    Sprint 3: Project Management Decoupling
 
-    Cyclomatic complexity: We will aim to reduce the cyclomatic complexity of key classes like MainWindow and e57parserlib by at least 20%, indicating a reduction in code complexity and making the code easier to understand and maintain.
+        Goal: Break down the ProjectManager into smaller, focused services.
 
-    Component coupling: We will use static analysis tools to measure the coupling between components, aiming for a significant reduction in afferent (incoming) and efferent (outgoing) coupling for the refactored classes. This will be a direct measure of our success in decoupling.
+        Tasks:
 
-    Number of bugs: A reduction in the number of regression bugs reported in the six months following the refactoring will be a key indicator of improved maintainability and stability. Fewer unexpected side effects from changes will demonstrate the value of this architectural improvement.
+            Separate the recent projects logic from ProjectManager into the existing RecentProjectsManager class, ensuring it's fully independent.
+
+            Create a new ProjectStateService to manage the currently active project state, removing that responsibility from ProjectManager.
+
+            Refactor ProjectManager to be a facade that coordinates these smaller services.
+
+    Sprint 4: UI Logic Separation
+
+        Goal: Decouple the business logic from the SidebarWidget.
+
+        Tasks:
+
+            Analyze sidebarwidget.cpp to identify logic not directly related to UI rendering (e.g., handling context menu actions, drag-and-drop logic).
+
+            Move this logic into the MainPresenter or a new dedicated controller.
+
+            The SidebarWidget should only be responsible for displaying data and emitting signals in response to user actions.
+
+Phase 3: Integration & Validation (4 Weeks)
+
+    Sprint 5: Full Integration
+
+        Goal: Ensure all decoupled components are fully integrated and the application is stable.
+
+        Tasks:
+
+            Perform end-to-end testing of all refactored user flows (e.g., opening a project, importing a scan, interacting with the viewer).
+
+            Resolve any integration issues that arise.
+
+            Conduct performance testing to ensure no regressions have been introduced.
+
+    Sprint 6: Test Suite Finalization & Documentation
+
+        Goal: Finalize the testing suite and document the new architecture.
+
+        Tasks:
+
+            Complete unit and integration test coverage for all new modules.
+
+            Update developer documentation to reflect the new, decoupled architecture.
+
+            Measure and document the final success metrics.
+
+7. Success Metrics
+
+    LOC Reduction: A minimum of a 25% reduction in the total lines of code across the five target files.
+
+    Unit Test Coverage: Achieve at least 70% unit test coverage for all new, decoupled modules.
+
+    Code Complexity: A measurable reduction in the cyclomatic complexity of the original classes.
+
+    Build Time: A noticeable improvement in incremental build times after modifying a decoupled component compared to modifying the original monolithic file.
+
+    Qualitative Feedback: Positive feedback from the development team regarding the ease of understanding and working with the new code structure.
+
+8. Risks & Mitigation
+
+    Risk: Introducing regressions or breaking existing functionality.
+
+        Mitigation: A comprehensive suite of manual and automated tests will be run at the end of each phase. The phased approach limits the scope of potential issues at each step.
+
+    Risk: The refactoring effort takes longer than anticipated.
+
+        Mitigation: The work is broken into discrete, two-week sprints. If a sprint's goals are not met, the scope will be reassessed. The highest-impact files are tackled first to ensure maximum value early on.
+
+    Risk: Performance degradation due to increased abstractions.
+
+        Mitigation: Performance benchmarks will be established before starting and measured after each phase. Hot paths will be profiled to ensure abstractions do not introduce significant overhead.
