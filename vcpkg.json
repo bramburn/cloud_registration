@@ -4,6 +4,7 @@
   "dependencies": [
     "libe57format",
     "xerces-c",
-    "gtest"
+    "gtest",
+    "vulkan"
   ]
 }

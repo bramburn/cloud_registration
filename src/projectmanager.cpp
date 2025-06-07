@@ -146,44 +146,7 @@ bool ProjectManager::isValidProject(const QString &projectPath)
     }
 }
 
-ProjectInfo ProjectManager::loadProject(const QString &projectPath)
-{
-    if (!isValidProject(projectPath)) {
-        throw ProjectLoadException(QString("Invalid project directory: %1").arg(projectPath));
-    }
-    
-    try {
-        QJsonObject metadata = readProjectMetadata(projectPath);
-        
-        ProjectInfo info;
-        info.projectId = metadata["projectID"].toString();
-        info.projectName = metadata["projectName"].toString();
-        info.creationDate = metadata["creationDate"].toString();
-        info.fileFormatVersion = metadata["fileFormatVersion"].toString();
-        info.projectPath = projectPath;
-        
-        if (!info.isValid()) {
-            throw ProjectLoadException("Project metadata is incomplete or invalid");
-        }
-
-        // Store current project info for cluster management
-        m_currentProject = info;
-
-        // Open the project database
-        QString dbPath = getDatabasePath(projectPath);
-        if (!m_sqliteManager->openDatabase(dbPath)) {
-            qWarning() << "Failed to open project database:" << dbPath;
-        }
-
-        qInfo() << "Project loaded successfully:" << info.projectName;
-        return info;
-        
-    } catch (const ProjectLoadException&) {
-        throw;
-    } catch (const std::exception& e) {
-        throw ProjectLoadException(QString("Failed to load project: %1").arg(e.what()));
-    }
-}
+// Removed duplicate loadProject method - using the enhanced version below that returns ProjectLoadResult
 
 bool ProjectManager::validateProjectMetadata(const QJsonObject &metadata)
 {

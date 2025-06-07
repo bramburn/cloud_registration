@@ -6,7 +6,7 @@
 #include "project.h"
 #include "pointcloudviewerwidget.h"
 #include "pointcloudloadmanager.h"
-#include "e57parserlib.h"
+#include "IE57Parser.h"
 #include "lasparser.h"
 #include "loadingsettingsdialog.h"
 #include "lasheadermetadata.h"
@@ -62,6 +62,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_parserThread(nullptr)
     , m_workerParser(nullptr)
     , m_isLoading(false)
+    , m_e57Parser(nullptr)
     , m_currentScanCount(0)
     , m_statusLabel(nullptr)
     , m_permanentStatusLabel(nullptr)
@@ -127,6 +128,54 @@ MainWindow::MainWindow(QWidget *parent)
         connect(m_loadManager, &PointCloudLoadManager::pointCloudViewFailed,
                 this, &MainWindow::onPointCloudViewFailed);
 
+        // Sprint 1.3: Connect E57 loading signals
+        connect(m_loadManager, &PointCloudLoadManager::loadingStarted,
+                this, [this](const QString& message) {
+                    statusBar()->showMessage(message);
+                    setCursor(Qt::WaitCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::loadingCompleted,
+                this, [this]() {
+                    setCursor(Qt::ArrowCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::statusUpdate,
+                this, [this](const QString& status) {
+                    statusBar()->showMessage(status);
+                });
+
+        // Sprint 2.1: Connect enhanced state management signals
+        connect(m_loadManager, &PointCloudLoadManager::batchOperationProgress,
+                this, [this](const QString& operation, int completed, int total) {
+                    QString message = QString("Batch %1: %2/%3 completed").arg(operation).arg(completed).arg(total);
+                    statusBar()->showMessage(message);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Preprocessing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Preprocessing completed: %1").arg(scanId) :
+                        QString("Preprocessing failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Optimizing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Optimization completed: %1").arg(scanId) :
+                        QString("Optimization failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
         // Set window properties
         qDebug() << "Setting window properties...";
         updateWindowTitle();
@@ -139,6 +188,160 @@ MainWindow::MainWindow(QWidget *parent)
         setStatusReady();
 
         qDebug() << "MainWindow constructor completed successfully";
+    } catch (const std::exception& e) {
+        qCritical() << "Exception in MainWindow constructor:" << e.what();
+        throw;
+    } catch (...) {
+        qCritical() << "Unknown exception in MainWindow constructor";
+        throw;
+    }
+}
+
+// Sprint 1 Decoupling: Constructor with dependency injection
+MainWindow::MainWindow(IE57Parser* e57Parser, QWidget *parent)
+    : QMainWindow(parent)
+    , m_centralStack(nullptr)
+    , m_projectHub(nullptr)
+    , m_projectView(nullptr)
+    , m_projectSplitter(nullptr)
+    , m_sidebar(nullptr)
+    , m_mainContentArea(nullptr)
+    , m_viewer(nullptr)
+    , m_progressDialog(nullptr)
+    , m_projectManager(new ProjectManager(this))
+    , m_loadManager(new PointCloudLoadManager(this))
+    , m_currentProject(nullptr)
+    , m_newProjectAction(nullptr)
+    , m_openProjectAction(nullptr)
+    , m_closeProjectAction(nullptr)
+    , m_importScansAction(nullptr)
+    , m_loadingSettingsAction(nullptr)
+    , m_topViewAction(nullptr)
+    , m_leftViewAction(nullptr)
+    , m_rightViewAction(nullptr)
+    , m_bottomViewAction(nullptr)
+    , m_importGuidanceWidget(nullptr)
+    , m_importGuidanceButton(nullptr)
+    , m_lasParser(nullptr)
+    , m_parserThread(nullptr)
+    , m_workerParser(nullptr)
+    , m_isLoading(false)
+    , m_e57Parser(e57Parser)
+    , m_currentScanCount(0)
+    , m_statusLabel(nullptr)
+    , m_permanentStatusLabel(nullptr)
+    , m_currentPointCount(0)
+    , m_colorRenderCheckbox(nullptr)
+    , m_intensityRenderCheckbox(nullptr)
+    , m_attenuationCheckbox(nullptr)
+    , m_minSizeSlider(nullptr)
+    , m_maxSizeSlider(nullptr)
+    , m_attenuationFactorSlider(nullptr)
+    , m_minSizeLabel(nullptr)
+    , m_maxSizeLabel(nullptr)
+    , m_attenuationFactorLabel(nullptr)
+{
+    qDebug() << "MainWindow constructor (with injected E57Parser) started";
+
+    try {
+        // Set parent for injected parser if needed
+        if (m_e57Parser && !m_e57Parser->parent()) {
+            m_e57Parser->setParent(this);
+        }
+
+        qDebug() << "Setting up UI...";
+        setupUI();
+        qDebug() << "UI setup completed";
+
+        qDebug() << "Setting up menu bar...";
+        setupMenuBar();
+        qDebug() << "Menu bar setup completed";
+
+        qDebug() << "Setting up status bar...";
+        setupStatusBar();
+        qDebug() << "Status bar setup completed";
+
+        // Initialize legacy parsers for point cloud loading
+        qDebug() << "Initializing parsers...";
+        m_lasParser = new LasParser(this);
+        qDebug() << "Parsers initialized";
+
+        // Sprint 1.2: Connect project manager signals
+        connect(m_projectManager, &ProjectManager::scansImported,
+                this, &MainWindow::onScansImported);
+        connect(m_projectManager, &ProjectManager::projectScansChanged,
+                this, [this]() {
+                    if (m_sidebar) {
+                        m_sidebar->refreshFromDatabase();
+                    }
+                });
+
+        // Sprint 3.2: Connect point cloud load manager signals
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudDataReady,
+                this, &MainWindow::onPointCloudDataReady);
+        connect(m_loadManager, &PointCloudLoadManager::pointCloudViewFailed,
+                this, &MainWindow::onPointCloudViewFailed);
+
+        // Sprint 1.3: Connect E57 loading signals
+        connect(m_loadManager, &PointCloudLoadManager::loadingStarted,
+                this, [this](const QString& message) {
+                    statusBar()->showMessage(message);
+                    setCursor(Qt::WaitCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::loadingCompleted,
+                this, [this]() {
+                    setCursor(Qt::ArrowCursor);
+                });
+        connect(m_loadManager, &PointCloudLoadManager::statusUpdate,
+                this, [this](const QString& status) {
+                    statusBar()->showMessage(status);
+                });
+
+        // Sprint 2.1: Connect enhanced state management signals
+        connect(m_loadManager, &PointCloudLoadManager::batchOperationProgress,
+                this, [this](const QString& operation, int completed, int total) {
+                    QString message = QString("Batch %1: %2/%3 completed").arg(operation).arg(completed).arg(total);
+                    statusBar()->showMessage(message);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Preprocessing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::preprocessingFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Preprocessing completed: %1").arg(scanId) :
+                        QString("Preprocessing failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationStarted,
+                this, [this](const QString& scanId) {
+                    statusBar()->showMessage(QString("Optimizing scan: %1").arg(scanId));
+                });
+
+        connect(m_loadManager, &PointCloudLoadManager::optimizationFinished,
+                this, [this](const QString& scanId, bool success) {
+                    QString message = success ?
+                        QString("Optimization completed: %1").arg(scanId) :
+                        QString("Optimization failed: %1").arg(scanId);
+                    statusBar()->showMessage(message, 3000);
+                });
+
+        // Set window properties
+        qDebug() << "Setting window properties...";
+        updateWindowTitle();
+        setMinimumSize(1000, 700);
+        resize(1200, 800);
+        qDebug() << "Window properties set";
+
+        // Start with Project Hub
+        m_centralStack->setCurrentWidget(m_projectHub);
+        setStatusReady();
+
+        qDebug() << "MainWindow constructor (with injected E57Parser) completed successfully";
     } catch (const std::exception& e) {
         qCritical() << "Exception in MainWindow constructor:" << e.what();
         throw;
@@ -335,6 +538,29 @@ void MainWindow::setupStatusBar()
     // Sprint 3.4: Setup memory display
     setupMemoryDisplay();
 
+    // Sprint 2.2: Setup performance statistics display
+    m_fpsLabel = new QLabel(this);
+    m_fpsLabel->setText("FPS: 0.0");
+    m_fpsLabel->setMinimumWidth(80);
+    m_fpsLabel->setAlignment(Qt::AlignCenter);
+    m_fpsLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    m_pointsLabel = new QLabel(this);
+    m_pointsLabel->setText("Points: 0");
+    m_pointsLabel->setMinimumWidth(100);
+    m_pointsLabel->setAlignment(Qt::AlignCenter);
+    m_pointsLabel->setStyleSheet("QLabel { color: #666; margin: 0 5px; }");
+
+    // Add performance labels to status bar
+    statusBar()->addPermanentWidget(m_fpsLabel);
+    statusBar()->addPermanentWidget(m_pointsLabel);
+
+    // Connect to viewer performance statistics
+    if (m_viewer) {
+        connect(m_viewer, &PointCloudViewerWidget::statsUpdated,
+                this, &MainWindow::onStatsUpdated);
+    }
+
     // Setup status bar style
     statusBar()->setStyleSheet(
         "QStatusBar { border-top: 1px solid #cccccc; }"
@@ -420,12 +646,23 @@ void MainWindow::onOpenFileClicked()
 
     // Create parser instance for the worker thread
     if (extension == "e57") {
-        E57ParserLib* e57Worker = new E57ParserLib();
+        // Sprint 1 Decoupling: Use injected parser if available, otherwise create default
+        IE57Parser* e57Worker = nullptr;
+        if (m_e57Parser) {
+            // Use the injected parser (for testing or custom implementations)
+            e57Worker = m_e57Parser;
+        } else {
+            // Create default implementation for normal operation
+            // Note: We need to include the concrete class for fallback
+            QMessageBox::warning(this, "Error", "No E57 parser available. Please use dependency injection.");
+            return;
+        }
+
         e57Worker->moveToThread(m_parserThread);
         m_workerParser = e57Worker;
 
-        // Convert dialog settings to E57ParserLib::LoadingSettings
-        E57ParserLib::LoadingSettings e57Settings;
+        // Convert dialog settings to IE57Parser::LoadingSettings
+        IE57Parser::LoadingSettings e57Settings;
         e57Settings.loadIntensity = loadingSettings.parameters.value("loadIntensity", true).toBool();
         e57Settings.loadColor = loadingSettings.parameters.value("loadColor", true).toBool();
         e57Settings.maxPointsPerScan = loadingSettings.parameters.value("maxPoints", -1).toInt();
@@ -437,22 +674,22 @@ void MainWindow::onOpenFileClicked()
         });
 
         // Connect progress updates
-        connect(e57Worker, &E57ParserLib::progressUpdated, this, &MainWindow::onParsingProgressUpdated, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::progressUpdated, this, &MainWindow::onParsingProgressUpdated, Qt::QueuedConnection);
 
         // Connect parsing finished
-        connect(e57Worker, &E57ParserLib::parsingFinished, this, &MainWindow::onParsingFinished, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::parsingFinished, this, &MainWindow::onParsingFinished, Qt::QueuedConnection);
 
         // Connect additional E57-specific signals
-        connect(e57Worker, &E57ParserLib::scanMetadataAvailable, this, &MainWindow::onScanMetadataReceived, Qt::QueuedConnection);
-        connect(e57Worker, &E57ParserLib::intensityDataExtracted, this, &MainWindow::onIntensityDataReceived, Qt::QueuedConnection);
-        connect(e57Worker, &E57ParserLib::colorDataExtracted, this, &MainWindow::onColorDataReceived, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::scanMetadataAvailable, this, &MainWindow::onScanMetadataReceived, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::intensityDataExtracted, this, &MainWindow::onIntensityDataReceived, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::colorDataExtracted, this, &MainWindow::onColorDataReceived, Qt::QueuedConnection);
 
         // Sprint 2.3: Connect to viewer for visual feedback
-        connect(e57Worker, &E57ParserLib::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
-        connect(e57Worker, &E57ParserLib::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
 
         // Connect thread cleanup
-        connect(e57Worker, &E57ParserLib::parsingFinished, [this, e57Worker]() {
+        connect(e57Worker, &IE57Parser::parsingFinished, [this, e57Worker]() {
             cleanupParsingThread(e57Worker);
         });
 
@@ -613,6 +850,28 @@ void MainWindow::cleanupParsingThread()
         m_parserThread->wait();
         m_parserThread->deleteLater();
         m_parserThread = nullptr;
+    }
+}
+
+void MainWindow::cleanupParsingThread(QObject* parser)
+{
+    if (m_parserThread) {
+        m_parserThread->quit();
+        m_parserThread->wait(5000); // Wait up to 5 seconds
+
+        if (m_parserThread->isRunning()) {
+            qWarning() << "Parser thread did not quit gracefully, terminating";
+            m_parserThread->terminate();
+            m_parserThread->wait(1000);
+        }
+
+        m_parserThread->deleteLater();
+        m_parserThread = nullptr;
+    }
+
+    if (parser) {
+        parser->deleteLater();
+        m_workerParser = nullptr;
     }
 }
 
@@ -809,7 +1068,33 @@ void MainWindow::onProjectOpened(const QString &projectPath)
 {
     try {
         // Load project using ProjectManager
-        auto projectInfo = m_projectManager->loadProject(projectPath);
+        auto loadResult = m_projectManager->loadProject(projectPath);
+
+        if (loadResult != ProjectLoadResult::Success) {
+            QString errorMsg = "Failed to load project";
+            switch (loadResult) {
+                case ProjectLoadResult::MetadataCorrupted:
+                    errorMsg = "Project metadata is corrupted";
+                    break;
+                case ProjectLoadResult::DatabaseCorrupted:
+                    errorMsg = "Project database is corrupted";
+                    break;
+                case ProjectLoadResult::DatabaseMissing:
+                    errorMsg = "Project database is missing";
+                    break;
+                case ProjectLoadResult::MetadataMissing:
+                    errorMsg = "Project metadata is missing";
+                    break;
+                default:
+                    errorMsg = "Unknown error loading project";
+                    break;
+            }
+            QMessageBox::critical(this, "Project Load Error", errorMsg);
+            return;
+        }
+
+        // Get project info using legacy method for Project object creation
+        auto projectInfo = m_projectManager->loadProjectLegacy(projectPath);
 
         // Create Project object
         delete m_currentProject;
@@ -838,6 +1123,50 @@ void MainWindow::transitionToProjectView(const QString &projectPath)
         m_loadManager->setSQLiteManager(m_projectManager->getSQLiteManager());
         m_loadManager->setProjectTreeModel(m_sidebar->getModel());
         m_sidebar->setPointCloudLoadManager(m_loadManager);
+
+        // Sprint 2.1: Connect ProjectTreeModel enhanced signals
+        connect(m_sidebar->getModel(), &ProjectTreeModel::memoryWarningTriggered,
+                this, [this](size_t currentUsage, size_t threshold) {
+                    QString message = QString("Memory warning: %1 MB used (threshold: %2 MB)")
+                                     .arg(currentUsage / (1024 * 1024))
+                                     .arg(threshold / (1024 * 1024));
+                    statusBar()->showMessage(message, 5000);
+
+                    // Show warning dialog for critical memory usage
+                    if (currentUsage > threshold * 1.2) { // 20% over threshold
+                        QMessageBox::warning(this, "Memory Warning",
+                            "Memory usage is critically high. Consider unloading some scans to free memory.");
+                    }
+                });
+
+        connect(m_sidebar->getModel(), &ProjectTreeModel::scanStateChanged,
+                this, [this](const QString& scanId, LoadedState oldState, LoadedState newState) {
+                    Q_UNUSED(oldState)
+                    QString stateStr;
+                    switch (newState) {
+                        case LoadedState::Loaded: stateStr = "loaded"; break;
+                        case LoadedState::Unloaded: stateStr = "unloaded"; break;
+                        case LoadedState::Loading: stateStr = "loading"; break;
+                        case LoadedState::Processing: stateStr = "processing"; break;
+                        case LoadedState::Error: stateStr = "error"; break;
+                        case LoadedState::Cached: stateStr = "cached"; break;
+                        case LoadedState::MemoryWarning: stateStr = "memory warning"; break;
+                        case LoadedState::Optimized: stateStr = "optimized"; break;
+                        default: stateStr = "unknown"; break;
+                    }
+                    qDebug() << "Scan state changed:" << scanId << "to" << stateStr;
+                });
+
+        // Sprint 1.3: Connect scan activation for E57 handling
+        connect(m_sidebar, &SidebarWidget::viewPointCloudRequested,
+                this, [this](const QString& itemId, const QString& itemType) {
+                    if (itemType == "scan") {
+                        onScanActivated(itemId);
+                    } else {
+                        // For clusters, use the existing mechanism
+                        m_loadManager->viewPointCloud(itemId, itemType);
+                    }
+                });
 
         // Update window title
         updateWindowTitle(m_currentProject->projectName());
@@ -932,25 +1261,46 @@ void MainWindow::onImportScans()
     ScanImportDialog dialog(this);
     dialog.setProjectPath(m_currentProject->projectPath());
 
-    if (dialog.exec() == QDialog::Accepted) {
-        QStringList files = dialog.selectedFiles();
-        ImportMode mode = dialog.importMode();
+    // Sprint 1.3: Connect E57-specific import signals
+    auto* scanImportManager = m_projectManager->getScanImportManager();
+    scanImportManager->setProjectTreeModel(m_sidebar->getModel());
 
-        if (!files.isEmpty()) {
-            auto result = m_projectManager->getScanImportManager()->importScans(
-                files, m_currentProject->projectPath(), m_currentProject->projectId(), mode, this);
+    connect(&dialog, &ScanImportDialog::importE57FileRequested,
+            scanImportManager, &ScanImportManager::handleE57Import);
+    connect(&dialog, &ScanImportDialog::importLasFileRequested,
+            this, [this, scanImportManager](const QString& filePath) {
+                // Handle LAS import using existing mechanism
+                QStringList files = {filePath};
+                auto result = scanImportManager->importScans(
+                    files, m_currentProject->projectPath(), m_currentProject->projectId(), ImportMode::Copy, this);
 
-            if (result.success) {
-                // Hide guidance and refresh sidebar
+                if (result.success) {
+                    showImportGuidance(false);
+                    m_sidebar->refreshFromDatabase();
+                    statusBar()->showMessage("Successfully imported LAS file", 3000);
+                } else {
+                    QMessageBox::warning(this, "Import Failed", result.errorMessage);
+                }
+            });
+
+    connect(scanImportManager, &ScanImportManager::importCompleted,
+            this, [this](const QString& filePath, int scanCount) {
+                Q_UNUSED(filePath)
                 showImportGuidance(false);
                 m_sidebar->refreshFromDatabase();
-
                 statusBar()->showMessage(
-                    QString("Successfully imported %1 scan(s)").arg(result.successfulFiles.size()), 3000);
-            } else {
-                QMessageBox::warning(this, "Import Failed", result.errorMessage);
-            }
-        }
+                    QString("Successfully imported %1 scan(s) from E57 file").arg(scanCount), 3000);
+            });
+
+    connect(scanImportManager, &ScanImportManager::importFailed,
+            this, [this](const QString& filePath, const QString& error) {
+                QMessageBox::critical(this, "E57 Import Failed",
+                    QString("Failed to import %1:\n%2").arg(QFileInfo(filePath).fileName(), error));
+            });
+
+    if (dialog.exec() == QDialog::Accepted) {
+        // The dialog will emit the appropriate signals for E57 or LAS files
+        // No additional processing needed here for Sprint 1.3
     }
 }
 
@@ -965,6 +1315,49 @@ void MainWindow::onScansImported(const QList<ScanInfo> &scans)
     showImportGuidance(false);
 
     qDebug() << "Imported" << scans.size() << "scans";
+}
+
+// Sprint 1.3: E57 scan activation implementation
+void MainWindow::onScanActivated(const QString& scanId)
+{
+    try {
+        if (!m_projectManager || !m_projectManager->getSQLiteManager()) {
+            qDebug() << "MainWindow: No project manager or database available";
+            return;
+        }
+
+        // Get scan info from database
+        ScanInfo scanInfo = m_projectManager->getSQLiteManager()->getScanById(scanId);
+
+        if (scanInfo.scanId.isEmpty()) {
+            QMessageBox::warning(this, "Scan Not Found",
+                QString("Scan with ID %1 was not found in the database.").arg(scanId));
+            return;
+        }
+
+        qDebug() << "MainWindow: Activating scan" << scanInfo.scanName << "of type" << scanInfo.importType;
+
+        if (scanInfo.importType == "E57") {
+            // Load E57 scan using the stored GUID (stored in originalSourcePath field)
+            QString e57Guid = scanInfo.originalSourcePath;
+            QString filePath = scanInfo.filePathRelative;
+
+            if (e57Guid.isEmpty() || filePath.isEmpty()) {
+                QMessageBox::warning(this, "Invalid E57 Data",
+                    "E57 scan data is incomplete. Please re-import the file.");
+                return;
+            }
+
+            m_loadManager->loadE57Scan(filePath, e57Guid);
+        } else {
+            // Handle other file types using existing mechanism
+            emit m_sidebar->viewPointCloudRequested(scanId, "scan");
+        }
+
+    } catch (const std::exception& ex) {
+        QMessageBox::critical(this, "Load Error",
+            QString("Failed to load scan: %1").arg(ex.what()));
+    }
 }
 
 void MainWindow::showImportGuidance(bool show)
@@ -1123,6 +1516,7 @@ void MainWindow::onProgressUpdated(const QString& operationId, int value, int ma
 
 void MainWindow::onEstimatedTimeChanged(const QString& operationId, const QDateTime& estimatedEnd)
 {
+    Q_UNUSED(estimatedEnd)
     if (operationId == m_currentOperationId) {
         QString timeText = ProgressManager::instance().formatTimeRemaining(operationId);
         m_timeLabel->setText(timeText);
@@ -1517,5 +1911,40 @@ void MainWindow::onAmbientIntensityChanged(int value)
 
         // Update label
         m_ambientIntensityLabel->setText(QString("Ambient: %1").arg(intensity, 0, 'f', 2));
+    }
+}
+
+// Sprint 2.2: Performance statistics display implementation
+void MainWindow::onStatsUpdated(float fps, int visiblePoints)
+{
+    if (m_fpsLabel) {
+        m_fpsLabel->setText(QString("FPS: %1").arg(fps, 0, 'f', 1));
+
+        // Color code FPS based on performance
+        if (fps >= 30.0f) {
+            m_fpsLabel->setStyleSheet("QLabel { color: #4caf50; margin: 0 5px; }"); // Green
+        } else if (fps >= 15.0f) {
+            m_fpsLabel->setStyleSheet("QLabel { color: #ff9800; margin: 0 5px; }"); // Orange
+        } else {
+            m_fpsLabel->setStyleSheet("QLabel { color: #f44336; margin: 0 5px; }"); // Red
+        }
+    }
+
+    if (m_pointsLabel) {
+        QString pointsText;
+        if (visiblePoints >= 1000000) {
+            // Display in millions
+            double millions = visiblePoints / 1000000.0;
+            pointsText = QString("Points: %1M").arg(millions, 0, 'f', 1);
+        } else if (visiblePoints >= 1000) {
+            // Display in thousands
+            double thousands = visiblePoints / 1000.0;
+            pointsText = QString("Points: %1K").arg(thousands, 0, 'f', 1);
+        } else {
+            pointsText = QString("Points: %1").arg(visiblePoints);
+        }
+
+        m_pointsLabel->setText(pointsText);
+    }
     }
 }

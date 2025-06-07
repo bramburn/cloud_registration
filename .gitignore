@@ -66,4 +66,9 @@ Thumbs.db
 # Project specific
 # Add any other project-specific files or directories that should be ignored
 
-repomix-output.xml
+repomix-output*.xml
+repomix-output*.md
+vcpkg_installed
+build-test
+build_test
+Testing

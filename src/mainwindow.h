@@ -7,16 +7,17 @@
 #include <QLabel>
 #include <QAction>
 #include <QProgressBar>
+#include <QVBoxLayout>
 #include <vector>
 #include "progressmanager.h"
+#include "projectmanager.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
 class PointCloudViewerWidget;
-class ProjectManager;
 class PointCloudLoadManager;
 class Project;
-class E57ParserLib;
+class IE57Parser;
 class LasParser;
 class ScanImportDialog;
 class SQLiteManager;
@@ -26,7 +27,6 @@ class QCheckBox;
 class QSlider;
 class QGroupBox;
 struct LasHeaderMetadata;
-struct ScanInfo;
 
 class MainWindow : public QMainWindow
 {
@@ -34,6 +34,7 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(IE57Parser* e57Parser, QWidget *parent = nullptr);
     ~MainWindow();
 
 private slots:
@@ -46,6 +47,9 @@ private slots:
     // Sprint 1.2: Scan Import functionality
     void onImportScans();
     void onScansImported(const QList<ScanInfo> &scans);
+
+    // Sprint 1.3: E57 scan activation
+    void onScanActivated(const QString& scanId);
 
     // Legacy point cloud loading slots (for existing functionality)
     void onOpenFileClicked();
@@ -124,6 +128,9 @@ private:
     void setupMemoryDisplay();
     void onMemoryUsageChanged(size_t totalBytes);
 
+    // Sprint 2.2: Performance statistics display
+    void onStatsUpdated(float fps, int visiblePoints);
+
     // Main UI Components
     QStackedWidget *m_centralStack;
     ProjectHubWidget *m_projectHub;
@@ -163,6 +170,9 @@ private:
     QString m_currentFilePath;
     bool m_isLoading;
 
+    // Sprint 1 Decoupling: Injected E57 parser interface
+    IE57Parser *m_e57Parser = nullptr;
+
     // E57-specific data storage
     int m_currentScanCount = 0;
     QStringList m_currentScanNames;
@@ -177,6 +187,10 @@ private:
 
     // Sprint 3.4: Memory usage display
     QLabel *m_memoryLabel;
+
+    // Sprint 2.2: Performance monitoring display
+    QLabel *m_fpsLabel;
+    QLabel *m_pointsLabel;
 
     // Sprint 3.3: Progress display widgets
     QProgressBar* m_progressBar;

@@ -104,6 +104,15 @@ public slots:
     void setLightColor(const QColor& color);
     void setAmbientIntensity(float intensity);
 
+signals:
+    // Sprint 2.2: Performance monitoring signals
+    void statsUpdated(float fps, int visiblePoints);
+    void renderingError(const QString& error);
+    void pointCloudLoaded(const std::vector<float>& points);
+    void pointCloudLoadFailed(const QString& error);
+    void pointCloudCleared();
+    void stateChanged(ViewerState newState, const QString& message);
+
 protected:
     // OpenGL overrides
     void initializeGL() override;
@@ -163,6 +172,7 @@ private:
 
 private slots:
     void updateLoadingAnimation();
+    void emitPerformanceStats(); // Sprint 2.2: Performance monitoring
 
 private:
     // OpenGL objects
@@ -235,6 +245,9 @@ private:
     // Loading animation
     QTimer *m_loadingTimer;
     int m_loadingAngle;
+
+    // Sprint 2.2: Performance monitoring timer
+    QTimer *m_statsTimer;
 
     // Fonts for overlay text
     QFont m_overlayFont;
