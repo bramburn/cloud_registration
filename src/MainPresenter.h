@@ -11,6 +11,7 @@ class IMainView;
 class IE57Parser;
 class IE57Writer;
 class IPointCloudViewer;
+class ProjectManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
@@ -37,9 +38,23 @@ public:
      * @param e57Writer Pointer to the E57 writer interface
      * @param parent Parent QObject
      */
-    explicit MainPresenter(IMainView* view, 
-                          IE57Parser* e57Parser, 
+    explicit MainPresenter(IMainView* view,
+                          IE57Parser* e57Parser,
                           IE57Writer* e57Writer = nullptr,
+                          QObject* parent = nullptr);
+
+    /**
+     * @brief Constructor with ProjectManager dependency (Sprint 3)
+     * @param view Pointer to the main view interface
+     * @param e57Parser Pointer to the E57 parser interface
+     * @param e57Writer Pointer to the E57 writer interface
+     * @param projectManager Pointer to the project manager
+     * @param parent Parent QObject
+     */
+    explicit MainPresenter(IMainView* view,
+                          IE57Parser* e57Parser,
+                          IE57Writer* e57Writer,
+                          ProjectManager* projectManager,
                           QObject* parent = nullptr);
 
     virtual ~MainPresenter() = default;
@@ -48,6 +63,12 @@ public:
      * @brief Initialize the presenter and set up connections
      */
     void initialize();
+
+    /**
+     * @brief Set the project manager (Sprint 3)
+     * @param projectManager Pointer to the project manager
+     */
+    void setProjectManager(ProjectManager* projectManager);
 
 public slots:
     /**
@@ -97,6 +118,72 @@ public slots:
      * @brief Handle application exit request
      */
     void handleExit();
+
+    // Sprint 3: Sidebar operation handlers
+    /**
+     * @brief Handle cluster creation request
+     * @param parentClusterId ID of parent cluster (empty for root level)
+     */
+    void handleCreateCluster(const QString& parentClusterId = QString());
+
+    /**
+     * @brief Handle cluster renaming request
+     * @param clusterId ID of cluster to rename
+     * @param newName New name for the cluster
+     */
+    void handleRenameCluster(const QString& clusterId, const QString& newName);
+
+    /**
+     * @brief Handle cluster deletion request
+     * @param clusterId ID of cluster to delete
+     * @param deletePhysicalFiles Whether to delete physical files
+     */
+    void handleDeleteCluster(const QString& clusterId, bool deletePhysicalFiles = false);
+
+    /**
+     * @brief Handle scan loading request
+     * @param scanId ID of scan to load
+     */
+    void handleLoadScan(const QString& scanId);
+
+    /**
+     * @brief Handle scan unloading request
+     * @param scanId ID of scan to unload
+     */
+    void handleUnloadScan(const QString& scanId);
+
+    /**
+     * @brief Handle cluster loading request
+     * @param clusterId ID of cluster to load
+     */
+    void handleLoadCluster(const QString& clusterId);
+
+    /**
+     * @brief Handle cluster unloading request
+     * @param clusterId ID of cluster to unload
+     */
+    void handleUnloadCluster(const QString& clusterId);
+
+    /**
+     * @brief Handle point cloud view request
+     * @param itemId ID of item to view
+     * @param itemType Type of item (scan/cluster)
+     */
+    void handleViewPointCloud(const QString& itemId, const QString& itemType);
+
+    /**
+     * @brief Handle scan deletion request
+     * @param scanId ID of scan to delete
+     * @param deletePhysicalFile Whether to delete physical file
+     */
+    void handleDeleteScan(const QString& scanId, bool deletePhysicalFile);
+
+    /**
+     * @brief Handle batch operation request
+     * @param operation Operation type (load/unload)
+     * @param scanIds List of scan IDs
+     */
+    void handleBatchOperation(const QString& operation, const QStringList& scanIds);
 
 private slots:
     /**
@@ -201,6 +288,9 @@ private:
     IE57Parser* m_e57Parser;
     IE57Writer* m_e57Writer;
     IPointCloudViewer* m_viewer;
+
+    // Sprint 3: Add ProjectManager dependency
+    class ProjectManager* m_projectManager;
 
     // Application state
     QString m_currentProjectPath;

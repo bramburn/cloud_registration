@@ -36,6 +36,7 @@
 #include <QCheckBox>
 #include <QSlider>
 #include <QColorDialog>
+#include <QInputDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -2072,6 +2073,11 @@ IPointCloudViewer* MainWindow::getViewer()
     return m_viewerInterface;
 }
 
+SidebarWidget* MainWindow::getSidebar()
+{
+    return m_sidebar;
+}
+
 void MainWindow::showProgressDialog(const QString& title, const QString& message)
 {
     if (!m_progressDialog) {
@@ -2236,5 +2242,148 @@ void MainWindow::cleanupResources()
     if (m_parserThread && m_parserThread->isRunning()) {
         m_parserThread->quit();
         m_parserThread->wait(3000);
+    }
+}
+
+// Sprint 3: Additional IMainView interface implementations
+void MainWindow::showProgressDialog(bool show, const QString& title, const QString& message)
+{
+    if (show) {
+        showProgressDialog(title, message);
+    } else {
+        hideProgressDialog();
+    }
+}
+
+void MainWindow::updateProgress(int percentage, const QString& message)
+{
+    updateProgressDialog(percentage, message);
+}
+
+void MainWindow::setActionsEnabled(bool enabled)
+{
+    enableViewControls(enabled);
+    enableProjectActions(enabled);
+}
+
+void MainWindow::setProjectTitle(const QString& projectName)
+{
+    updateWindowTitle(projectName);
+}
+
+void MainWindow::updateScanList(const QStringList& scanNames)
+{
+    m_currentScanNames = scanNames;
+    // Update sidebar if needed
+    refreshScanList();
+}
+
+void MainWindow::highlightScan(const QString& scanName)
+{
+    // Implementation would highlight scan in sidebar
+    Q_UNUSED(scanName)
+    qDebug() << "MainWindow: Highlighting scan:" << scanName;
+}
+
+void MainWindow::showProjectView()
+{
+    if (m_centralStack && m_projectView) {
+        m_centralStack->setCurrentWidget(m_projectView);
+    }
+}
+
+void MainWindow::updateMemoryUsage(size_t totalBytes)
+{
+    updateMemoryDisplay(totalBytes);
+}
+
+void MainWindow::updateRenderingStats(float fps, int visiblePoints)
+{
+    updatePerformanceStats(fps, visiblePoints);
+}
+
+QString MainWindow::askForOpenFilePath(const QString& title, const QString& filter)
+{
+    return showOpenFileDialog(title, filter);
+}
+
+QString MainWindow::askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName)
+{
+    Q_UNUSED(defaultName)
+    return showSaveFileDialog(title, filter);
+}
+
+bool MainWindow::askForConfirmation(const QString& title, const QString& message)
+{
+    return QMessageBox::question(this, title, message,
+                                QMessageBox::Yes | QMessageBox::No,
+                                QMessageBox::No) == QMessageBox::Yes;
+}
+
+// Sprint 3: Sidebar operation interface implementations
+QString MainWindow::promptForClusterName(const QString& title, const QString& defaultName)
+{
+    bool ok;
+    QString name = QInputDialog::getText(this, title, "Cluster name:",
+                                        QLineEdit::Normal, defaultName, &ok);
+
+    if (ok && !name.trimmed().isEmpty()) {
+        return name.trimmed();
+    }
+
+    return QString();
+}
+
+void MainWindow::loadScan(const QString& scanId)
+{
+    if (m_loadManager) {
+        emit m_sidebar->loadScanRequested(scanId);
+    }
+}
+
+void MainWindow::unloadScan(const QString& scanId)
+{
+    if (m_loadManager) {
+        emit m_sidebar->unloadScanRequested(scanId);
+    }
+}
+
+void MainWindow::loadCluster(const QString& clusterId)
+{
+    if (m_loadManager) {
+        emit m_sidebar->loadClusterRequested(clusterId);
+    }
+}
+
+void MainWindow::unloadCluster(const QString& clusterId)
+{
+    if (m_loadManager) {
+        emit m_sidebar->unloadClusterRequested(clusterId);
+    }
+}
+
+void MainWindow::viewPointCloud(const QString& itemId, const QString& itemType)
+{
+    if (itemType == "scan") {
+        onScanActivated(itemId);
+    } else {
+        // For clusters, use the existing mechanism
+        if (m_loadManager) {
+            m_loadManager->viewPointCloud(itemId, itemType);
+        }
+    }
+}
+
+void MainWindow::deleteScan(const QString& scanId, bool deletePhysicalFile)
+{
+    if (m_sidebar) {
+        emit m_sidebar->deleteScanRequested(scanId, deletePhysicalFile);
+    }
+}
+
+void MainWindow::performBatchOperation(const QString& operation, const QStringList& scanIds)
+{
+    if (m_sidebar) {
+        emit m_sidebar->batchOperationRequested(operation, scanIds);
     }
 }

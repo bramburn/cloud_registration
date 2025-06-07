@@ -3,11 +3,15 @@
 #include "IE57Parser.h"
 #include "IE57Writer.h"
 #include "IPointCloudViewer.h"
+#include "projectmanager.h"
+#include "scaninfo.h"
+#include "sqlitemanager.h"
 #include <QFileInfo>
 #include <QDir>
+#include <QDebug>
 
-MainPresenter::MainPresenter(IMainView* view, 
-                           IE57Parser* e57Parser, 
+MainPresenter::MainPresenter(IMainView* view,
+                           IE57Parser* e57Parser,
                            IE57Writer* e57Writer,
                            QObject* parent)
     : QObject(parent)
@@ -15,6 +19,30 @@ MainPresenter::MainPresenter(IMainView* view,
     , m_e57Parser(e57Parser)
     , m_e57Writer(e57Writer)
     , m_viewer(nullptr)
+    , m_projectManager(nullptr)
+    , m_isFileOpen(false)
+    , m_isProjectOpen(false)
+    , m_isParsingInProgress(false)
+    , m_currentMemoryUsage(0)
+    , m_currentFPS(0.0f)
+    , m_currentVisiblePoints(0)
+{
+    if (m_view) {
+        m_viewer = m_view->getViewer();
+    }
+}
+
+MainPresenter::MainPresenter(IMainView* view,
+                           IE57Parser* e57Parser,
+                           IE57Writer* e57Writer,
+                           ProjectManager* projectManager,
+                           QObject* parent)
+    : QObject(parent)
+    , m_view(view)
+    , m_e57Parser(e57Parser)
+    , m_e57Writer(e57Writer)
+    , m_viewer(nullptr)
+    , m_projectManager(projectManager)
     , m_isFileOpen(false)
     , m_isProjectOpen(false)
     , m_isParsingInProgress(false)
@@ -31,6 +59,10 @@ void MainPresenter::initialize() {
     setupConnections();
     updateUIState();
     updateWindowTitle();
+}
+
+void MainPresenter::setProjectManager(ProjectManager* projectManager) {
+    m_projectManager = projectManager;
 }
 
 void MainPresenter::setupConnections() {
@@ -60,6 +92,36 @@ void MainPresenter::setupConnections() {
     if (m_viewer) {
         connect(m_viewer, &IPointCloudViewer::stateChanged, this, &MainPresenter::onViewerStateChanged);
         connect(m_viewer, &IPointCloudViewer::statsUpdated, this, &MainPresenter::onRenderingStatsUpdated);
+    }
+
+    // Sprint 3: Connect sidebar signals if available
+    if (m_view) {
+        auto* sidebar = m_view->getSidebar();
+        if (sidebar) {
+            // Connect cluster operations
+            connect(sidebar, &SidebarWidget::clusterCreationRequested,
+                    this, &MainPresenter::handleCreateCluster);
+            connect(sidebar, &SidebarWidget::clusterRenameRequested,
+                    this, &MainPresenter::handleRenameCluster);
+            connect(sidebar, &SidebarWidget::deleteClusterRequested,
+                    this, &MainPresenter::handleDeleteCluster);
+
+            // Connect scan operations
+            connect(sidebar, &SidebarWidget::loadScanRequested,
+                    this, &MainPresenter::handleLoadScan);
+            connect(sidebar, &SidebarWidget::unloadScanRequested,
+                    this, &MainPresenter::handleUnloadScan);
+            connect(sidebar, &SidebarWidget::loadClusterRequested,
+                    this, &MainPresenter::handleLoadCluster);
+            connect(sidebar, &SidebarWidget::unloadClusterRequested,
+                    this, &MainPresenter::handleUnloadCluster);
+            connect(sidebar, &SidebarWidget::viewPointCloudRequested,
+                    this, &MainPresenter::handleViewPointCloud);
+            connect(sidebar, &SidebarWidget::deleteScanRequested,
+                    this, &MainPresenter::handleDeleteScan);
+            connect(sidebar, &SidebarWidget::batchOperationRequested,
+                    this, &MainPresenter::handleBatchOperation);
+        }
     }
 }
 
@@ -360,4 +422,169 @@ void MainPresenter::clearPointCloudData() {
     }
     m_currentScanNames.clear();
     m_view->updateScanList(QStringList());
+}
+
+// Sprint 3: Sidebar operation handler implementations
+void MainPresenter::handleCreateCluster(const QString& parentClusterId) {
+    if (!m_projectManager) {
+        showError("Create Cluster", "Project manager is not available.");
+        return;
+    }
+
+    QString clusterName = m_view->promptForClusterName("Create New Cluster");
+    if (clusterName.isEmpty()) {
+        return;
+    }
+
+    QString clusterId = m_projectManager->createCluster(clusterName, parentClusterId);
+    if (!clusterId.isEmpty()) {
+        qDebug() << "MainPresenter: Cluster created successfully:" << clusterName;
+        m_view->updateStatusBar(QString("Created cluster: %1").arg(clusterName));
+    } else {
+        showError("Create Cluster", "Failed to create cluster.");
+    }
+}
+
+void MainPresenter::handleRenameCluster(const QString& clusterId, const QString& newName) {
+    if (!m_projectManager) {
+        showError("Rename Cluster", "Project manager is not available.");
+        return;
+    }
+
+    if (m_projectManager->renameCluster(clusterId, newName)) {
+        qDebug() << "MainPresenter: Cluster renamed successfully to:" << newName;
+        m_view->updateStatusBar(QString("Renamed cluster to: %1").arg(newName));
+    } else {
+        showError("Rename Cluster", "Failed to rename cluster.");
+    }
+}
+
+void MainPresenter::handleDeleteCluster(const QString& clusterId, bool deletePhysicalFiles) {
+    if (!m_projectManager) {
+        showError("Delete Cluster", "Project manager is not available.");
+        return;
+    }
+
+    // Show confirmation dialog
+    QString message = QString("Are you sure you want to delete this cluster?\n\n"
+                             "All scans in this cluster will be moved to the project root.\n"
+                             "All sub-clusters will also be deleted.");
+
+    bool confirmed = m_view->askForConfirmation("Delete Cluster", message);
+    if (!confirmed) {
+        return;
+    }
+
+    if (m_projectManager->deleteCluster(clusterId)) {
+        qDebug() << "MainPresenter: Cluster deleted successfully:" << clusterId;
+        m_view->updateStatusBar("Cluster deleted successfully");
+    } else {
+        showError("Delete Cluster", "Failed to delete cluster.");
+    }
+}
+
+void MainPresenter::handleLoadScan(const QString& scanId) {
+    if (!m_view) {
+        return;
+    }
+
+    // Delegate to view's load manager through interface
+    m_view->loadScan(scanId);
+    m_view->updateStatusBar(QString("Loading scan: %1").arg(scanId));
+}
+
+void MainPresenter::handleUnloadScan(const QString& scanId) {
+    if (!m_view) {
+        return;
+    }
+
+    // Delegate to view's load manager through interface
+    m_view->unloadScan(scanId);
+    m_view->updateStatusBar(QString("Unloading scan: %1").arg(scanId));
+}
+
+void MainPresenter::handleLoadCluster(const QString& clusterId) {
+    if (!m_view) {
+        return;
+    }
+
+    // Delegate to view's load manager through interface
+    m_view->loadCluster(clusterId);
+    m_view->updateStatusBar(QString("Loading cluster: %1").arg(clusterId));
+}
+
+void MainPresenter::handleUnloadCluster(const QString& clusterId) {
+    if (!m_view) {
+        return;
+    }
+
+    // Delegate to view's load manager through interface
+    m_view->unloadCluster(clusterId);
+    m_view->updateStatusBar(QString("Unloading cluster: %1").arg(clusterId));
+}
+
+void MainPresenter::handleViewPointCloud(const QString& itemId, const QString& itemType) {
+    if (!m_view) {
+        return;
+    }
+
+    // Delegate to view's point cloud viewing mechanism
+    m_view->viewPointCloud(itemId, itemType);
+    m_view->updateStatusBar(QString("Viewing %1: %2").arg(itemType, itemId));
+}
+
+void MainPresenter::handleDeleteScan(const QString& scanId, bool deletePhysicalFile) {
+    if (!m_projectManager) {
+        showError("Delete Scan", "Project manager is not available.");
+        return;
+    }
+
+    // Get scan info to check import type and show appropriate confirmation
+    auto* sqliteManager = m_projectManager->getSQLiteManager();
+    if (!sqliteManager) {
+        showError("Delete Scan", "Database manager is not available.");
+        return;
+    }
+
+    ScanInfo scan = sqliteManager->getScanById(scanId);
+    if (!scan.isValid()) {
+        showError("Delete Scan", "Could not retrieve scan information.");
+        return;
+    }
+
+    QString message = QString("Are you sure you want to delete scan '%1'?\nThis action cannot be undone.")
+                     .arg(scan.scanName);
+
+    // For copied/moved scans, ask about deleting physical files
+    bool shouldDeletePhysicalFile = deletePhysicalFile;
+    if (scan.importType == "COPIED" || scan.importType == "MOVED") {
+        QString extendedMessage = message + "\n\nAlso delete the physical scan file from the project folder?";
+        shouldDeletePhysicalFile = m_view->askForConfirmation("Delete Scan", extendedMessage);
+        if (!shouldDeletePhysicalFile) {
+            // Still ask for basic confirmation
+            bool basicConfirm = m_view->askForConfirmation("Delete Scan", message);
+            if (!basicConfirm) {
+                return;
+            }
+        }
+    } else {
+        bool confirmed = m_view->askForConfirmation("Delete Scan", message);
+        if (!confirmed) {
+            return;
+        }
+    }
+
+    // Delegate to view's scan deletion mechanism
+    m_view->deleteScan(scanId, shouldDeletePhysicalFile);
+    m_view->updateStatusBar(QString("Deleting scan: %1").arg(scan.scanName));
+}
+
+void MainPresenter::handleBatchOperation(const QString& operation, const QStringList& scanIds) {
+    if (!m_view || scanIds.isEmpty()) {
+        return;
+    }
+
+    // Delegate to view's batch operation mechanism
+    m_view->performBatchOperation(operation, scanIds);
+    m_view->updateStatusBar(QString("Performing %1 operation on %2 scans").arg(operation).arg(scanIds.size()));
 }

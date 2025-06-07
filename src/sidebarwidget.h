@@ -22,8 +22,10 @@ public:
     void setProject(const QString &projectName, const QString &projectPath);
     void clearProject();
     void setSQLiteManager(SQLiteManager *manager);
-    void setProjectManager(ProjectManager *manager);
     void setPointCloudLoadManager(PointCloudLoadManager *manager);
+
+    // Sprint 3: Remove direct ProjectManager dependency
+    // void setProjectManager(ProjectManager *manager); // Removed
     void refreshFromDatabase();
     void addScan(const ScanInfo &scan);
 
@@ -40,6 +42,10 @@ signals:
     void clusterDeleted(const QString &clusterId);
     void clusterRenamed(const QString &clusterId, const QString &newName);
     void scanMovedToCluster(const QString &scanId, const QString &clusterId);
+
+    // Sprint 3: New signals for presenter integration
+    void clusterCreationRequested(const QString &parentClusterId);
+    void clusterRenameRequested(const QString &clusterId, const QString &newName);
 
     // New signals for Sprint 2.1
     void loadScanRequested(const QString &scanId);
@@ -113,9 +119,11 @@ private:
     QString getItemTypeFromIndex(const QModelIndex &index) const;
 
     ProjectTreeModel *m_model;
-    ProjectManager *m_projectManager;
     PointCloudLoadManager *m_loadManager;
     QString m_currentProjectPath;
+
+    // Sprint 3: Remove direct ProjectManager dependency
+    // ProjectManager *m_projectManager; // Removed
 
     // Context menu and actions
     QMenu *m_contextMenu;

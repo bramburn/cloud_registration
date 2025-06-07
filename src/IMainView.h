@@ -70,6 +70,12 @@ public:
     virtual IPointCloudViewer* getViewer() = 0;
 
     /**
+     * @brief Get the sidebar widget (Sprint 3)
+     * @return Pointer to the sidebar widget
+     */
+    virtual class SidebarWidget* getSidebar() = 0;
+
+    /**
      * @brief Show or hide the progress dialog
      * @param show true to show, false to hide
      * @param title Progress dialog title
@@ -155,6 +161,60 @@ public:
      * @return true if user confirmed, false otherwise
      */
     virtual bool askForConfirmation(const QString& title, const QString& message) = 0;
+
+    // Sprint 3: Sidebar operation interface methods
+    /**
+     * @brief Prompt user for cluster name
+     * @param title Dialog title
+     * @param defaultName Default cluster name
+     * @return Entered cluster name, empty if cancelled
+     */
+    virtual QString promptForClusterName(const QString& title, const QString& defaultName = QString()) = 0;
+
+    /**
+     * @brief Load a scan through the view's load manager
+     * @param scanId ID of scan to load
+     */
+    virtual void loadScan(const QString& scanId) = 0;
+
+    /**
+     * @brief Unload a scan through the view's load manager
+     * @param scanId ID of scan to unload
+     */
+    virtual void unloadScan(const QString& scanId) = 0;
+
+    /**
+     * @brief Load a cluster through the view's load manager
+     * @param clusterId ID of cluster to load
+     */
+    virtual void loadCluster(const QString& clusterId) = 0;
+
+    /**
+     * @brief Unload a cluster through the view's load manager
+     * @param clusterId ID of cluster to unload
+     */
+    virtual void unloadCluster(const QString& clusterId) = 0;
+
+    /**
+     * @brief View point cloud for item
+     * @param itemId ID of item to view
+     * @param itemType Type of item (scan/cluster)
+     */
+    virtual void viewPointCloud(const QString& itemId, const QString& itemType) = 0;
+
+    /**
+     * @brief Delete a scan
+     * @param scanId ID of scan to delete
+     * @param deletePhysicalFile Whether to delete physical file
+     */
+    virtual void deleteScan(const QString& scanId, bool deletePhysicalFile) = 0;
+
+    /**
+     * @brief Perform batch operation on scans
+     * @param operation Operation type (load/unload)
+     * @param scanIds List of scan IDs
+     */
+    virtual void performBatchOperation(const QString& operation, const QStringList& scanIds) = 0;
 
 signals:
     /**
