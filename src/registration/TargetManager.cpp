@@ -1,622 +1,553 @@
 #include "TargetManager.h"
 #include <QDebug>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QFile>
-#include <QDateTime>
+#include <QtMath>
 #include <algorithm>
-#include <cmath>
 
 TargetManager::TargetManager(QObject* parent)
     : QObject(parent)
-    , m_nextTargetId(1)
+    , nextTargetId_(1)
 {
 }
 
-bool TargetManager::addTarget(const QString& scanId, std::shared_ptr<Target> target)
+void TargetManager::addTarget(const QString& scanId, std::unique_ptr<Target> target)
 {
-    if (!target || scanId.isEmpty()) {
-        qWarning() << "TargetManager: Cannot add null target or empty scan ID";
-        return false;
-    }
-    
-    QString targetId = target->getTargetId();
-    if (targetId.isEmpty()) {
-        targetId = generateUniqueTargetId();
-        // Note: We can't modify the target ID after creation in this design
-        // In a real implementation, you might want to allow setting the ID
-        qWarning() << "TargetManager: Target has empty ID, cannot add";
-        return false;
-    }
-    
-    if (m_targets.contains(targetId)) {
-        qWarning() << "TargetManager: Target with ID" << targetId << "already exists";
-        return false;
-    }
-    
-    // Add target to main collection
-    m_targets[targetId] = target;
-    
-    // Add target ID to scan's target list
-    if (!m_scanTargets.contains(scanId)) {
-        m_scanTargets[scanId] = QStringList();
-    }
-    m_scanTargets[scanId].append(targetId);
-    
-    qDebug() << "TargetManager: Added target" << targetId << "to scan" << scanId;
-    
-    emit targetAdded(scanId, targetId);
-    
-    return true;
-}
-
-bool TargetManager::removeTarget(const QString& targetId)
-{
-    if (!m_targets.contains(targetId)) {
-        return false;
-    }
-    
-    // Remove target from main collection
-    m_targets.remove(targetId);
-    
-    // Remove target ID from all scan lists
-    for (auto& targetList : m_scanTargets) {
-        targetList.removeAll(targetId);
-    }
-    
-    // Remove any correspondences involving this target
-    m_correspondences.erase(
-        std::remove_if(m_correspondences.begin(), m_correspondences.end(),
-                      [&targetId](const TargetCorrespondence& corr) {
-                          return corr.targetId1 == targetId || corr.targetId2 == targetId;
-                      }),
-        m_correspondences.end());
-    
-    qDebug() << "TargetManager: Removed target" << targetId;
-    
-    emit targetRemoved(targetId);
-    
-    return true;
-}
-
-std::shared_ptr<Target> TargetManager::getTarget(const QString& targetId) const
-{
-    auto it = m_targets.find(targetId);
-    return (it != m_targets.end()) ? it.value() : nullptr;
-}
-
-QList<std::shared_ptr<Target>> TargetManager::getTargetsForScan(const QString& scanId) const
-{
-    QList<std::shared_ptr<Target>> targets;
-    
-    if (m_scanTargets.contains(scanId)) {
-        const QStringList& targetIds = m_scanTargets[scanId];
-        targets.reserve(targetIds.size());
-        
-        for (const QString& targetId : targetIds) {
-            auto target = getTarget(targetId);
-            if (target) {
-                targets.append(target);
-            }
-        }
-    }
-    
-    return targets;
-}
-
-QList<std::shared_ptr<Target>> TargetManager::getTargetsByType(const QString& targetType) const
-{
-    QList<std::shared_ptr<Target>> targets;
-    
-    for (const auto& target : m_targets) {
-        if (target && target->getType() == targetType) {
-            targets.append(target);
-        }
-    }
-    
-    return targets;
-}
-
-QList<std::shared_ptr<Target>> TargetManager::getAllTargets() const
-{
-    QList<std::shared_ptr<Target>> targets;
-    targets.reserve(m_targets.size());
-    
-    for (const auto& target : m_targets) {
-        if (target) {
-            targets.append(target);
-        }
-    }
-    
-    return targets;
-}
-
-QStringList TargetManager::getScansWithTargets() const
-{
-    QStringList scans;
-    
-    for (auto it = m_scanTargets.begin(); it != m_scanTargets.end(); ++it) {
-        if (!it.value().isEmpty()) {
-            scans.append(it.key());
-        }
-    }
-    
-    return scans;
-}
-
-void TargetManager::clearTargetsForScan(const QString& scanId)
-{
-    if (!m_scanTargets.contains(scanId)) {
+    if (!target) {
+        qWarning() << "TargetManager: Cannot add null target";
         return;
     }
     
-    const QStringList& targetIds = m_scanTargets[scanId];
-    
-    // Remove each target
-    for (const QString& targetId : targetIds) {
-        removeTarget(targetId);
+    if (scanId.isEmpty()) {
+        qWarning() << "TargetManager: Cannot add target with empty scan ID";
+        return;
     }
     
-    // Clear the scan's target list
-    m_scanTargets[scanId].clear();
-    
-    qDebug() << "TargetManager: Cleared all targets for scan" << scanId;
-}
-
-void TargetManager::clearAllTargets()
-{
-    m_targets.clear();
-    m_scanTargets.clear();
-    m_correspondences.clear();
-    
-    qDebug() << "TargetManager: Cleared all targets and correspondences";
-}
-
-bool TargetManager::addCorrespondence(const TargetCorrespondence& correspondence)
-{
-    if (!validateCorrespondence(correspondence)) {
-        qWarning() << "TargetManager: Invalid correspondence";
-        return false;
+    // Generate ID if not set
+    if (target->targetId().isEmpty()) {
+        target->setTargetId(generateTargetId());
     }
     
-    // Check if correspondence already exists
-    for (const auto& existing : m_correspondences) {
-        if ((existing.targetId1 == correspondence.targetId1 && existing.targetId2 == correspondence.targetId2) ||
-            (existing.targetId1 == correspondence.targetId2 && existing.targetId2 == correspondence.targetId1)) {
-            qWarning() << "TargetManager: Correspondence already exists";
-            return false;
+    // Set scan ID
+    target->setScanId(scanId);
+    
+    // Validate target
+    if (!target->validate()) {
+        qWarning() << "TargetManager: Target validation failed:" << target->getValidationError();
+        return;
+    }
+    
+    QString targetId = target->targetId();
+    
+    // Check for duplicate ID
+    if (targets_.contains(targetId)) {
+        qWarning() << "TargetManager: Target with ID" << targetId << "already exists";
+        return;
+    }
+    
+    // Store target
+    targets_[targetId] = std::move(target);
+    updateScanTargetMapping(scanId, targetId);
+    
+    emit targetAdded(targetId, scanId);
+    emit dataChanged();
+    
+    qDebug() << "TargetManager: Added target" << targetId << "to scan" << scanId;
+}
+
+void TargetManager::removeTarget(const QString& targetId)
+{
+    auto it = targets_.find(targetId);
+    if (it == targets_.end()) {
+        qWarning() << "TargetManager: Target" << targetId << "not found";
+        return;
+    }
+    
+    QString scanId = it->second->scanId();
+    
+    // Remove correspondences involving this target
+    removeCorrespondencesForTarget(targetId);
+    
+    // Remove from scan mapping
+    removeScanTargetMapping(scanId, targetId);
+    
+    // Remove target
+    targets_.erase(it);
+    
+    emit targetRemoved(targetId);
+    emit dataChanged();
+    
+    qDebug() << "TargetManager: Removed target" << targetId;
+}
+
+Target* TargetManager::getTarget(const QString& targetId) const
+{
+    auto it = targets_.find(targetId);
+    return (it != targets_.end()) ? it->second.get() : nullptr;
+}
+
+QList<Target*> TargetManager::getTargetsForScan(const QString& scanId) const
+{
+    QList<Target*> result;
+    
+    auto it = scanTargets_.find(scanId);
+    if (it != scanTargets_.end()) {
+        for (const QString& targetId : it.value()) {
+            if (Target* target = getTarget(targetId)) {
+                result.append(target);
+            }
         }
     }
     
-    TargetCorrespondence newCorr = correspondence;
-    updateCorrespondenceQuality(newCorr);
+    return result;
+}
+
+QList<Target*> TargetManager::getAllTargets() const
+{
+    QList<Target*> result;
+    for (const auto& pair : targets_) {
+        result.append(pair.second.get());
+    }
+    return result;
+}
+
+QStringList TargetManager::getTargetIds() const
+{
+    QStringList result;
+    for (const auto& pair : targets_) {
+        result.append(pair.first);
+    }
+    return result;
+}
+
+int TargetManager::getTargetCount() const
+{
+    return static_cast<int>(targets_.size());
+}
+
+int TargetManager::getTargetCountForScan(const QString& scanId) const
+{
+    auto it = scanTargets_.find(scanId);
+    return (it != scanTargets_.end()) ? it.value().size() : 0;
+}
+
+QStringList TargetManager::getScanIds() const
+{
+    return scanTargets_.keys();
+}
+
+bool TargetManager::hasTarget(const QString& targetId) const
+{
+    return targets_.contains(targetId);
+}
+
+bool TargetManager::hasScan(const QString& scanId) const
+{
+    return scanTargets_.contains(scanId);
+}
+
+QList<Target*> TargetManager::getTargetsByType(const QString& type) const
+{
+    QList<Target*> result;
+    for (const auto& pair : targets_) {
+        if (pair.second->getType() == type) {
+            result.append(pair.second.get());
+        }
+    }
+    return result;
+}
+
+QList<Target*> TargetManager::getValidTargets() const
+{
+    QList<Target*> result;
+    for (const auto& pair : targets_) {
+        if (pair.second->isValid() && pair.second->validate()) {
+            result.append(pair.second.get());
+        }
+    }
+    return result;
+}
+
+QList<Target*> TargetManager::getTargetsWithinRadius(const QVector3D& center, float radius) const
+{
+    QList<Target*> result;
+    float radiusSquared = radius * radius;
     
-    m_correspondences.append(newCorr);
+    for (const auto& pair : targets_) {
+        QVector3D targetPos = pair.second->position();
+        float distanceSquared = (targetPos - center).lengthSquared();
+        if (distanceSquared <= radiusSquared) {
+            result.append(pair.second.get());
+        }
+    }
+    
+    return result;
+}
+
+void TargetManager::addCorrespondence(const TargetCorrespondence& correspondence)
+{
+    if (!correspondence.validate()) {
+        qWarning() << "TargetManager: Invalid correspondence:" << correspondence.getValidationError();
+        return;
+    }
+    
+    if (!isCorrespondenceValid(correspondence)) {
+        qWarning() << "TargetManager: Correspondence references non-existent targets";
+        return;
+    }
+    
+    // Check for duplicate
+    for (const auto& existing : correspondences_) {
+        if (existing == correspondence) {
+            qWarning() << "TargetManager: Correspondence already exists";
+            return;
+        }
+    }
+    
+    correspondences_.append(correspondence);
+    
+    emit correspondenceAdded(correspondence.targetId1(), correspondence.targetId2());
+    emit dataChanged();
     
     qDebug() << "TargetManager: Added correspondence between" 
-             << correspondence.targetId1 << "and" << correspondence.targetId2;
-    
-    emit correspondenceAdded(correspondence.targetId1, correspondence.targetId2);
-    
-    return true;
+             << correspondence.targetId1() << "and" << correspondence.targetId2();
 }
 
-bool TargetManager::removeCorrespondence(const QString& targetId1, const QString& targetId2)
+void TargetManager::removeCorrespondence(const QString& targetId1, const QString& targetId2)
 {
-    auto it = std::find_if(m_correspondences.begin(), m_correspondences.end(),
-                          [&](const TargetCorrespondence& corr) {
-                              return (corr.targetId1 == targetId1 && corr.targetId2 == targetId2) ||
-                                     (corr.targetId1 == targetId2 && corr.targetId2 == targetId1);
-                          });
+    auto it = std::find_if(correspondences_.begin(), correspondences_.end(),
+        [&](const TargetCorrespondence& c) {
+            return (c.targetId1() == targetId1 && c.targetId2() == targetId2) ||
+                   (c.targetId1() == targetId2 && c.targetId2() == targetId1);
+        });
     
-    if (it != m_correspondences.end()) {
-        m_correspondences.erase(it);
+    if (it != correspondences_.end()) {
+        QString id1 = it->targetId1();
+        QString id2 = it->targetId2();
+        correspondences_.erase(it);
         
-        qDebug() << "TargetManager: Removed correspondence between" << targetId1 << "and" << targetId2;
+        emit correspondenceRemoved(id1, id2);
+        emit dataChanged();
         
-        emit correspondenceRemoved(targetId1, targetId2);
-        return true;
+        qDebug() << "TargetManager: Removed correspondence between" << id1 << "and" << id2;
     }
-    
-    return false;
 }
 
-QList<TargetCorrespondence> TargetManager::getAllCorrespondences() const
+void TargetManager::removeCorrespondencesForTarget(const QString& targetId)
 {
-    return m_correspondences;
-}
-
-QList<TargetCorrespondence> TargetManager::getCorrespondencesForTarget(const QString& targetId) const
-{
-    QList<TargetCorrespondence> correspondences;
-    
-    for (const auto& corr : m_correspondences) {
-        if (corr.targetId1 == targetId || corr.targetId2 == targetId) {
-            correspondences.append(corr);
+    auto it = correspondences_.begin();
+    while (it != correspondences_.end()) {
+        if (it->containsTarget(targetId)) {
+            QString id1 = it->targetId1();
+            QString id2 = it->targetId2();
+            it = correspondences_.erase(it);
+            emit correspondenceRemoved(id1, id2);
+        } else {
+            ++it;
         }
     }
-    
-    return correspondences;
+    emit dataChanged();
 }
 
-QList<TargetCorrespondence> TargetManager::getCorrespondencesBetweenScans(
-    const QString& scanId1, const QString& scanId2) const
+void TargetManager::removeCorrespondencesForScan(const QString& scanId)
 {
-    QList<TargetCorrespondence> correspondences;
-    
-    for (const auto& corr : m_correspondences) {
-        if ((corr.scanId1 == scanId1 && corr.scanId2 == scanId2) ||
-            (corr.scanId1 == scanId2 && corr.scanId2 == scanId1)) {
-            correspondences.append(corr);
+    auto it = correspondences_.begin();
+    while (it != correspondences_.end()) {
+        if (it->containsScan(scanId)) {
+            QString id1 = it->targetId1();
+            QString id2 = it->targetId2();
+            it = correspondences_.erase(it);
+            emit correspondenceRemoved(id1, id2);
+        } else {
+            ++it;
         }
     }
-    
-    return correspondences;
+    emit dataChanged();
 }
 
-void TargetManager::clearAllCorrespondences()
+QList<TargetCorrespondence> TargetManager::getCorrespondences() const
 {
-    m_correspondences.clear();
-    qDebug() << "TargetManager: Cleared all correspondences";
+    return correspondences_;
 }
 
-bool TargetManager::validateAllData() const
+QList<TargetCorrespondence> TargetManager::getCorrespondencesForScan(const QString& scanId) const
 {
-    // Validate all targets
-    for (const auto& target : m_targets) {
-        if (!target || !target->isValid()) {
-            emit const_cast<TargetManager*>(this)->validationError(
-                QString("Invalid target: %1").arg(target ? target->getTargetId() : "null"));
-            return false;
+    QList<TargetCorrespondence> result;
+    for (const auto& correspondence : correspondences_) {
+        if (correspondence.containsScan(scanId)) {
+            result.append(correspondence);
         }
     }
-    
-    // Validate all correspondences
-    for (const auto& corr : m_correspondences) {
-        if (!validateCorrespondence(corr)) {
-            emit const_cast<TargetManager*>(this)->validationError(
-                QString("Invalid correspondence between %1 and %2").arg(corr.targetId1, corr.targetId2));
-            return false;
-        }
-    }
-    
-    return true;
+    return result;
 }
 
-TargetManager::TargetStatistics TargetManager::getStatistics() const
+QList<TargetCorrespondence> TargetManager::getCorrespondencesBetweenScans(const QString& scanId1, const QString& scanId2) const
 {
-    TargetStatistics stats;
+    QList<TargetCorrespondence> result;
+    for (const auto& correspondence : correspondences_) {
+        if (correspondence.matches(scanId1, scanId2)) {
+            result.append(correspondence);
+        }
+    }
+    return result;
+}
+
+TargetCorrespondence* TargetManager::getCorrespondence(const QString& targetId1, const QString& targetId2)
+{
+    auto it = std::find_if(correspondences_.begin(), correspondences_.end(),
+        [&](const TargetCorrespondence& c) {
+            return (c.targetId1() == targetId1 && c.targetId2() == targetId2) ||
+                   (c.targetId1() == targetId2 && c.targetId2() == targetId1);
+        });
     
-    stats.totalTargets = m_targets.size();
-    stats.correspondences = m_correspondences.size();
+    return (it != correspondences_.end()) ? &(*it) : nullptr;
+}
+
+int TargetManager::getCorrespondenceCount() const
+{
+    return correspondences_.size();
+}
+
+bool TargetManager::hasCorrespondence(const QString& targetId1, const QString& targetId2) const
+{
+    return getCorrespondence(targetId1, targetId2) != nullptr;
+}
+
+QStringList TargetManager::getCorrespondingTargets(const QString& targetId) const
+{
+    QStringList result;
+    for (const auto& correspondence : correspondences_) {
+        if (correspondence.targetId1() == targetId) {
+            result.append(correspondence.targetId2());
+        } else if (correspondence.targetId2() == targetId) {
+            result.append(correspondence.targetId1());
+        }
+    }
+    return result;
+}
+
+float TargetManager::getAverageTargetConfidence() const
+{
+    if (targets_.empty()) {
+        return 0.0f;
+    }
     
-    float qualitySum = 0.0f;
-    int validCount = 0;
+    float sum = 0.0f;
+    for (const auto& pair : targets_) {
+        sum += pair.second->confidence();
+    }
     
-    for (const auto& target : m_targets) {
-        if (target) {
-            if (target->isValid()) {
-                stats.validTargets++;
-                validCount++;
-                qualitySum += target->getQuality();
+    return sum / static_cast<float>(targets_.size());
+}
+
+float TargetManager::getAverageCorrespondenceConfidence() const
+{
+    if (correspondences_.isEmpty()) {
+        return 0.0f;
+    }
+    
+    float sum = 0.0f;
+    for (const auto& correspondence : correspondences_) {
+        sum += correspondence.confidence();
+    }
+    
+    return sum / static_cast<float>(correspondences_.size());
+}
+
+int TargetManager::getValidTargetCount() const
+{
+    int count = 0;
+    for (const auto& pair : targets_) {
+        if (pair.second->isValid() && pair.second->validate()) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int TargetManager::getValidCorrespondenceCount() const
+{
+    int count = 0;
+    for (const auto& correspondence : correspondences_) {
+        if (correspondence.isValid() && correspondence.validate()) {
+            count++;
+        }
+    }
+    return count;
+}
+
+void TargetManager::clear()
+{
+    clearCorrespondences();
+    clearTargets();
+    scanTargets_.clear();
+    nextTargetId_ = 1;
+    emit dataChanged();
+}
+
+void TargetManager::clearScan(const QString& scanId)
+{
+    // Remove correspondences for this scan
+    removeCorrespondencesForScan(scanId);
+    
+    // Remove targets for this scan
+    auto it = scanTargets_.find(scanId);
+    if (it != scanTargets_.end()) {
+        QStringList targetIds = it.value();
+        for (const QString& targetId : targetIds) {
+            auto targetIt = targets_.find(targetId);
+            if (targetIt != targets_.end()) {
+                targets_.erase(targetIt);
+                emit targetRemoved(targetId);
             }
-            
-            QString type = target->getType();
-            if (type == "Sphere") {
-                stats.sphereTargets++;
-            } else if (type == "Checkerboard") {
-                stats.checkerboardTargets++;
-            } else if (type == "Natural Point") {
-                stats.naturalPointTargets++;
-            }
         }
+        scanTargets_.erase(it);
     }
     
-    if (validCount > 0) {
-        stats.averageQuality = qualitySum / validCount;
-    }
+    emit dataChanged();
+}
+
+void TargetManager::clearTargets()
+{
+    targets_.clear();
+    scanTargets_.clear();
+    emit dataChanged();
+}
+
+void TargetManager::clearCorrespondences()
+{
+    correspondences_.clear();
+    emit dataChanged();
+}
+
+QString TargetManager::generateTargetId() const
+{
+    QString id;
+    do {
+        id = QString("target_%1").arg(nextTargetId_++);
+    } while (targets_.contains(id));
     
-    return stats;
+    return id;
 }
 
-void TargetManager::updateTargetQualities()
+void TargetManager::updateScanTargetMapping(const QString& scanId, const QString& targetId)
 {
-    for (const auto& target : m_targets) {
-        if (target) {
-            // Quality update logic would go here
-            // For now, we'll just emit the update signal
-            emit targetUpdated(target->getTargetId());
-        }
+    if (!scanTargets_[scanId].contains(targetId)) {
+        scanTargets_[scanId].append(targetId);
     }
-
-    TargetStatistics stats = getStatistics();
-    emit statisticsUpdated(stats);
 }
 
-QList<TargetCorrespondence> TargetManager::findPotentialCorrespondences(
-    const QString& scanId1, const QString& scanId2, float maxDistance) const
+void TargetManager::removeScanTargetMapping(const QString& scanId, const QString& targetId)
 {
-    QList<TargetCorrespondence> potentialCorrespondences;
-
-    QList<std::shared_ptr<Target>> targets1 = getTargetsForScan(scanId1);
-    QList<std::shared_ptr<Target>> targets2 = getTargetsForScan(scanId2);
-
-    for (const auto& target1 : targets1) {
-        for (const auto& target2 : targets2) {
-            if (!target1 || !target2) continue;
-
-            // Only match targets of the same type
-            if (target1->getType() != target2->getType()) continue;
-
-            // Check distance
-            float distance = (target1->getPosition() - target2->getPosition()).length();
-            if (distance <= maxDistance) {
-                TargetCorrespondence corr(target1->getTargetId(), target2->getTargetId(),
-                                        scanId1, scanId2);
-                corr.distance = distance;
-                corr.confidence = 1.0f - (distance / maxDistance);  // Higher confidence for closer targets
-
-                potentialCorrespondences.append(corr);
-            }
+    auto it = scanTargets_.find(scanId);
+    if (it != scanTargets_.end()) {
+        it.value().removeAll(targetId);
+        if (it.value().isEmpty()) {
+            scanTargets_.erase(it);
         }
     }
+}
 
-    // Sort by confidence (best first)
-    std::sort(potentialCorrespondences.begin(), potentialCorrespondences.end(),
-              [](const TargetCorrespondence& a, const TargetCorrespondence& b) {
-                  return a.confidence > b.confidence;
-              });
-
-    return potentialCorrespondences;
+bool TargetManager::isCorrespondenceValid(const TargetCorrespondence& correspondence) const
+{
+    return hasTarget(correspondence.targetId1()) && hasTarget(correspondence.targetId2());
 }
 
 QVariantMap TargetManager::serialize() const
 {
     QVariantMap data;
-
+    
     // Serialize targets
-    QVariantMap targetsData;
-    for (auto it = m_targets.begin(); it != m_targets.end(); ++it) {
-        if (it.value()) {
-            targetsData[it.key()] = it.value()->serialize();
-        }
+    QVariantList targetsList;
+    for (const auto& pair : targets_) {
+        targetsList.append(pair.second->serialize());
     }
-    data["targets"] = targetsData;
-
-    // Serialize scan-target mapping
-    QVariantMap scanTargetsData;
-    for (auto it = m_scanTargets.begin(); it != m_scanTargets.end(); ++it) {
-        scanTargetsData[it.key()] = QVariantList(it.value().begin(), it.value().end());
-    }
-    data["scanTargets"] = scanTargetsData;
-
+    data["targets"] = targetsList;
+    
     // Serialize correspondences
-    QVariantList correspondencesData;
-    for (const auto& corr : m_correspondences) {
-        QVariantMap corrData;
-        corrData["targetId1"] = corr.targetId1;
-        corrData["targetId2"] = corr.targetId2;
-        corrData["scanId1"] = corr.scanId1;
-        corrData["scanId2"] = corr.scanId2;
-        corrData["confidence"] = corr.confidence;
-        corrData["distance"] = corr.distance;
-        correspondencesData.append(corrData);
+    QVariantList correspondencesList;
+    for (const auto& correspondence : correspondences_) {
+        correspondencesList.append(correspondence.serialize());
     }
-    data["correspondences"] = correspondencesData;
-
-    // Add metadata
-    data["version"] = "1.0";
-    data["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    data["nextTargetId"] = m_nextTargetId;
-
+    data["correspondences"] = correspondencesList;
+    
+    data["nextTargetId"] = nextTargetId_;
+    
     return data;
 }
 
 bool TargetManager::deserialize(const QVariantMap& data)
 {
-    if (!data.contains("targets") || !data.contains("correspondences")) {
-        qWarning() << "TargetManager: Invalid serialization data";
-        return false;
-    }
-
-    // Clear existing data
-    clearAllTargets();
-
+    clear();
+    
     // Deserialize targets
-    QVariantMap targetsData = data["targets"].toMap();
-    for (auto it = targetsData.begin(); it != targetsData.end(); ++it) {
-        QVariantMap targetData = it.value().toMap();
-        QString targetType = targetData["type"].toString();
-
-        std::shared_ptr<Target> target;
-
-        if (targetType == "Sphere") {
-            target = std::make_shared<SphereTarget>("", QVector3D(), 0.0f);
-        } else if (targetType == "Checkerboard") {
-            target = std::make_shared<CheckerboardTarget>("", QVector3D(), QList<QVector3D>());
-        } else if (targetType == "Natural Point") {
-            target = std::make_shared<NaturalPointTarget>("", QVector3D(), "");
-        }
-
-        if (target && target->deserialize(targetData)) {
-            m_targets[it.key()] = target;
+    QVariantList targetsList = data.value("targets").toList();
+    for (const auto& targetVar : targetsList) {
+        QVariantMap targetData = targetVar.toMap();
+        auto target = createTargetFromData(targetData);
+        if (target) {
+            QString scanId = target->scanId();
+            QString targetId = target->targetId();
+            targets_[targetId] = std::move(target);
+            updateScanTargetMapping(scanId, targetId);
         }
     }
-
-    // Deserialize scan-target mapping
-    if (data.contains("scanTargets")) {
-        QVariantMap scanTargetsData = data["scanTargets"].toMap();
-        for (auto it = scanTargetsData.begin(); it != scanTargetsData.end(); ++it) {
-            QVariantList targetList = it.value().toList();
-            QStringList targetIds;
-            for (const auto& targetId : targetList) {
-                targetIds.append(targetId.toString());
-            }
-            m_scanTargets[it.key()] = targetIds;
-        }
-    }
-
+    
     // Deserialize correspondences
-    QVariantList correspondencesData = data["correspondences"].toList();
-    for (const auto& corrVar : correspondencesData) {
-        QVariantMap corrData = corrVar.toMap();
-        TargetCorrespondence corr(
-            corrData["targetId1"].toString(),
-            corrData["targetId2"].toString(),
-            corrData["scanId1"].toString(),
-            corrData["scanId2"].toString()
-        );
-        corr.confidence = corrData["confidence"].toFloat();
-        corr.distance = corrData["distance"].toFloat();
-
-        m_correspondences.append(corr);
+    QVariantList correspondencesList = data.value("correspondences").toList();
+    for (const auto& correspondenceVar : correspondencesList) {
+        QVariantMap correspondenceData = correspondenceVar.toMap();
+        TargetCorrespondence correspondence;
+        if (correspondence.deserialize(correspondenceData)) {
+            correspondences_.append(correspondence);
+        }
     }
-
-    // Restore metadata
-    if (data.contains("nextTargetId")) {
-        m_nextTargetId = data["nextTargetId"].toInt();
-    }
-
-    qDebug() << "TargetManager: Deserialized" << m_targets.size() << "targets and"
-             << m_correspondences.size() << "correspondences";
-
+    
+    nextTargetId_ = data.value("nextTargetId", 1).toInt();
+    
+    emit dataChanged();
     return true;
 }
 
-bool TargetManager::saveToFile(const QString& filePath) const
+bool TargetManager::validate() const
 {
-    QVariantMap data = serialize();
-
-    QJsonDocument doc = QJsonDocument::fromVariant(data);
-    QByteArray jsonData = doc.toJson();
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        qWarning() << "TargetManager: Cannot open file for writing:" << filePath;
-        return false;
+    // Validate all targets
+    for (const auto& pair : targets_) {
+        if (!pair.second->validate()) {
+            return false;
+        }
     }
-
-    qint64 bytesWritten = file.write(jsonData);
-    file.close();
-
-    if (bytesWritten != jsonData.size()) {
-        qWarning() << "TargetManager: Error writing to file:" << filePath;
-        return false;
+    
+    // Validate all correspondences
+    for (const auto& correspondence : correspondences_) {
+        if (!correspondence.validate() || !isCorrespondenceValid(correspondence)) {
+            return false;
+        }
     }
-
-    qDebug() << "TargetManager: Saved data to" << filePath;
+    
     return true;
 }
 
-bool TargetManager::loadFromFile(const QString& filePath)
+QStringList TargetManager::getValidationErrors() const
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "TargetManager: Cannot open file for reading:" << filePath;
-        return false;
+    QStringList errors;
+    
+    // Check target validation
+    for (const auto& pair : targets_) {
+        if (!pair.second->validate()) {
+            errors.append(QString("Target %1: %2").arg(pair.first, pair.second->getValidationError()));
+        }
     }
-
-    QByteArray jsonData = file.readAll();
-    file.close();
-
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &error);
-
-    if (error.error != QJsonParseError::NoError) {
-        qWarning() << "TargetManager: JSON parse error:" << error.errorString();
-        return false;
+    
+    // Check correspondence validation
+    for (const auto& correspondence : correspondences_) {
+        if (!correspondence.validate()) {
+            errors.append(QString("Correspondence %1-%2: %3")
+                         .arg(correspondence.targetId1(), correspondence.targetId2(), correspondence.getValidationError()));
+        }
+        if (!isCorrespondenceValid(correspondence)) {
+            errors.append(QString("Correspondence %1-%2: References non-existent targets")
+                         .arg(correspondence.targetId1(), correspondence.targetId2()));
+        }
     }
-
-    QVariantMap data = doc.toVariant().toMap();
-    bool success = deserialize(data);
-
-    if (success) {
-        qDebug() << "TargetManager: Loaded data from" << filePath;
-    }
-
-    return success;
-}
-
-QString TargetManager::generateUniqueTargetId() const
-{
-    return QString("target_%1_%2")
-        .arg(QDateTime::currentMSecsSinceEpoch())
-        .arg(m_nextTargetId++);
-}
-
-bool TargetManager::validateCorrespondence(const TargetCorrespondence& correspondence) const
-{
-    // Check that both targets exist
-    if (!m_targets.contains(correspondence.targetId1) ||
-        !m_targets.contains(correspondence.targetId2)) {
-        return false;
-    }
-
-    // Check that targets are from different scans
-    if (correspondence.scanId1 == correspondence.scanId2) {
-        return false;
-    }
-
-    // Check that targets are valid
-    auto target1 = m_targets[correspondence.targetId1];
-    auto target2 = m_targets[correspondence.targetId2];
-
-    if (!target1 || !target2 || !target1->isValid() || !target2->isValid()) {
-        return false;
-    }
-
-    // Check that targets are of the same type
-    if (target1->getType() != target2->getType()) {
-        return false;
-    }
-
-    return correspondence.isValid();
-}
-
-float TargetManager::calculateCorrespondenceDistance(const TargetCorrespondence& correspondence) const
-{
-    auto target1 = getTarget(correspondence.targetId1);
-    auto target2 = getTarget(correspondence.targetId2);
-
-    if (!target1 || !target2) {
-        return std::numeric_limits<float>::max();
-    }
-
-    return (target1->getPosition() - target2->getPosition()).length();
-}
-
-void TargetManager::updateCorrespondenceQuality(TargetCorrespondence& correspondence) const
-{
-    auto target1 = getTarget(correspondence.targetId1);
-    auto target2 = getTarget(correspondence.targetId2);
-
-    if (!target1 || !target2) {
-        correspondence.confidence = 0.0f;
-        return;
-    }
-
-    // Calculate distance
-    correspondence.distance = calculateCorrespondenceDistance(correspondence);
-
-    // Calculate confidence based on target qualities and distance
-    float avgQuality = (target1->getQuality() + target2->getQuality()) * 0.5f;
-    float distanceFactor = std::exp(-correspondence.distance);  // Closer = better
-
-    correspondence.confidence = avgQuality * distanceFactor;
-    correspondence.confidence = std::min(1.0f, correspondence.confidence);
-}
-
-// TargetStatistics implementation
-QVariantMap TargetManager::TargetStatistics::toVariantMap() const
-{
-    QVariantMap data;
-    data["totalTargets"] = totalTargets;
-    data["sphereTargets"] = sphereTargets;
-    data["checkerboardTargets"] = checkerboardTargets;
-    data["naturalPointTargets"] = naturalPointTargets;
-    data["validTargets"] = validTargets;
-    data["correspondences"] = correspondences;
-    data["averageQuality"] = averageQuality;
-    return data;
+    
+    return errors;
 }

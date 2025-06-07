@@ -1,147 +1,475 @@
 #include "Target.h"
+#include <QDebug>
+#include <QtMath>
 
 // Target base class implementation
 Target::Target(const QString& id, const QVector3D& pos)
-    : m_targetId(id), m_position(pos), m_quality(1.0f), m_isValid(true)
+    : targetId_(id)
+    , position_(pos)
+    , confidence_(1.0f)
+    , isValid_(true)
 {
 }
 
 QVariantMap Target::serialize() const
 {
-    QVariantMap data;
-    data["targetId"] = m_targetId;
+    QVariantMap data = serializeBase();
     data["type"] = getType();
-    data["position"] = QVariantList{m_position.x(), m_position.y(), m_position.z()};
-    data["quality"] = m_quality;
-    data["isValid"] = m_isValid;
     return data;
 }
 
 bool Target::deserialize(const QVariantMap& data)
 {
-    if (!data.contains("targetId") || !data.contains("position")) {
+    return deserializeBase(data);
+}
+
+bool Target::validate() const
+{
+    if (targetId_.isEmpty()) {
         return false;
     }
     
-    m_targetId = data["targetId"].toString();
+    if (!position_.isNull() && (qIsNaN(position_.x()) || qIsNaN(position_.y()) || qIsNaN(position_.z()))) {
+        return false;
+    }
     
-    QVariantList posList = data["position"].toList();
+    if (confidence_ < 0.0f || confidence_ > 1.0f) {
+        return false;
+    }
+    
+    return true;
+}
+
+QString Target::getValidationError() const
+{
+    if (targetId_.isEmpty()) {
+        return "Target ID cannot be empty";
+    }
+    
+    if (!position_.isNull() && (qIsNaN(position_.x()) || qIsNaN(position_.y()) || qIsNaN(position_.z()))) {
+        return "Target position contains invalid values";
+    }
+    
+    if (confidence_ < 0.0f || confidence_ > 1.0f) {
+        return "Confidence must be between 0.0 and 1.0";
+    }
+    
+    return QString();
+}
+
+QVariantMap Target::serializeBase() const
+{
+    QVariantMap data;
+    data["targetId"] = targetId_;
+    data["position"] = QVariantList{position_.x(), position_.y(), position_.z()};
+    data["confidence"] = confidence_;
+    data["isValid"] = isValid_;
+    data["description"] = description_;
+    data["scanId"] = scanId_;
+    return data;
+}
+
+bool Target::deserializeBase(const QVariantMap& data)
+{
+    targetId_ = data.value("targetId").toString();
+    
+    QVariantList posList = data.value("position").toList();
     if (posList.size() == 3) {
-        m_position = QVector3D(posList[0].toFloat(), posList[1].toFloat(), posList[2].toFloat());
-    } else {
-        return false;
+        position_ = QVector3D(posList[0].toFloat(), posList[1].toFloat(), posList[2].toFloat());
     }
     
-    if (data.contains("quality")) m_quality = data["quality"].toFloat();
-    if (data.contains("isValid")) m_isValid = data["isValid"].toBool();
+    confidence_ = data.value("confidence", 1.0f).toFloat();
+    isValid_ = data.value("isValid", true).toBool();
+    description_ = data.value("description").toString();
+    scanId_ = data.value("scanId").toString();
     
     return true;
 }
 
 // SphereTarget implementation
 SphereTarget::SphereTarget(const QString& id, const QVector3D& pos, float radius)
-    : Target(id, pos), m_radius(radius), m_rmsError(0.0f), m_inlierCount(0)
+    : Target(id, pos)
+    , radius_(radius)
+    , rmsError_(0.0f)
+    , inlierCount_(0)
+    , coverage_(0.0f)
 {
 }
 
 QVariantMap SphereTarget::serialize() const
 {
     QVariantMap data = Target::serialize();
-    data["radius"] = m_radius;
-    data["rmsError"] = m_rmsError;
-    data["inlierCount"] = m_inlierCount;
+    data["radius"] = radius_;
+    data["rmsError"] = rmsError_;
+    data["inlierCount"] = inlierCount_;
+    data["coverage"] = coverage_;
     return data;
 }
 
 bool SphereTarget::deserialize(const QVariantMap& data)
 {
-    if (!Target::deserialize(data) || !data.contains("radius")) {
+    if (!Target::deserialize(data)) {
         return false;
     }
     
-    m_radius = data["radius"].toFloat();
-    if (data.contains("rmsError")) m_rmsError = data["rmsError"].toFloat();
-    if (data.contains("inlierCount")) m_inlierCount = data["inlierCount"].toInt();
+    radius_ = data.value("radius", 0.0f).toFloat();
+    rmsError_ = data.value("rmsError", 0.0f).toFloat();
+    inlierCount_ = data.value("inlierCount", 0).toInt();
+    coverage_ = data.value("coverage", 0.0f).toFloat();
     
     return true;
 }
 
-// NaturalPointTarget implementation
-NaturalPointTarget::NaturalPointTarget(const QString& id, const QVector3D& pos, const QString& description)
-    : Target(id, pos), m_description(description), m_featureVector(0, 0, 0), m_confidence(1.0f)
+std::unique_ptr<Target> SphereTarget::clone() const
 {
+    auto cloned = std::make_unique<SphereTarget>(targetId_, position_, radius_);
+    cloned->setConfidence(confidence_);
+    cloned->setValid(isValid_);
+    cloned->setDescription(description_);
+    cloned->setScanId(scanId_);
+    cloned->setRmsError(rmsError_);
+    cloned->setInlierCount(inlierCount_);
+    cloned->setCoverage(coverage_);
+    return cloned;
 }
 
-QVariantMap NaturalPointTarget::serialize() const
+bool SphereTarget::validate() const
 {
-    QVariantMap data = Target::serialize();
-    data["description"] = m_description;
-    data["featureVector"] = QVariantList{m_featureVector.x(), m_featureVector.y(), m_featureVector.z()};
-    data["confidence"] = m_confidence;
-    return data;
-}
-
-bool NaturalPointTarget::deserialize(const QVariantMap& data)
-{
-    if (!Target::deserialize(data)) return false;
+    if (!Target::validate()) {
+        return false;
+    }
     
-    if (data.contains("description")) m_description = data["description"].toString();
-    if (data.contains("confidence")) m_confidence = data["confidence"].toFloat();
+    if (radius_ <= 0.0f) {
+        return false;
+    }
     
-    if (data.contains("featureVector")) {
-        QVariantList featureList = data["featureVector"].toList();
-        if (featureList.size() == 3) {
-            m_featureVector = QVector3D(featureList[0].toFloat(), featureList[1].toFloat(), featureList[2].toFloat());
-        }
+    if (rmsError_ < 0.0f) {
+        return false;
+    }
+    
+    if (inlierCount_ < 0) {
+        return false;
+    }
+    
+    if (coverage_ < 0.0f || coverage_ > 1.0f) {
+        return false;
     }
     
     return true;
+}
+
+QString SphereTarget::getValidationError() const
+{
+    QString baseError = Target::getValidationError();
+    if (!baseError.isEmpty()) {
+        return baseError;
+    }
+    
+    if (radius_ <= 0.0f) {
+        return "Sphere radius must be positive";
+    }
+    
+    if (rmsError_ < 0.0f) {
+        return "RMS error cannot be negative";
+    }
+    
+    if (inlierCount_ < 0) {
+        return "Inlier count cannot be negative";
+    }
+    
+    if (coverage_ < 0.0f || coverage_ > 1.0f) {
+        return "Coverage must be between 0.0 and 1.0";
+    }
+    
+    return QString();
 }
 
 // CheckerboardTarget implementation
 CheckerboardTarget::CheckerboardTarget(const QString& id, const QVector3D& pos, const QList<QVector3D>& corners)
-    : Target(id, pos), m_cornerPoints(corners), m_normal(0, 0, 1), m_patternWidth(0), m_patternHeight(0)
+    : Target(id, pos)
+    , cornerPoints_(corners)
+    , planeError_(0.0f)
 {
+    calculateDerivedProperties();
+}
+
+QVector3D CheckerboardTarget::centroid() const
+{
+    if (cornerPoints_.isEmpty()) {
+        return QVector3D();
+    }
+    
+    return calculateCentroid(cornerPoints_);
+}
+
+float CheckerboardTarget::area() const
+{
+    if (cornerPoints_.size() < 3) {
+        return 0.0f;
+    }
+    
+    // Simple area calculation for quadrilateral (assuming 4 corners)
+    if (cornerPoints_.size() == 4) {
+        QVector3D v1 = cornerPoints_[1] - cornerPoints_[0];
+        QVector3D v2 = cornerPoints_[3] - cornerPoints_[0];
+        return 0.5f * QVector3D::crossProduct(v1, v2).length();
+    }
+    
+    return 0.0f;
 }
 
 QVariantMap CheckerboardTarget::serialize() const
 {
     QVariantMap data = Target::serialize();
     
-    QVariantList cornersList;
-    for (const auto& corner : m_cornerPoints) {
-        cornersList.append(QVariantList{corner.x(), corner.y(), corner.z()});
+    QVariantList corners;
+    for (const auto& corner : cornerPoints_) {
+        corners.append(QVariantList{corner.x(), corner.y(), corner.z()});
     }
-    data["cornerPoints"] = cornersList;
-    data["normal"] = QVariantList{m_normal.x(), m_normal.y(), m_normal.z()};
-    data["patternWidth"] = m_patternWidth;
-    data["patternHeight"] = m_patternHeight;
+    data["cornerPoints"] = corners;
+    data["normal"] = QVariantList{normal_.x(), normal_.y(), normal_.z()};
+    data["planeError"] = planeError_;
     
     return data;
 }
 
 bool CheckerboardTarget::deserialize(const QVariantMap& data)
 {
-    if (!Target::deserialize(data) || !data.contains("cornerPoints")) return false;
+    if (!Target::deserialize(data)) {
+        return false;
+    }
     
-    QVariantList cornersList = data["cornerPoints"].toList();
-    m_cornerPoints.clear();
-    for (const auto& cornerVar : cornersList) {
-        QVariantList cornerCoords = cornerVar.toList();
-        if (cornerCoords.size() == 3) {
-            m_cornerPoints.append(QVector3D(cornerCoords[0].toFloat(), cornerCoords[1].toFloat(), cornerCoords[2].toFloat()));
+    cornerPoints_.clear();
+    QVariantList corners = data.value("cornerPoints").toList();
+    for (const auto& cornerVar : corners) {
+        QVariantList cornerList = cornerVar.toList();
+        if (cornerList.size() == 3) {
+            cornerPoints_.append(QVector3D(cornerList[0].toFloat(), 
+                                         cornerList[1].toFloat(), 
+                                         cornerList[2].toFloat()));
         }
     }
     
-    if (data.contains("normal")) {
-        QVariantList normalList = data["normal"].toList();
-        if (normalList.size() == 3) {
-            m_normal = QVector3D(normalList[0].toFloat(), normalList[1].toFloat(), normalList[2].toFloat());
-        }
+    QVariantList normalList = data.value("normal").toList();
+    if (normalList.size() == 3) {
+        normal_ = QVector3D(normalList[0].toFloat(), normalList[1].toFloat(), normalList[2].toFloat());
     }
     
-    if (data.contains("patternWidth")) m_patternWidth = data["patternWidth"].toInt();
-    if (data.contains("patternHeight")) m_patternHeight = data["patternHeight"].toInt();
+    planeError_ = data.value("planeError", 0.0f).toFloat();
     
     return true;
+}
+
+std::unique_ptr<Target> CheckerboardTarget::clone() const
+{
+    auto cloned = std::make_unique<CheckerboardTarget>(targetId_, position_, cornerPoints_);
+    cloned->setConfidence(confidence_);
+    cloned->setValid(isValid_);
+    cloned->setDescription(description_);
+    cloned->setScanId(scanId_);
+    cloned->setNormal(normal_);
+    cloned->setPlaneError(planeError_);
+    return cloned;
+}
+
+bool CheckerboardTarget::validate() const
+{
+    if (!Target::validate()) {
+        return false;
+    }
+    
+    if (cornerPoints_.size() < 3) {
+        return false;
+    }
+    
+    if (planeError_ < 0.0f) {
+        return false;
+    }
+    
+    return true;
+}
+
+QString CheckerboardTarget::getValidationError() const
+{
+    QString baseError = Target::getValidationError();
+    if (!baseError.isEmpty()) {
+        return baseError;
+    }
+    
+    if (cornerPoints_.size() < 3) {
+        return "Checkerboard must have at least 3 corner points";
+    }
+    
+    if (planeError_ < 0.0f) {
+        return "Plane error cannot be negative";
+    }
+    
+    return QString();
+}
+
+void CheckerboardTarget::calculateDerivedProperties()
+{
+    if (cornerPoints_.size() >= 3) {
+        // Calculate normal vector from first three points
+        QVector3D v1 = cornerPoints_[1] - cornerPoints_[0];
+        QVector3D v2 = cornerPoints_[2] - cornerPoints_[0];
+        normal_ = QVector3D::crossProduct(v1, v2).normalized();
+        
+        // Update position to centroid if not set
+        if (position_.isNull()) {
+            position_ = centroid();
+        }
+    }
+}
+
+// NaturalPointTarget implementation
+NaturalPointTarget::NaturalPointTarget(const QString& id, const QVector3D& pos, const QString& desc)
+    : Target(id, pos)
+    , curvature_(0.0f)
+    , distinctiveness_(0.0f)
+    , neighborCount_(0)
+{
+    setDescription(desc);
+}
+
+QVariantMap NaturalPointTarget::serialize() const
+{
+    QVariantMap data = Target::serialize();
+    data["normal"] = QVariantList{normal_.x(), normal_.y(), normal_.z()};
+    data["curvature"] = curvature_;
+    data["distinctiveness"] = distinctiveness_;
+    data["neighborCount"] = neighborCount_;
+    
+    QVariantList descriptor;
+    for (float value : featureDescriptor_) {
+        descriptor.append(value);
+    }
+    data["featureDescriptor"] = descriptor;
+    
+    return data;
+}
+
+bool NaturalPointTarget::deserialize(const QVariantMap& data)
+{
+    if (!Target::deserialize(data)) {
+        return false;
+    }
+    
+    QVariantList normalList = data.value("normal").toList();
+    if (normalList.size() == 3) {
+        normal_ = QVector3D(normalList[0].toFloat(), normalList[1].toFloat(), normalList[2].toFloat());
+    }
+    
+    curvature_ = data.value("curvature", 0.0f).toFloat();
+    distinctiveness_ = data.value("distinctiveness", 0.0f).toFloat();
+    neighborCount_ = data.value("neighborCount", 0).toInt();
+    
+    featureDescriptor_.clear();
+    QVariantList descriptor = data.value("featureDescriptor").toList();
+    for (const auto& value : descriptor) {
+        featureDescriptor_.append(value.toFloat());
+    }
+    
+    return true;
+}
+
+std::unique_ptr<Target> NaturalPointTarget::clone() const
+{
+    auto cloned = std::make_unique<NaturalPointTarget>(targetId_, position_, description_);
+    cloned->setConfidence(confidence_);
+    cloned->setValid(isValid_);
+    cloned->setScanId(scanId_);
+    cloned->setNormal(normal_);
+    cloned->setCurvature(curvature_);
+    cloned->setDistinctiveness(distinctiveness_);
+    cloned->setNeighborCount(neighborCount_);
+    cloned->setFeatureDescriptor(featureDescriptor_);
+    return cloned;
+}
+
+bool NaturalPointTarget::validate() const
+{
+    if (!Target::validate()) {
+        return false;
+    }
+    
+    if (distinctiveness_ < 0.0f || distinctiveness_ > 1.0f) {
+        return false;
+    }
+    
+    if (neighborCount_ < 0) {
+        return false;
+    }
+    
+    return true;
+}
+
+QString NaturalPointTarget::getValidationError() const
+{
+    QString baseError = Target::getValidationError();
+    if (!baseError.isEmpty()) {
+        return baseError;
+    }
+    
+    if (distinctiveness_ < 0.0f || distinctiveness_ > 1.0f) {
+        return "Distinctiveness must be between 0.0 and 1.0";
+    }
+    
+    if (neighborCount_ < 0) {
+        return "Neighbor count cannot be negative";
+    }
+    
+    return QString();
+}
+
+// Utility functions
+std::unique_ptr<Target> createTargetFromData(const QVariantMap& data)
+{
+    QString type = data.value("type").toString();
+    
+    if (type == "Sphere") {
+        auto target = std::make_unique<SphereTarget>("", QVector3D(), 0.0f);
+        if (target->deserialize(data)) {
+            return target;
+        }
+    } else if (type == "Checkerboard") {
+        auto target = std::make_unique<CheckerboardTarget>("", QVector3D(), QList<QVector3D>());
+        if (target->deserialize(data)) {
+            return target;
+        }
+    } else if (type == "NaturalPoint") {
+        auto target = std::make_unique<NaturalPointTarget>("", QVector3D());
+        if (target->deserialize(data)) {
+            return target;
+        }
+    }
+    
+    return nullptr;
+}
+
+QString targetTypeToString(const Target* target)
+{
+    if (!target) {
+        return "Unknown";
+    }
+    return target->getType();
+}
+
+QVector3D calculateCentroid(const QList<QVector3D>& points)
+{
+    if (points.isEmpty()) {
+        return QVector3D();
+    }
+    
+    QVector3D sum;
+    for (const auto& point : points) {
+        sum += point;
+    }
+    
+    return sum / static_cast<float>(points.size());
+}
+
+float calculateDistance(const QVector3D& p1, const QVector3D& p2)
+{
+    return (p2 - p1).length();
 }
