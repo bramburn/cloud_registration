@@ -24,4 +24,8 @@
         <file>icons/dark/scan.svg</file>
         <file>icons/dark/cluster.svg</file>
     </qresource>
+    <qresource prefix="/shaders">
+        <!-- Sprint 6: GPU culling compute shaders -->
+        <file>shaders/culling.comp</file>
+    </qresource>
 </RCC>

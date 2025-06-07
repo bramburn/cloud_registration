@@ -207,6 +207,7 @@ set(SOURCES
     src/scanimportmanager.cpp
     src/E57ParserCore.cpp
     src/ProjectStateService.cpp
+    src/rendering/GpuCuller.cpp
 )
 
 # Header files
@@ -480,8 +481,26 @@ if(TARGET GTest::gtest_main)
         target_include_directories(MainPresenterTests PRIVATE src)
         add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
 
+        # Sprint 6: GPU Culler Tests
+        add_executable(GpuCullerTests
+            tests/test_gpuculler.cpp
+            src/rendering/GpuCuller.cpp
+            src/octree.cpp
+        )
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests)
+        target_link_libraries(GpuCullerTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::OpenGL
+            Qt6::OpenGLWidgets
+        )
+
+        target_include_directories(GpuCullerTests PRIVATE src)
+        add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
 
     else()
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)

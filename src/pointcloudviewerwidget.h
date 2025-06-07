@@ -21,6 +21,7 @@
 #include "screenspaceerror.h"
 #include "pointdata.h"
 #include "IPointCloudViewer.h"
+#include "rendering/GpuCuller.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
@@ -92,6 +93,19 @@ public slots:
     // Sprint R4: Splatting and lighting slots (Task R4.3.2)
     // Note: These methods are now declared in the interface implementation above
 
+    // Sprint 6: Multi-scan visualization support
+    void loadMultipleScans(const QStringList& scanIds);
+    void unloadScan(const QString& scanId);
+    void clearAllScans();
+    void setScanColor(const QString& scanId, const QColor& color);
+    QStringList getLoadedScans() const;
+
+    // Sprint 6: GPU culling support
+    void setGpuCullingEnabled(bool enabled);
+    bool isGpuCullingEnabled() const;
+    void setGpuCullingThreshold(float threshold);
+    float getGpuCullingPerformance() const;
+
 signals:
     // Sprint 2.2: Performance monitoring signals
     void statsUpdated(float fps, int visiblePoints);
@@ -157,6 +171,16 @@ private:
     void setupSplatShaders();
     void setupSplatTexture();
     void setupSplatVertexArrayObject();
+
+    // Sprint 6: GPU culling methods
+    void initializeGpuCuller();
+    void performGpuCulling();
+    void renderWithGpuCulling();
+
+    // Sprint 6: Multi-scan rendering methods
+    void renderMultipleScans();
+    void updateScanOctrees();
+    QColor generateScanColor(int scanIndex);
 
 private slots:
     void updateLoadingAnimation();
@@ -292,6 +316,22 @@ private:
     float m_fps;
     int m_frameCount;
     size_t m_visiblePointCount;
+
+    // Sprint 6: GPU culling support
+    std::unique_ptr<GpuCuller> m_gpuCuller;
+    bool m_gpuCullingEnabled;
+    float m_gpuCullingThreshold;
+
+    // Sprint 6: Multi-scan visualization support
+    struct ScanData {
+        QString scanId;
+        std::vector<float> pointData;
+        QColor color;
+        bool isLoaded;
+        std::unique_ptr<Octree> octree;
+    };
+    std::vector<ScanData> m_loadedScans;
+    QStringList m_activeScanIds;
 };
 
 #endif // POINTCLOUDVIEWERWIDGET_H

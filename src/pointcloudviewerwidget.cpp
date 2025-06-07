@@ -66,6 +66,9 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     , m_fps(0.0f)
     , m_frameCount(0)
     , m_visiblePointCount(0)
+    , m_gpuCuller(nullptr)
+    , m_gpuCullingEnabled(false)
+    , m_gpuCullingThreshold(1.0f)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -209,6 +212,11 @@ void PointCloudViewerWidget::initializeGL()
         qDebug() << "Setting up Sprint R4 splat VAOs...";
         setupSplatVertexArrayObject();
         qDebug() << "Sprint R4 splat VAOs setup completed";
+
+        // Sprint 6: Initialize GPU culler
+        qDebug() << "Initializing Sprint 6 GPU culler...";
+        initializeGpuCuller();
+        qDebug() << "Sprint 6 GPU culler initialization completed";
 
         qDebug() << "OpenGL initialized successfully";
     } catch (const std::exception& e) {
@@ -2457,4 +2465,314 @@ void PointCloudViewerWidget::optimizeMemory()
         m_octree.reset(new Octree());
     }
 }
+}
+
+// ============================================================================
+// Sprint 6: GPU Culling Implementation
+// ============================================================================
+
+void PointCloudViewerWidget::initializeGpuCuller() {
+    qDebug() << "PointCloudViewerWidget::initializeGpuCuller started";
+
+    try {
+        m_gpuCuller = std::make_unique<GpuCuller>();
+
+        if (m_gpuCuller->initialize()) {
+            qDebug() << "GPU culler initialized successfully";
+            qDebug() << "GPU memory usage:" << m_gpuCuller->getGpuMemoryUsage() << "bytes";
+        } else {
+            qWarning() << "Failed to initialize GPU culler - falling back to CPU culling";
+            m_gpuCuller.reset();
+            m_gpuCullingEnabled = false;
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Exception during GPU culler initialization:" << e.what();
+        m_gpuCuller.reset();
+        m_gpuCullingEnabled = false;
+    }
+
+    qDebug() << "PointCloudViewerWidget::initializeGpuCuller completed";
+}
+
+void PointCloudViewerWidget::setGpuCullingEnabled(bool enabled) {
+    if (enabled && !m_gpuCuller) {
+        qWarning() << "Cannot enable GPU culling - GPU culler not initialized";
+        return;
+    }
+
+    m_gpuCullingEnabled = enabled;
+    qDebug() << "GPU culling" << (enabled ? "enabled" : "disabled");
+
+    // Trigger a repaint to apply the change
+    update();
+}
+
+bool PointCloudViewerWidget::isGpuCullingEnabled() const {
+    return m_gpuCullingEnabled && m_gpuCuller && m_gpuCuller->isInitialized();
+}
+
+void PointCloudViewerWidget::setGpuCullingThreshold(float threshold) {
+    m_gpuCullingThreshold = threshold;
+    qDebug() << "GPU culling threshold set to:" << threshold;
+}
+
+float PointCloudViewerWidget::getGpuCullingPerformance() const {
+    if (m_gpuCuller) {
+        return m_gpuCuller->getLastCullingTime();
+    }
+    return 0.0f;
+}
+
+void PointCloudViewerWidget::performGpuCulling() {
+    if (!isGpuCullingEnabled() || !m_octree || !m_octree->root) {
+        return;
+    }
+
+    try {
+        // Convert octree to GPU format
+        auto gpuNodes = GpuCuller::convertOctreeToGpuFormat(m_octree->root.get());
+
+        if (gpuNodes.empty()) {
+            return;
+        }
+
+        // Upload octree data to GPU
+        if (!m_gpuCuller->updateOctreeData(gpuNodes)) {
+            qWarning() << "Failed to upload octree data to GPU";
+            return;
+        }
+
+        // Setup culling parameters
+        GpuCuller::CullingParams params;
+        params.viewProjectionMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+        params.cameraPosition = m_cameraPosition;
+        params.nearPlane = 0.1f;
+        params.farPlane = 1000.0f;
+        params.screenSpaceErrorThreshold = m_gpuCullingThreshold;
+        params.viewportWidth = static_cast<uint32_t>(width());
+        params.viewportHeight = static_cast<uint32_t>(height());
+        params.maxNodes = static_cast<uint32_t>(gpuNodes.size());
+
+        // Perform GPU culling
+        auto result = m_gpuCuller->performCulling(params);
+
+        // Update visible point count for performance monitoring
+        m_visiblePointCount = result.totalVisiblePoints;
+
+        qDebug() << "GPU culling completed:" << result.visibleNodeIndices.size()
+                 << "visible nodes," << result.totalVisiblePoints << "visible points in"
+                 << result.cullingTimeMs << "ms";
+
+    } catch (const std::exception& e) {
+        qWarning() << "Exception during GPU culling:" << e.what();
+    }
+}
+
+void PointCloudViewerWidget::renderWithGpuCulling() {
+    if (!isGpuCullingEnabled()) {
+        return;
+    }
+
+    // Perform GPU culling first
+    performGpuCulling();
+
+    // Render visible nodes only
+    // Note: This is a simplified implementation
+    // In a full implementation, you would render only the visible nodes
+    // returned by the GPU culler
+
+    qDebug() << "Rendering with GPU culling - visible points:" << m_visiblePointCount;
+}
+
+// ============================================================================
+// Sprint 6: Multi-Scan Visualization Implementation
+// ============================================================================
+
+void PointCloudViewerWidget::loadMultipleScans(const QStringList& scanIds) {
+    qDebug() << "Loading multiple scans:" << scanIds;
+
+    m_activeScanIds = scanIds;
+
+    // Initialize scan data structures
+    m_loadedScans.clear();
+    m_loadedScans.reserve(scanIds.size());
+
+    for (int i = 0; i < scanIds.size(); ++i) {
+        ScanData scanData;
+        scanData.scanId = scanIds[i];
+        scanData.color = generateScanColor(i);
+        scanData.isLoaded = false;
+        scanData.octree = std::make_unique<Octree>();
+
+        m_loadedScans.push_back(std::move(scanData));
+    }
+
+    qDebug() << "Initialized" << m_loadedScans.size() << "scan data structures";
+    update();
+}
+
+void PointCloudViewerWidget::unloadScan(const QString& scanId) {
+    qDebug() << "Unloading scan:" << scanId;
+
+    // Remove from active scan IDs
+    m_activeScanIds.removeAll(scanId);
+
+    // Remove from loaded scans
+    auto it = std::remove_if(m_loadedScans.begin(), m_loadedScans.end(),
+        [&scanId](const ScanData& scan) {
+            return scan.scanId == scanId;
+        });
+
+    if (it != m_loadedScans.end()) {
+        m_loadedScans.erase(it, m_loadedScans.end());
+        qDebug() << "Scan" << scanId << "unloaded successfully";
+        update();
+    } else {
+        qWarning() << "Scan" << scanId << "not found for unloading";
+    }
+}
+
+void PointCloudViewerWidget::clearAllScans() {
+    qDebug() << "Clearing all scans";
+
+    m_activeScanIds.clear();
+    m_loadedScans.clear();
+
+    // Reset to single scan mode
+    clearPointCloud();
+
+    qDebug() << "All scans cleared";
+    update();
+}
+
+void PointCloudViewerWidget::setScanColor(const QString& scanId, const QColor& color) {
+    for (auto& scan : m_loadedScans) {
+        if (scan.scanId == scanId) {
+            scan.color = color;
+            qDebug() << "Set color for scan" << scanId << "to" << color.name();
+            update();
+            return;
+        }
+    }
+
+    qWarning() << "Scan" << scanId << "not found for color setting";
+}
+
+QStringList PointCloudViewerWidget::getLoadedScans() const {
+    QStringList loadedScanIds;
+    for (const auto& scan : m_loadedScans) {
+        if (scan.isLoaded) {
+            loadedScanIds.append(scan.scanId);
+        }
+    }
+    return loadedScanIds;
+}
+
+void PointCloudViewerWidget::renderMultipleScans() {
+    if (m_loadedScans.empty()) {
+        return;
+    }
+
+    qDebug() << "Rendering" << m_loadedScans.size() << "scans";
+
+    // Render each scan with its unique color
+    for (const auto& scan : m_loadedScans) {
+        if (!scan.isLoaded || scan.pointData.empty()) {
+            continue;
+        }
+
+        // Set scan-specific color
+        QVector3D scanColor(scan.color.redF(), scan.color.greenF(), scan.color.blueF());
+
+        // Use shader program
+        if (!m_shaderProgram->bind()) {
+            qWarning() << "Failed to bind shader program for scan" << scan.scanId;
+            continue;
+        }
+
+        // Set uniforms
+        QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+        m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
+        m_shaderProgram->setUniformValue(m_colorLocation, scanColor);
+        m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
+
+        // Create temporary VBO for this scan
+        QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
+        if (tempBuffer.create()) {
+            tempBuffer.bind();
+            tempBuffer.allocate(scan.pointData.data(),
+                              static_cast<int>(scan.pointData.size() * sizeof(float)));
+
+            // Set vertex attributes
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+
+            // Draw points
+            glDrawArrays(GL_POINTS, 0, static_cast<int>(scan.pointData.size() / 3));
+
+            tempBuffer.release();
+        }
+
+        m_shaderProgram->release();
+    }
+
+    qDebug() << "Multi-scan rendering completed";
+}
+
+void PointCloudViewerWidget::updateScanOctrees() {
+    for (auto& scan : m_loadedScans) {
+        if (scan.isLoaded && !scan.pointData.empty() && scan.octree) {
+            // Convert point data to PointFullData format for octree
+            std::vector<PointFullData> points;
+            points.reserve(scan.pointData.size() / 3);
+
+            for (size_t i = 0; i < scan.pointData.size(); i += 3) {
+                if (i + 2 < scan.pointData.size()) {
+                    PointFullData point;
+                    point.x = scan.pointData[i];
+                    point.y = scan.pointData[i + 1];
+                    point.z = scan.pointData[i + 2];
+                    point.intensity = 1.0f;
+                    point.red = static_cast<uint8_t>(scan.color.red());
+                    point.green = static_cast<uint8_t>(scan.color.green());
+                    point.blue = static_cast<uint8_t>(scan.color.blue());
+                    points.push_back(point);
+                }
+            }
+
+            // Build octree for this scan
+            scan.octree->build(points);
+            qDebug() << "Built octree for scan" << scan.scanId
+                     << "- Points:" << points.size()
+                     << "Nodes:" << scan.octree->getNodeCount();
+        }
+    }
+}
+
+QColor PointCloudViewerWidget::generateScanColor(int scanIndex) {
+    // Generate distinct colors for different scans
+    static const QColor predefinedColors[] = {
+        QColor(255, 100, 100),  // Red
+        QColor(100, 255, 100),  // Green
+        QColor(100, 100, 255),  // Blue
+        QColor(255, 255, 100),  // Yellow
+        QColor(255, 100, 255),  // Magenta
+        QColor(100, 255, 255),  // Cyan
+        QColor(255, 150, 100),  // Orange
+        QColor(150, 100, 255),  // Purple
+        QColor(100, 255, 150),  // Light Green
+        QColor(255, 100, 150)   // Pink
+    };
+
+    const int numPredefined = sizeof(predefinedColors) / sizeof(predefinedColors[0]);
+
+    if (scanIndex < numPredefined) {
+        return predefinedColors[scanIndex];
+    } else {
+        // Generate procedural colors for additional scans
+        float hue = (scanIndex * 137.5f) / 360.0f; // Golden angle for good distribution
+        hue = hue - std::floor(hue); // Keep in [0,1] range
+
+        return QColor::fromHsvF(hue, 0.8f, 0.9f);
+    }
 }
