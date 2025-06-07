@@ -208,6 +208,13 @@ set(SOURCES
     src/E57ParserCore.cpp
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 3: Target Detection and Registration
+    src/registration/Target.cpp
+    src/registration/TargetManager.cpp
+    src/detection/TargetDetectionBase.cpp
+    src/detection/SphereDetector.cpp
+    src/detection/NaturalPointSelector.cpp
+    src/ui/TargetDetectionDialog.cpp
 )
 
 # Header files
@@ -240,6 +247,13 @@ set(HEADERS
     src/scanimportmanager.h
     src/E57ParserCore.h
     src/ProjectStateService.h
+    # Sprint 3: Target Detection and Registration Headers
+    src/registration/Target.h
+    src/registration/TargetManager.h
+    src/detection/TargetDetectionBase.h
+    src/detection/SphereDetector.h
+    src/detection/NaturalPointSelector.h
+    src/ui/TargetDetectionDialog.h
 )
 
 # Shader files
@@ -498,6 +512,65 @@ if(TARGET GTest::gtest_main)
         )
 
         target_include_directories(GpuCullerTests PRIVATE src)
+        add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
+
+        # Sprint 3: Target Detection and Registration Tests
+        add_executable(TargetTests
+            tests/test_target.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetTests PRIVATE src)
+        add_test(NAME TargetTests COMMAND TargetTests)
+
+        add_executable(TargetManagerTests
+            tests/test_targetmanager.cpp
+            src/registration/TargetManager.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetManagerTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetManagerTests PRIVATE src)
+        add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+        add_executable(SphereDetectorTests
+            tests/test_spheredetector.cpp
+            src/detection/SphereDetector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(SphereDetectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(SphereDetectorTests PRIVATE src)
+        add_test(NAME SphereDetectorTests COMMAND SphereDetectorTests)
+
+        add_executable(NaturalPointSelectorTests
+            tests/test_naturalpointselector.cpp
+            src/detection/NaturalPointSelector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(NaturalPointSelectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(NaturalPointSelectorTests PRIVATE src)
+        add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
 
         set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests)
