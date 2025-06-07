@@ -101,6 +101,11 @@ public slots:
     void setScanColor(const QString& scanId, const QColor& color);
     QStringList getLoadedScans() const;
 
+    // Sprint 4: Dynamic transformation support for real-time alignment preview
+    void setDynamicTransform(const QMatrix4x4& transform);
+    QMatrix4x4 getDynamicTransform() const { return m_dynamicTransform; }
+    void clearDynamicTransform();
+
     // Sprint 6: GPU culling support
     void setGpuCullingEnabled(bool enabled);
     bool isGpuCullingEnabled() const;
@@ -333,6 +338,9 @@ private:
     };
     std::vector<ScanData> m_loadedScans;
     QStringList m_activeScanIds;
+
+    // Sprint 4: Dynamic transformation for real-time alignment preview
+    QMatrix4x4 m_dynamicTransform;  ///< Additional transformation applied during rendering
 };
 
 #endif // POINTCLOUDVIEWERWIDGET_H
