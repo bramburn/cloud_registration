@@ -213,6 +213,14 @@ set(SOURCES
     src/camera/CameraController.cpp
     src/rendering/LODManager.cpp
     src/ui/ViewerToolbar.cpp
+    # Sprint 9: Advanced Registration Techniques
+    src/registration/PoseGraph.cpp
+    src/registration/PoseGraphBuilder.cpp
+    src/registration/FeatureBasedRegistration.cpp
+    src/registration/RegistrationWorkflowWidget.cpp
+    src/optimization/BundleAdjustment.cpp
+    src/features/FeatureExtractor.cpp
+    src/analysis/DifferenceAnalysis.cpp
 )
 
 # Header files
@@ -250,6 +258,14 @@ set(HEADERS
     src/camera/CameraController.h
     src/rendering/LODManager.h
     src/ui/ViewerToolbar.h
+    # Sprint 9: Advanced Registration Techniques
+    src/registration/PoseGraph.h
+    src/registration/PoseGraphBuilder.h
+    src/registration/FeatureBasedRegistration.h
+    src/registration/RegistrationWorkflowWidget.h
+    src/optimization/BundleAdjustment.h
+    src/features/FeatureExtractor.h
+    src/analysis/DifferenceAnalysis.h
 )
 
 # Shader files
@@ -545,7 +561,29 @@ if(TARGET GTest::gtest_main)
         target_include_directories(CameraControllerTests PRIVATE src)
         add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests)
+        # Sprint 9: Advanced Registration Tests
+        add_executable(Sprint9RegistrationTests
+            tests/test_sprint9_registration.cpp
+            src/registration/PoseGraph.cpp
+            src/registration/PoseGraphBuilder.cpp
+            src/optimization/BundleAdjustment.cpp
+            src/features/FeatureExtractor.cpp
+            src/registration/FeatureBasedRegistration.cpp
+            src/analysis/DifferenceAnalysis.cpp
+        )
+
+        target_link_libraries(Sprint9RegistrationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+        )
+
+        target_include_directories(Sprint9RegistrationTests PRIVATE src)
+        add_test(NAME Sprint9RegistrationTests COMMAND Sprint9RegistrationTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests Sprint9RegistrationTests)
 
     else()
         # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
