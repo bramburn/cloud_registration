@@ -6,126 +6,186 @@
 #include <vector>
 #include <memory>
 
-// Forward declarations for data structures
+/**
+ * @brief Point3D - Basic 3D point structure for E57 writing
+ */
 struct Point3D {
-    float x, y, z;
-    float intensity = 0.0f;
-    uint8_t r = 255, g = 255, b = 255;
-    
-    Point3D() = default;
-    Point3D(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
-    Point3D(float x_, float y_, float z_, float intensity_) 
-        : x(x_), y(y_), z(z_), intensity(intensity_) {}
-    Point3D(float x_, float y_, float z_, uint8_t r_, uint8_t g_, uint8_t b_)
-        : x(x_), y(y_), z(z_), r(r_), g(g_), b(b_) {}
+    double x, y, z;
+
+    Point3D() : x(0.0), y(0.0), z(0.0) {}
+    Point3D(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
 };
 
+/**
+ * @brief ScanPose - Pose information for a scan
+ */
+struct ScanPose {
+    double translation[3] = {0.0, 0.0, 0.0};
+    double rotation[4] = {1.0, 0.0, 0.0, 0.0}; // quaternion (w, x, y, z)
+};
+
+/**
+ * @brief ScanMetadata - Metadata for a scan
+ */
 struct ScanMetadata {
-    QString scanName;
+    QString name;
     QString description;
+    ScanPose pose;
+    int64_t pointCount = 0;
     QString acquisitionDateTime;
     QString sensorVendor;
     QString sensorModel;
     QString sensorSerialNumber;
-    
-    // Coordinate system information
-    double originX = 0.0;
-    double originY = 0.0;
-    double originZ = 0.0;
-    
-    // Transformation matrix (4x4, row-major order)
-    std::vector<double> transformationMatrix;
-    
-    // Point cloud bounds
-    double minX = 0.0, maxX = 0.0;
-    double minY = 0.0, maxY = 0.0;
-    double minZ = 0.0, maxZ = 0.0;
-    
-    ScanMetadata() {
-        // Initialize as identity matrix
-        transformationMatrix = {
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        };
-    }
+    double temperatureCelsius = 0.0;
+    double relativeHumidity = 0.0;
+    double atmosphericPressure = 0.0;
 };
 
+/**
+ * @brief ExportOptions - Options for E57 export
+ */
 struct ExportOptions {
     bool includeIntensity = false;
     bool includeColor = false;
     bool compressData = true;
-    double scaleFactor = 0.0001; // 0.1mm precision
+    double coordinateScaleFactor = 0.0001; // 0.1mm precision
     QString coordinateSystem = "CARTESIAN";
-    
-    // Quality settings
-    int compressionLevel = 6; // 0-9, higher = better compression
-    bool optimizeForSize = true;
-    
-    ExportOptions() = default;
 };
 
 /**
- * @brief Abstract interface for E57 file writing operations
- * 
- * This interface decouples the application from the specific implementation
- * details of libE57Format, allowing for easier testing and future changes.
+ * @brief ScanData - Complete scan data structure
  */
-class IE57Writer : public QObject
-{
+struct ScanData {
+    ScanMetadata metadata;
+    std::vector<Point3D> points;
+    std::vector<float> intensities;
+    std::vector<uint8_t> colors; // RGB interleaved
+};
+
+/**
+ * @brief IE57Writer - Abstract interface for E57 file writing
+ *
+ * This interface defines the contract for all E57 writer implementations.
+ * It enables loose coupling between the writing logic and the rest of the application,
+ * allowing for easy testing with mock implementations and future substitution
+ * of different E57 writing libraries.
+ *
+ * Sprint 2 Decoupling Requirements:
+ * - Provides abstraction layer for E57 writing operations
+ * - Enables dependency injection and polymorphic usage
+ * - Supports unit testing with mock implementations
+ * - Maintains compatibility with existing application interface
+ */
+class IE57Writer : public QObject {
     Q_OBJECT
 
 public:
     explicit IE57Writer(QObject *parent = nullptr) : QObject(parent) {}
     virtual ~IE57Writer() = default;
 
-    // File management
+    /**
+     * @brief Create a new E57 file for writing
+     * @param filePath Path where the E57 file should be created
+     * @return true if file created successfully, false otherwise
+     */
     virtual bool createFile(const QString& filePath) = 0;
-    virtual bool closeFile() = 0;
-    virtual bool isFileOpen() const = 0;
 
-    // Scan management
+    /**
+     * @brief Add a new scan to the E57 file
+     * @param metadata Metadata for the scan
+     * @return true if scan added successfully, false otherwise
+     */
     virtual bool addScan(const ScanMetadata& metadata) = 0;
-    virtual bool setScanBounds(double minX, double maxX, double minY, double maxY, double minZ, double maxZ) = 0;
+
+    /**
+     * @brief Write points to the current scan
+     * @param points Vector of 3D points to write
+     * @param options Export options for the points
+     * @return true if points written successfully, false otherwise
+     */
+    virtual bool writePoints(const std::vector<Point3D>& points, const ExportOptions& options = ExportOptions()) = 0;
+
+    /**
+     * @brief Write complete scan data (points + attributes)
+     * @param scanData Complete scan data including metadata, points, and attributes
+     * @return true if scan data written successfully, false otherwise
+     */
+    virtual bool writeScanData(const ScanData& scanData) = 0;
+
+    /**
+     * @brief Close the current E57 file
+     * @return true if file closed successfully, false otherwise
+     */
+    virtual bool closeFile() = 0;
+
+    /**
+     * @brief Check if a file is currently open for writing
+     * @return true if file is open, false otherwise
+     */
+    virtual bool isOpen() const = 0;
+
+    /**
+     * @brief Get the last error message
+     * @return Error message string, empty if no error
+     */
+    virtual QString getLastError() const = 0;
+
+    /**
+     * @brief Get the current file path
+     * @return Path of the currently open file, empty if no file is open
+     */
+    virtual QString getCurrentFilePath() const = 0;
+
+    /**
+     * @brief Get the number of scans written to the file
+     * @return Number of scans in the file
+     */
     virtual int getScanCount() const = 0;
 
-    // Point data writing
-    virtual bool writePoints(const std::vector<Point3D>& points, const ExportOptions& options = ExportOptions()) = 0;
-    virtual bool writePointsXYZ(const std::vector<float>& points, const ExportOptions& options = ExportOptions()) = 0;
-    virtual bool writePointsWithIntensity(const std::vector<float>& points, const std::vector<float>& intensity, const ExportOptions& options = ExportOptions()) = 0;
-    virtual bool writePointsWithColor(const std::vector<float>& points, const std::vector<uint8_t>& colors, const ExportOptions& options = ExportOptions()) = 0;
-
-    // Batch operations
-    virtual bool beginPointWriting(size_t estimatedPointCount) = 0;
-    virtual bool writePointBatch(const std::vector<Point3D>& points) = 0;
-    virtual bool endPointWriting() = 0;
-
-    // Error handling
-    virtual QString getLastError() const = 0;
-    virtual bool hasError() const = 0;
-    virtual void clearError() = 0;
-
-    // File information
-    virtual QString getFilePath() const = 0;
-    virtual size_t getFileSize() const = 0;
-    virtual size_t getTotalPointsWritten() const = 0;
-
-    // Validation
-    virtual bool validateFile(const QString& filePath) = 0;
-    virtual bool canWriteToPath(const QString& filePath) = 0;
+    /**
+     * @brief Set file-level metadata
+     * @param guid File GUID (if empty, auto-generated)
+     * @param description File description
+     * @param creationDateTime Creation date/time (if empty, current time used)
+     * @return true if metadata set successfully, false otherwise
+     */
+    virtual bool setFileMetadata(const QString& guid = QString(),
+                                const QString& description = QString(),
+                                const QString& creationDateTime = QString()) = 0;
 
 signals:
-    // Progress reporting
-    void progressUpdated(int percentage, const QString& stage);
-    void writeCompleted(bool success, const QString& message);
-    void errorOccurred(const QString& error);
+    /**
+     * @brief Emitted when file creation starts
+     * @param filePath Path of the file being created
+     */
+    void fileCreationStarted(const QString& filePath);
 
-    // File operations
-    void fileCreated(const QString& filePath);
-    void fileClosed(const QString& filePath);
-    void scanAdded(const QString& scanName);
-    void pointsWritten(size_t pointCount);
+    /**
+     * @brief Emitted when file creation completes
+     * @param success true if successful, false if failed
+     * @param message Success or error message
+     */
+    void fileCreationFinished(bool success, const QString& message);
+
+    /**
+     * @brief Emitted when a scan is added
+     * @param scanIndex Index of the added scan
+     * @param scanName Name of the added scan
+     */
+    void scanAdded(int scanIndex, const QString& scanName);
+
+    /**
+     * @brief Emitted during point writing to report progress
+     * @param percentage Progress percentage (0-100)
+     * @param pointsWritten Number of points written so far
+     */
+    void progressUpdated(int percentage, int64_t pointsWritten);
+
+    /**
+     * @brief Emitted when an error occurs
+     * @param errorMessage Description of the error
+     */
+    void errorOccurred(const QString& errorMessage);
 };
 
 #endif // IE57WRITER_H

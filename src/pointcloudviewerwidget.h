@@ -33,59 +33,25 @@ public:
     // IPointCloudViewer interface implementation
     void loadPointCloud(const std::vector<float>& points) override;
     void clearPointCloud() override;
-    void addPointCloudData(const std::vector<float>& additionalPoints) override;
-    void setState(ViewerState state, const QString& message = "") override;
-    ViewerState getState() const override;
-
-    void setPointSize(float size) override;
-    void setBackgroundColor(const QColor& color) override;
-    void setShowGrid(bool show) override;
-    void setShowAxes(bool show) override;
-
-    void setLODEnabled(bool enabled) override;
-    bool isLODEnabled() const override;
-
-    void setRenderWithColor(bool enabled) override;
-    void setRenderWithIntensity(bool enabled) override;
-    bool isRenderingWithColor() const override;
-    bool isRenderingWithIntensity() const override;
-
+    void setState(ViewerState state, const QString &message = "") override;
     void setTopView() override;
     void setLeftView() override;
     void setRightView() override;
     void setBottomView() override;
-    void setFrontView() override;
-    void setBackView() override;
-    void setIsometricView() override;
+    void setLODEnabled(bool enabled) override;
+    bool isLODEnabled() const override { return m_lodEnabled; }
+    void setRenderWithColor(bool enabled) override;
+    void setRenderWithIntensity(bool enabled) override;
+    void setPointSizeAttenuationEnabled(bool enabled) override;
+    void setPointSizeAttenuationParams(float minSize, float maxSize, float factor) override;
+    ViewerState getViewerState() const override { return m_currentState; }
+    bool hasPointCloudData() const override { return m_hasData; }
+    size_t getPointCount() const override { return static_cast<size_t>(m_pointCount); }
+    QVector3D getGlobalOffset() const override { return m_globalOffset; }
+    float getCurrentFPS() const override { return m_fps; }
+    size_t getVisiblePointCount() const override { return m_visiblePointCount; }
 
-    bool hasData() const override;
-    size_t pointCount() const override;
-
-    void setMinPointSize(float size) override;
-    void setMaxPointSize(float size) override;
-    void setAttenuationEnabled(bool enabled) override;
-    void setAttenuationFactor(float factor) override;
-
-    void setSplattingEnabled(bool enabled) override;
-    void setLightingEnabled(bool enabled) override;
-    void setLightDirection(const QVector3D& direction) override;
-    void setLightColor(const QColor& color) override;
-    void setAmbientIntensity(float intensity) override;
-
-    void onLoadingStarted() override;
-    void onLoadingProgress(int percentage, const QString& stage) override;
-    void onLoadingFinished(bool success, const QString& message) override;
-
-    size_t getMemoryUsage() const override;
-    void optimizeMemory() override;
-
-    // Coordinate transformation access (User Story 3)
-    QVector3D getGlobalOffset() const { return m_globalOffset; }
-
-    // Sprint 3.2: Test helper methods
-    ViewerState getViewerState() const { return m_currentState; }
-    bool hasPointCloudData() const { return m_hasData; }
-    size_t getPointCount() const { return static_cast<size_t>(m_pointCount); }
+    // Additional public methods specific to PointCloudViewerWidget
     float getCameraYaw() const { return m_cameraYaw; }
     float getCameraPitch() const { return m_cameraPitch; }
     QVector3D getCameraTarget() const { return m_cameraTarget; }
@@ -96,32 +62,29 @@ public:
     void simulatePanCamera(const QPoint &start, const QPoint &end);
     void simulateZoomCamera(float factor);
 
-    // Sprint R1: LOD system controls
+    // Additional LOD methods not in interface
     void setLODDistances(float distance1, float distance2);
     void getLODDistances(float& distance1, float& distance2) const;
-
-    // Performance monitoring
-    float getCurrentFPS() const { return m_fps; }
-    size_t getVisiblePointCount() const { return m_visiblePointCount; }
     size_t getOctreeNodeCount() const;
 
 public slots:
-    // Legacy loading feedback slot (for backward compatibility)
+    // IPointCloudViewer interface slots implementation
+    void onLoadingStarted() override;
+    void onLoadingProgress(int percentage, const QString &stage) override;
     void onLoadingFinished(bool success, const QString &message,
-                          const std::vector<float> &points);
+                          const std::vector<float> &points) override;
+    void toggleLOD(bool enabled) override;
+    void setLODSubsampleRate(float rate) override;
+    void setScreenSpaceErrorThreshold(float threshold) override;
+    void setPrimaryScreenSpaceErrorThreshold(float threshold) override;
+    void setCullScreenSpaceErrorThreshold(float threshold) override;
 
-    // Sprint 3.4: LOD control slots
-    void toggleLOD(bool enabled);
-    void setLODSubsampleRate(float rate);
-
-    // Sprint R2: Screen-space error LOD control slots
-    void setScreenSpaceErrorThreshold(float threshold);
-    void setPrimaryScreenSpaceErrorThreshold(float threshold);
-    void setCullScreenSpaceErrorThreshold(float threshold);
-
-    // Sprint R3: Attribute rendering and point size attenuation slots (as per backlog Tasks R3.1.6, R3.2.5, R3.3.3)
-    void setPointSizeAttenuationEnabled(bool enabled);
-    void setPointSizeAttenuationParams(float minSize, float maxSize, float factor);
+    // Sprint R4: Splatting and lighting slots (Task R4.3.2)
+    void setSplattingEnabled(bool enabled);
+    void setLightingEnabled(bool enabled);
+    void setLightDirection(const QVector3D& direction);
+    void setLightColor(const QColor& color);
+    void setAmbientIntensity(float intensity);
 
 signals:
     // Sprint 2.2: Performance monitoring signals

@@ -3,138 +3,217 @@
 
 #include <QObject>
 #include <QString>
-#include <QList>
+#include <QStringList>
 #include <memory>
 
 // Forward declarations
 class IMainView;
-class IPointCloudViewer;
 class IE57Parser;
 class IE57Writer;
-class ProjectManager;
-class Project;
-struct ScanInfo;
-struct LasHeaderMetadata;
-class LoadingSettings;
+class IPointCloudViewer;
 
 /**
- * @brief Presenter class for the main application window (MVP pattern)
+ * @brief MainPresenter - Presentation layer for the main application window
  * 
- * This class contains all the business logic and application workflow that was
- * previously in MainWindow. It acts as an intermediary between the view (IMainView)
- * and the model (services like parsers, project manager, etc.).
+ * This class implements the MVP (Model-View-Presenter) pattern by acting as the
+ * intermediary between the view (IMainView) and the model (services like IE57Parser).
+ * It contains all the application logic and coordinates between different components
+ * without being coupled to specific UI or service implementations.
+ * 
+ * Sprint 4 Decoupling Requirements:
+ * - Separates presentation logic from UI implementation
+ * - Coordinates between view and model components through interfaces
+ * - Enables unit testing of application logic without UI dependencies
+ * - Promotes loose coupling and high cohesion
  */
-class MainPresenter : public QObject
-{
+class MainPresenter : public QObject {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructor with dependency injection
+     * @param view Pointer to the main view interface
+     * @param e57Parser Pointer to the E57 parser interface
+     * @param e57Writer Pointer to the E57 writer interface
+     * @param parent Parent QObject
+     */
     explicit MainPresenter(IMainView* view, 
-                          IE57Parser* e57Parser = nullptr,
+                          IE57Parser* e57Parser, 
                           IE57Writer* e57Writer = nullptr,
                           QObject* parent = nullptr);
-    ~MainPresenter();
 
-    // Initialization
+    virtual ~MainPresenter() = default;
+
+    /**
+     * @brief Initialize the presenter and set up connections
+     */
     void initialize();
-    void setProjectManager(ProjectManager* projectManager);
 
-    // Project management operations
+public slots:
+    /**
+     * @brief Handle new project creation request
+     */
     void handleNewProject();
+
+    /**
+     * @brief Handle project opening request
+     */
     void handleOpenProject();
+
+    /**
+     * @brief Handle project closing request
+     */
     void handleCloseProject();
-    void handleProjectOpened(const QString& projectPath);
 
-    // Scan import operations (simplified for now)
+    /**
+     * @brief Handle scan import request
+     */
     void handleImportScans();
-    void handleScanActivated(const QString& scanId);
 
-    // File operations
-    void handleOpenFile();
-    void handleLoadingSettings();
+    /**
+     * @brief Handle file opening request
+     * @param filePath Path of the file to open
+     */
+    void handleOpenFile(const QString& filePath);
 
-    // Point cloud loading operations
-    void handleLoadingFinished(bool success, const QString& message);
-    void handleParsingProgressUpdated(int percentage, const QString& stage);
-    void handleParsingFinished(bool success, const QString& message, const std::vector<float>& points);
-    void handleLasHeaderParsed(const LasHeaderMetadata& metadata);
+    /**
+     * @brief Handle file saving request
+     * @param filePath Path where to save the file
+     */
+    void handleSaveFile(const QString& filePath);
 
-    // E57-specific operations
-    void handleScanMetadataReceived(int scanCount, const QStringList& scanNames);
-    void handleIntensityDataReceived(const std::vector<float>& intensityValues);
-    void handleColorDataReceived(const std::vector<uint8_t>& colorValues);
+    /**
+     * @brief Handle scan activation
+     * @param scanId ID of the scan to activate
+     */
+    void handleScanActivation(const QString& scanId);
 
-    // View control operations
-    void handleTopViewClicked();
-    void handleLeftViewClicked();
-    void handleRightViewClicked();
-    void handleBottomViewClicked();
-    void handleFrontViewClicked();
-    void handleBackViewClicked();
-    void handleIsometricViewClicked();
+    /**
+     * @brief Handle viewer settings changes
+     */
+    void handleViewerSettingsChanged();
 
-    // Memory and performance monitoring
-    void handleMemoryUsageChanged(size_t totalBytes);
-    void handleStatsUpdated(float fps, int visiblePoints);
-
-    // Progress management
-    void handleProgressUpdated(const QString& operationId, int percentage, const QString& stage);
-    void handleProgressCompleted(const QString& operationId, bool success, const QString& message);
-    void handleProgressCancelled(const QString& operationId);
-
-    // Application lifecycle
-    void handleApplicationShutdown();
+    /**
+     * @brief Handle application exit request
+     */
+    void handleExit();
 
 private slots:
-    // Internal slots for service coordination
-    void onParsingThreadFinished();
-    void onProjectManagerError(const QString& error);
+    /**
+     * @brief Handle E57 parsing progress updates
+     * @param percentage Progress percentage (0-100)
+     * @param stage Current parsing stage
+     */
+    void onParsingProgress(int percentage, const QString& stage);
+
+    /**
+     * @brief Handle E57 parsing completion
+     * @param success true if parsing succeeded, false otherwise
+     * @param message Success or error message
+     * @param points Extracted point data
+     */
+    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points);
+
+    /**
+     * @brief Handle scan metadata availability
+     * @param scanCount Number of scans found
+     * @param scanNames List of scan names
+     */
+    void onScanMetadataAvailable(int scanCount, const QStringList& scanNames);
+
+    /**
+     * @brief Handle intensity data extraction
+     * @param intensityValues Extracted intensity values
+     */
+    void onIntensityDataExtracted(const std::vector<float>& intensityValues);
+
+    /**
+     * @brief Handle color data extraction
+     * @param colorValues Extracted color values (RGB interleaved)
+     */
+    void onColorDataExtracted(const std::vector<uint8_t>& colorValues);
+
+    /**
+     * @brief Handle point cloud viewer state changes
+     * @param newState New viewer state
+     * @param message Optional message
+     */
+    void onViewerStateChanged(int newState, const QString& message);
+
+    /**
+     * @brief Handle rendering statistics updates
+     * @param fps Frames per second
+     * @param visiblePoints Number of visible points
+     */
+    void onRenderingStatsUpdated(float fps, int visiblePoints);
+
+    /**
+     * @brief Handle memory usage updates
+     * @param totalBytes Total memory usage in bytes
+     */
+    void onMemoryUsageChanged(size_t totalBytes);
 
 private:
-    // Helper methods
+    /**
+     * @brief Set up signal-slot connections between components
+     */
     void setupConnections();
-    void cleanupParsingThread(QObject* worker);
-    void updateUIAfterParsing(bool success, const QString& message);
-    void cleanupProgressDialog();
-    void startE57Parsing(const QString& filePath, const LoadingSettings& settings);
-    void startLasParsing(const QString& filePath, const LoadingSettings& settings);
-    void validateProjectState();
-    void updateWindowTitleForProject();
 
-    // State management
-    void setLoadingState(bool isLoading);
-    void updateStatusForOperation(const QString& operation, bool success, const QString& details = QString());
+    /**
+     * @brief Update UI state based on current application state
+     */
+    void updateUIState();
 
-    // Error handling
-    void handleCriticalError(const QString& operation, const QString& error);
-    void handleWarning(const QString& operation, const QString& warning);
+    /**
+     * @brief Validate file path for opening
+     * @param filePath Path to validate
+     * @return true if valid, false otherwise
+     */
+    bool validateFilePath(const QString& filePath);
+
+    /**
+     * @brief Show error message to user
+     * @param title Error title
+     * @param message Error message
+     */
+    void showError(const QString& title, const QString& message);
+
+    /**
+     * @brief Show information message to user
+     * @param title Info title
+     * @param message Info message
+     */
+    void showInfo(const QString& title, const QString& message);
+
+    /**
+     * @brief Update window title based on current state
+     */
+    void updateWindowTitle();
+
+    /**
+     * @brief Clear current point cloud data
+     */
+    void clearPointCloudData();
 
 private:
-    // View and service dependencies
+    // Interface pointers (not owned by this class)
     IMainView* m_view;
     IE57Parser* m_e57Parser;
     IE57Writer* m_e57Writer;
-    ProjectManager* m_projectManager;
+    IPointCloudViewer* m_viewer;
 
-    // Current state
-    Project* m_currentProject;
+    // Application state
+    QString m_currentProjectPath;
     QString m_currentFilePath;
-    QString m_currentFileName;
-    bool m_isLoading;
-
-    // E57-specific data
-    int m_currentScanCount;
     QStringList m_currentScanNames;
-    std::vector<float> m_currentIntensityData;
-    std::vector<uint8_t> m_currentColorData;
+    bool m_isFileOpen;
+    bool m_isProjectOpen;
+    bool m_isParsingInProgress;
 
-    // Threading support
-    QThread* m_parserThread;
-    QObject* m_workerParser;
-
-    // Progress tracking
-    QString m_currentOperationId;
-    int m_currentPointCount;
+    // Statistics
+    size_t m_currentMemoryUsage;
+    float m_currentFPS;
+    int m_currentVisiblePoints;
 };
 
 #endif // MAINPRESENTER_H

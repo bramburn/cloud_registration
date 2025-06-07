@@ -7,6 +7,13 @@
 #include <memory>
 
 /**
+ * @brief Sprint 5 Addition: Interface-based testing
+ *
+ * These tests verify that E57ParserLib can be used through the IE57Parser interface,
+ * ensuring the abstraction is complete and supports polymorphic usage.
+ */
+
+/**
  * @brief Unit tests for E57ParserLib class
  * 
  * Tests Sprint 1 requirements:
@@ -404,4 +411,142 @@ TEST_F(E57ParserLibTest, DependencyInjectionCompatibility) {
 
     // Move back to main thread for cleanup
     parser->moveToThread(QThread::currentThread());
+}
+
+// ============================================================================
+// Sprint 5 Addition: Interface-Based Testing
+// ============================================================================
+
+/**
+ * @brief Test class for interface-based E57ParserLib testing
+ *
+ * These tests verify that E57ParserLib works correctly when used through
+ * the IE57Parser interface, ensuring complete abstraction compliance.
+ */
+class E57ParserLibInterfaceTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Create parser through interface
+        m_parser = std::make_unique<E57ParserLib>();
+        m_interface = m_parser.get();
+    }
+
+    void TearDown() override {
+        if (m_interface && m_interface->isOpen()) {
+            m_interface->closeFile();
+        }
+        m_parser.reset();
+    }
+
+protected:
+    std::unique_ptr<E57ParserLib> m_parser;
+    IE57Parser* m_interface;
+    const std::string validFile = "sample/bunnyDouble.e57";
+    const std::string invalidFile = "test_invalid.e57";
+};
+
+// Test Case: Interface Method Compliance
+TEST_F(E57ParserLibInterfaceTest, InterfaceMethodCompliance) {
+    // Test that all interface methods are accessible and work correctly
+    EXPECT_FALSE(m_interface->isOpen());
+    EXPECT_TRUE(m_interface->getLastError().isEmpty());
+    EXPECT_EQ(m_interface->getScanCount(), 0);
+
+    // Test metadata methods with closed file
+    EXPECT_EQ(m_interface->getGuid(), "");
+    EXPECT_EQ(m_interface->getVersion(), std::make_pair(0, 0));
+    EXPECT_EQ(m_interface->getPointCount(0), 0);
+}
+
+// Test Case: Interface File Operations
+TEST_F(E57ParserLibInterfaceTest, InterfaceFileOperations) {
+    std::ifstream file(validFile);
+    if (file.good()) {
+        file.close();
+
+        // Test opening through interface
+        EXPECT_TRUE(m_interface->openFile(validFile));
+        EXPECT_TRUE(m_interface->isOpen());
+
+        // Test metadata access through interface
+        auto version = m_interface->getVersion();
+        EXPECT_GT(version.first, 0);
+
+        int scanCount = m_interface->getScanCount();
+        EXPECT_GE(scanCount, 0);
+
+        // Test point data extraction through interface
+        if (scanCount > 0) {
+            auto points = m_interface->extractPointData(0);
+            EXPECT_GE(points.size(), 0);
+
+            int64_t pointCount = m_interface->getPointCount(0);
+            if (!points.empty()) {
+                EXPECT_EQ(points.size(), pointCount * 3);
+            }
+        }
+
+        // Test closing through interface
+        m_interface->closeFile();
+        EXPECT_FALSE(m_interface->isOpen());
+    } else {
+        GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
+    }
+}
+
+// Test Case: Interface Error Handling
+TEST_F(E57ParserLibInterfaceTest, InterfaceErrorHandling) {
+    // Test error handling through interface
+    EXPECT_FALSE(m_interface->openFile(invalidFile));
+    EXPECT_FALSE(m_interface->isOpen());
+    EXPECT_FALSE(m_interface->getLastError().isEmpty());
+
+    // Test extracting data without open file
+    auto points = m_interface->extractPointData(0);
+    EXPECT_TRUE(points.empty());
+    EXPECT_FALSE(m_interface->getLastError().isEmpty());
+}
+
+// Test Case: Interface Signal Compatibility
+TEST_F(E57ParserLibInterfaceTest, InterfaceSignalCompatibility) {
+    // Test that signals work through the interface
+    QSignalSpy progressSpy(m_interface, &IE57Parser::progressUpdated);
+    QSignalSpy finishedSpy(m_interface, &IE57Parser::parsingFinished);
+    QSignalSpy metadataSpy(m_interface, &IE57Parser::scanMetadataAvailable);
+
+    EXPECT_TRUE(progressSpy.isValid());
+    EXPECT_TRUE(finishedSpy.isValid());
+    EXPECT_TRUE(metadataSpy.isValid());
+
+    std::ifstream file(validFile);
+    if (file.good()) {
+        file.close();
+
+        m_interface->openFile(validFile);
+        if (m_interface->isOpen()) {
+            // Extract data to trigger signals
+            m_interface->extractPointData(0);
+
+            // Verify signals were emitted
+            EXPECT_GT(finishedSpy.count(), 0);
+        }
+    } else {
+        GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
+    }
+}
+
+// Test Case: Polymorphic Usage Verification
+TEST_F(E57ParserLibInterfaceTest, PolymorphicUsageVerification) {
+    // Test that the parser can be used polymorphically
+    std::vector<std::unique_ptr<IE57Parser>> parsers;
+    parsers.push_back(std::make_unique<E57ParserLib>());
+
+    for (auto& parser : parsers) {
+        EXPECT_FALSE(parser->isOpen());
+        EXPECT_TRUE(parser->getLastError().isEmpty());
+
+        // Test that virtual method dispatch works correctly
+        parser->closeFile(); // Should be safe to call
+        EXPECT_FALSE(parser->isOpen());
+    }
 }

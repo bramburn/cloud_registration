@@ -1,181 +1,398 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <QApplication>
-#include <QTest>
+#include <QCoreApplication>
+#include <QSignalSpy>
+#include <memory>
 
-#include "MainPresenter.h"
-#include "IMainView.h"
-#include "IPointCloudViewer.h"
+#include "../src/MainPresenter.h"
+#include "mocks/MockMainView.h"
+#include "mocks/MockE57Parser.h"
+#include "mocks/MockE57Writer.h"
+#include "mocks/MockPointCloudViewer.h"
 
-// Mock implementation of IMainView for testing
-class MockMainView : public IMainView
-{
-public:
-    MOCK_METHOD(void, setWindowTitle, (const QString& title), (override));
-    MOCK_METHOD(void, updateWindowTitle, (), (override));
-    MOCK_METHOD(void, updateStatusBar, (const QString& text), (override));
-    MOCK_METHOD(void, setStatusReady, (), (override));
-    MOCK_METHOD(void, setStatusLoading, (const QString& fileName), (override));
-    MOCK_METHOD(void, setStatusLoadSuccess, (const QString& fileName, int pointCount), (override));
-    MOCK_METHOD(void, setStatusLoadFailed, (const QString& fileName, const QString& message), (override));
-    MOCK_METHOD(void, setStatusViewChanged, (const QString& viewName), (override));
-    MOCK_METHOD(void, displayErrorMessage, (const QString& title, const QString& message), (override));
-    MOCK_METHOD(void, displayWarningMessage, (const QString& title, const QString& message), (override));
-    MOCK_METHOD(void, displayInfoMessage, (const QString& title, const QString& message), (override));
-    MOCK_METHOD(void, showProjectHub, (), (override));
-    MOCK_METHOD(void, transitionToProjectView, (const QString& projectPath), (override));
-    MOCK_METHOD(void, enableProjectActions, (bool enabled), (override));
-    MOCK_METHOD(void, showImportGuidance, (bool show), (override));
-    MOCK_METHOD(IPointCloudViewer*, getViewer, (), (override));
-    MOCK_METHOD(void, showProgressDialog, (const QString& title, const QString& message), (override));
-    MOCK_METHOD(void, updateProgressDialog, (int percentage, const QString& stage), (override));
-    MOCK_METHOD(void, hideProgressDialog, (), (override));
-    MOCK_METHOD(void, updateMemoryDisplay, (size_t totalBytes), (override));
-    MOCK_METHOD(void, updatePerformanceStats, (float fps, int visiblePoints), (override));
-    MOCK_METHOD(void, setLoadingState, (bool isLoading), (override));
-    MOCK_METHOD(void, updateLoadingProgress, (int percentage, const QString& stage), (override));
-    MOCK_METHOD(QString, showOpenFileDialog, (const QString& title, const QString& filter), (override));
-    MOCK_METHOD(QString, showOpenProjectDialog, (), (override));
-    MOCK_METHOD(QString, showSaveFileDialog, (const QString& title, const QString& filter), (override));
-    MOCK_METHOD(bool, showLoadingSettingsDialog, (), (override));
-    MOCK_METHOD(bool, showCreateProjectDialog, (QString& projectName, QString& projectPath), (override));
-    MOCK_METHOD(bool, showScanImportDialog, (), (override));
-    MOCK_METHOD(void, refreshScanList, (), (override));
-    MOCK_METHOD(void, enableViewControls, (bool enabled), (override));
-    MOCK_METHOD(void, updateViewControlsState, (), (override));
-    MOCK_METHOD(bool, isProjectOpen, (), (const, override));
-    MOCK_METHOD(QString, getCurrentProjectPath, (), (const, override));
-    MOCK_METHOD(Project*, getCurrentProject, (), (const, override));
-    MOCK_METHOD(void, prepareForShutdown, (), (override));
-    MOCK_METHOD(void, cleanupResources, (), (override));
-};
+using ::testing::_;
+using ::testing::Return;
+using ::testing::StrictMock;
+using ::testing::NiceMock;
+using ::testing::InSequence;
+using ::testing::AtLeast;
 
-// Mock implementation of IPointCloudViewer for testing
-class MockPointCloudViewer : public IPointCloudViewer
-{
-public:
-    MOCK_METHOD(void, loadPointCloud, (const std::vector<float>& points), (override));
-    MOCK_METHOD(void, clearPointCloud, (), (override));
-    MOCK_METHOD(void, addPointCloudData, (const std::vector<float>& additionalPoints), (override));
-    MOCK_METHOD(void, setState, (ViewerState state, const QString& message), (override));
-    MOCK_METHOD(ViewerState, getState, (), (const, override));
-    MOCK_METHOD(void, setPointSize, (float size), (override));
-    MOCK_METHOD(void, setBackgroundColor, (const QColor& color), (override));
-    MOCK_METHOD(void, setShowGrid, (bool show), (override));
-    MOCK_METHOD(void, setShowAxes, (bool show), (override));
-    MOCK_METHOD(void, setLODEnabled, (bool enabled), (override));
-    MOCK_METHOD(bool, isLODEnabled, (), (const, override));
-    MOCK_METHOD(void, setRenderWithColor, (bool enabled), (override));
-    MOCK_METHOD(void, setRenderWithIntensity, (bool enabled), (override));
-    MOCK_METHOD(bool, isRenderingWithColor, (), (const, override));
-    MOCK_METHOD(bool, isRenderingWithIntensity, (), (const, override));
-    MOCK_METHOD(void, setTopView, (), (override));
-    MOCK_METHOD(void, setLeftView, (), (override));
-    MOCK_METHOD(void, setRightView, (), (override));
-    MOCK_METHOD(void, setBottomView, (), (override));
-    MOCK_METHOD(void, setFrontView, (), (override));
-    MOCK_METHOD(void, setBackView, (), (override));
-    MOCK_METHOD(void, setIsometricView, (), (override));
-    MOCK_METHOD(bool, hasData, (), (const, override));
-    MOCK_METHOD(size_t, pointCount, (), (const, override));
-    MOCK_METHOD(void, setMinPointSize, (float size), (override));
-    MOCK_METHOD(void, setMaxPointSize, (float size), (override));
-    MOCK_METHOD(void, setAttenuationEnabled, (bool enabled), (override));
-    MOCK_METHOD(void, setAttenuationFactor, (float factor), (override));
-    MOCK_METHOD(void, setSplattingEnabled, (bool enabled), (override));
-    MOCK_METHOD(void, setLightingEnabled, (bool enabled), (override));
-    MOCK_METHOD(void, setLightDirection, (const QVector3D& direction), (override));
-    MOCK_METHOD(void, setLightColor, (const QColor& color), (override));
-    MOCK_METHOD(void, setAmbientIntensity, (float intensity), (override));
-    MOCK_METHOD(void, onLoadingStarted, (), (override));
-    MOCK_METHOD(void, onLoadingProgress, (int percentage, const QString& stage), (override));
-    MOCK_METHOD(void, onLoadingFinished, (bool success, const QString& message), (override));
-    MOCK_METHOD(size_t, getMemoryUsage, (), (const, override));
-    MOCK_METHOD(void, optimizeMemory, (), (override));
-};
-
-class MainPresenterTest : public ::testing::Test
-{
+/**
+ * @brief Unit tests for MainPresenter class
+ * 
+ * Tests Sprint 5 requirements:
+ * - MainPresenter logic with mock dependencies
+ * - File opening and error handling
+ * - UI interaction patterns
+ * - Component coordination
+ * 
+ * These tests run without requiring access to the file system or a live OpenGL context.
+ */
+class MainPresenterTest : public ::testing::Test {
 protected:
-    void SetUp() override
-    {
-        // Create QApplication if it doesn't exist
-        if (!QApplication::instance()) {
-            int argc = 0;
-            char** argv = nullptr;
-            app = new QApplication(argc, argv);
-        }
+    void SetUp() override {
+        // Create mock objects
+        m_mockView = std::make_unique<NiceMock<MockMainView>>();
+        m_mockParser = std::make_unique<NiceMock<MockE57Parser>>();
+        m_mockWriter = std::make_unique<NiceMock<MockE57Writer>>();
         
-        mockView = std::make_unique<MockMainView>();
-        mockViewer = std::make_unique<MockPointCloudViewer>();
+        // Get raw pointers for presenter construction (presenter doesn't own these)
+        m_view = m_mockView.get();
+        m_parser = m_mockParser.get();
+        m_writer = m_mockWriter.get();
+        m_viewer = m_mockView->getMockViewer();
         
-        // Create presenter with mock view
-        presenter = std::make_unique<MainPresenter>(mockView.get());
+        // Create presenter with mock dependencies
+        m_presenter = std::make_unique<MainPresenter>(m_view, m_parser, m_writer);
+        
+        // Initialize presenter (sets up connections)
+        m_presenter->initialize();
     }
     
-    void TearDown() override
-    {
-        presenter.reset();
-        mockViewer.reset();
-        mockView.reset();
+    void TearDown() override {
+        m_presenter.reset();
+        m_mockWriter.reset();
+        m_mockParser.reset();
+        m_mockView.reset();
     }
+
+protected:
+    // Mock objects (owned by test)
+    std::unique_ptr<MockMainView> m_mockView;
+    std::unique_ptr<MockE57Parser> m_mockParser;
+    std::unique_ptr<MockE57Writer> m_mockWriter;
     
-    QApplication* app = nullptr;
-    std::unique_ptr<MockMainView> mockView;
-    std::unique_ptr<MockPointCloudViewer> mockViewer;
-    std::unique_ptr<MainPresenter> presenter;
+    // Raw pointers for convenience (not owned)
+    MockMainView* m_view;
+    MockE57Parser* m_parser;
+    MockE57Writer* m_writer;
+    MockPointCloudViewer* m_viewer;
+    
+    // Presenter under test
+    std::unique_ptr<MainPresenter> m_presenter;
+    
+    // Test data
+    const QString m_testFilePath = "test_file.e57";
+    const QString m_testProjectPath = "test_project.crp";
 };
 
-TEST_F(MainPresenterTest, ConstructorInitializesCorrectly)
-{
-    EXPECT_NE(presenter.get(), nullptr);
+// ============================================================================
+// Test Case 1: MainPresenter Logic Test with Mocks (from Sprint 5 documentation)
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleOpenFileSuccess) {
+    // Arrange: Set up successful parsing scenario
+    std::vector<float> testPoints = MockE57Parser::createTestPointData(100);
+    m_parser->setupSuccessfulParsing(testPoints);
+    m_viewer->setupEmptyViewer();
+    
+    // Set expectations
+    EXPECT_CALL(*m_parser, openFile(m_testFilePath.toStdString()))
+        .Times(1)
+        .WillOnce(Return(true));
+    
+    EXPECT_CALL(*m_parser, extractPointData(_))
+        .Times(1)
+        .WillOnce(Return(testPoints));
+    
+    EXPECT_CALL(*m_viewer, loadPointCloud(testPoints))
+        .Times(1);
+    
+    EXPECT_CALL(*m_viewer, resetCamera())
+        .Times(1);
+    
+    m_view->verifyProgressDialogShown(true);
+    m_view->verifyActionsEnabled(false); // Should disable during processing
+    m_view->verifyStatusUpdated();
+    m_view->verifyInfoDisplayed();
+    
+    // Act: Handle file opening
+    m_presenter->handleOpenFile(m_testFilePath);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }
 
-TEST_F(MainPresenterTest, InitializeCallsViewMethods)
-{
-    EXPECT_CALL(*mockView, setStatusReady()).Times(1);
-    EXPECT_CALL(*mockView, updateWindowTitle()).Times(1);
-    EXPECT_CALL(*mockView, enableProjectActions(false)).Times(1);
-    EXPECT_CALL(*mockView, showProjectHub()).Times(1);
+TEST_F(MainPresenterTest, HandleOpenFileFailure) {
+    // Arrange: Set up failed parsing scenario
+    const QString errorMessage = "Failed to open E57 file";
+    m_parser->setupFailedParsing(errorMessage);
     
-    presenter->initialize();
+    // Set expectations
+    EXPECT_CALL(*m_parser, openFile(m_testFilePath.toStdString()))
+        .Times(1)
+        .WillOnce(Return(false));
+    
+    EXPECT_CALL(*m_parser, getLastError())
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(errorMessage));
+    
+    // Viewer should NOT be called for failed parsing
+    EXPECT_CALL(*m_viewer, loadPointCloud(_))
+        .Times(0);
+    
+    m_view->verifyErrorDisplayed("File Opening Failed", errorMessage);
+    m_view->verifyStatusUpdated("Failed to open file");
+    
+    // Act: Handle file opening
+    m_presenter->handleOpenFile(m_testFilePath);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }
 
-TEST_F(MainPresenterTest, HandleNewProjectShowsDialog)
-{
-    QString projectName = "Test Project";
-    QString projectPath = "/test/path";
+TEST_F(MainPresenterTest, HandleOpenFileInvalidPath) {
+    // Arrange: Test with invalid file path
+    const QString invalidPath = "";
     
-    EXPECT_CALL(*mockView, showCreateProjectDialog(testing::_, testing::_))
-        .WillOnce(testing::DoAll(
-            testing::SetArgReferee<0>(projectName),
-            testing::SetArgReferee<1>(projectPath),
-            testing::Return(true)
-        ));
+    m_view->verifyErrorDisplayed("Invalid File", "File path is empty.");
     
-    presenter->handleNewProject();
+    // Parser should NOT be called for invalid path
+    EXPECT_CALL(*m_parser, openFile(_))
+        .Times(0);
+    
+    // Act: Handle invalid file path
+    m_presenter->handleOpenFile(invalidPath);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }
 
-TEST_F(MainPresenterTest, HandleOpenProjectShowsDialog)
-{
-    EXPECT_CALL(*mockView, showOpenProjectDialog())
-        .WillOnce(testing::Return("/test/project/path"));
+// ============================================================================
+// Test Case 2: Project Management Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleNewProject) {
+    // Arrange: Set up confirmation dialog
+    m_view->setupConfirmationDialog(true);
     
-    presenter->handleOpenProject();
+    m_view->verifyInfoDisplayed();
+    m_view->verifyWindowTitleSet();
+    
+    // Act: Handle new project creation
+    m_presenter->handleNewProject();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }
 
-TEST_F(MainPresenterTest, HandleViewControlsCallsViewer)
-{
-    EXPECT_CALL(*mockView, getViewer())
-        .WillRepeatedly(testing::Return(mockViewer.get()));
-    EXPECT_CALL(*mockViewer, setTopView()).Times(1);
-    EXPECT_CALL(*mockView, setStatusViewChanged("Top")).Times(1);
+TEST_F(MainPresenterTest, HandleOpenProject) {
+    // Arrange: Set up successful file dialog
+    m_view->setupSuccessfulFileDialog(m_testProjectPath);
     
-    presenter->handleTopViewClicked();
+    EXPECT_CALL(*m_view, setProjectTitle(_))
+        .Times(1);
+    
+    m_view->verifyProjectViewShown();
+    m_view->verifyInfoDisplayed();
+    m_view->verifyWindowTitleSet();
+    
+    // Act: Handle project opening
+    m_presenter->handleOpenProject();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }
 
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+TEST_F(MainPresenterTest, HandleOpenProjectCancelled) {
+    // Arrange: Set up cancelled file dialog
+    m_view->setupCancelledFileDialog();
+    
+    // No other methods should be called if dialog is cancelled
+    EXPECT_CALL(*m_view, setProjectTitle(_))
+        .Times(0);
+    
+    EXPECT_CALL(*m_view, showProjectView())
+        .Times(0);
+    
+    // Act: Handle cancelled project opening
+    m_presenter->handleOpenProject();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleCloseProject) {
+    // Arrange: Simulate open project state
+    // First open a project
+    m_view->setupSuccessfulFileDialog(m_testProjectPath);
+    m_presenter->handleOpenProject();
+    
+    // Now test closing
+    m_view->verifyProjectHubShown();
+    m_view->verifyStatusUpdated("Project closed");
+    
+    // Act: Handle project closing
+    m_presenter->handleCloseProject();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+// ============================================================================
+// Test Case 3: Import Scans Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleImportScansWithoutProject) {
+    // Arrange: No project is open
+    m_view->verifyErrorDisplayed("Import Scans", "Please open or create a project first.");
+    
+    // File dialog should NOT be shown
+    EXPECT_CALL(*m_view, askForOpenFilePath(_, _))
+        .Times(0);
+    
+    // Act: Handle import scans without project
+    m_presenter->handleImportScans();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleImportScansWithProject) {
+    // Arrange: Open a project first
+    m_view->setupSuccessfulFileDialog(m_testProjectPath);
+    m_presenter->handleOpenProject();
+    
+    // Set up file dialog for scan import
+    m_view->setupSuccessfulFileDialog(m_testFilePath);
+    
+    // Set up successful parsing
+    std::vector<float> testPoints = MockE57Parser::createTestPointData(50);
+    m_parser->setupSuccessfulParsing(testPoints);
+    
+    m_view->verifyFileDialogCalled("Import E57 Scan", "E57 Files (*.e57)");
+    
+    // Act: Handle import scans with project
+    m_presenter->handleImportScans();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+// ============================================================================
+// Test Case 4: Scan Activation Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleScanActivation) {
+    // Arrange: Set up file with scans
+    std::vector<float> testPoints = MockE57Parser::createTestPointData(100);
+    m_parser->setupSuccessfulParsing(testPoints);
+    m_presenter->handleOpenFile(m_testFilePath);
+    
+    const QString scanId = "Scan_001";
+    
+    EXPECT_CALL(*m_view, highlightScan(scanId))
+        .Times(1);
+    
+    m_view->verifyStatusUpdated("Activated scan: " + scanId);
+    
+    // Act: Handle scan activation
+    m_presenter->handleScanActivation(scanId);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleScanActivationWithoutFile) {
+    // Arrange: No file is open
+    const QString scanId = "Scan_001";
+    
+    m_view->verifyErrorDisplayed("Scan Activation", "No file is currently open.");
+    
+    // Highlight should NOT be called
+    EXPECT_CALL(*m_view, highlightScan(_))
+        .Times(0);
+    
+    // Act: Handle scan activation without file
+    m_presenter->handleScanActivation(scanId);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+// ============================================================================
+// Test Case 5: Signal Handling Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, OnParsingProgressSignal) {
+    // Arrange: Set up progress tracking
+    const int percentage = 50;
+    const QString stage = "Reading point data";
+    
+    EXPECT_CALL(*m_view, updateProgress(percentage, stage))
+        .Times(1);
+    
+    // Act: Simulate progress signal from parser
+    m_parser->emitProgressUpdated(percentage, stage);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, OnScanMetadataAvailableSignal) {
+    // Arrange: Set up scan metadata
+    const int scanCount = 3;
+    const QStringList scanNames = {"Scan_001", "Scan_002", "Scan_003"};
+    
+    EXPECT_CALL(*m_view, updateScanList(scanNames))
+        .Times(1);
+    
+    m_view->verifyStatusUpdated();
+    
+    // Act: Simulate metadata signal from parser
+    m_parser->emitScanMetadataAvailable(scanCount, scanNames);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, OnViewerStatsUpdatedSignal) {
+    // Arrange: Set up rendering stats
+    const float fps = 60.0f;
+    const int visiblePoints = 1500;
+    
+    EXPECT_CALL(*m_view, updateRenderingStats(fps, visiblePoints))
+        .Times(1);
+    
+    // Act: Simulate stats signal from viewer
+    m_viewer->emitStatsUpdated(fps, visiblePoints);
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+// ============================================================================
+// Test Case 6: Exit Handling Tests
+// ============================================================================
+
+TEST_F(MainPresenterTest, HandleExitWithConfirmation) {
+    // Arrange: Open a file first
+    std::vector<float> testPoints = MockE57Parser::createTestPointData(100);
+    m_parser->setupSuccessfulParsing(testPoints);
+    m_presenter->handleOpenFile(m_testFilePath);
+    
+    // Set up confirmation dialog
+    m_view->setupConfirmationDialog(true);
+    
+    m_view->verifyConfirmationAsked("Exit Application", 
+        "Are you sure you want to exit? Any unsaved changes will be lost.");
+    
+    EXPECT_CALL(*m_parser, closeFile())
+        .Times(1);
+    
+    EXPECT_CALL(*m_viewer, clearPointCloud())
+        .Times(1);
+    
+    // Act: Handle exit request
+    m_presenter->handleExit();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
+}
+
+TEST_F(MainPresenterTest, HandleExitCancelled) {
+    // Arrange: Open a file first
+    std::vector<float> testPoints = MockE57Parser::createTestPointData(100);
+    m_parser->setupSuccessfulParsing(testPoints);
+    m_presenter->handleOpenFile(m_testFilePath);
+    
+    // Set up cancelled confirmation dialog
+    m_view->setupConfirmationDialog(false);
+    
+    // Cleanup should NOT happen if user cancels
+    EXPECT_CALL(*m_parser, closeFile())
+        .Times(0);
+    
+    EXPECT_CALL(*m_viewer, clearPointCloud())
+        .Times(0);
+    
+    // Act: Handle cancelled exit request
+    m_presenter->handleExit();
+    
+    // Assert: Verify expectations are met (handled by Google Mock)
 }

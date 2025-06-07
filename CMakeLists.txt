@@ -194,11 +194,11 @@ set(SOURCES
     src/pointcloudviewerwidget.cpp
     src/e57parserlib.cpp
     src/IE57Parser.cpp
+    src/MainPresenter.cpp
     src/lasparser.cpp
     src/loadingsettingsdialog.cpp
     src/voxelgridfilter.cpp
     src/performance_profiler.cpp
-    src/MainPresenter.cpp
 )
 
 # Header files
@@ -211,18 +211,18 @@ set(HEADERS
     src/sidebarwidget.h
     src/project.h
     src/pointcloudviewerwidget.h
+    src/IPointCloudViewer.h
     src/e57parserlib.h
     src/IE57Parser.h
+    src/IE57Writer.h
+    src/IMainView.h
+    src/MainPresenter.h
     src/lasparser.h
     src/loadingsettingsdialog.h
     src/loadingsettings.h
     src/lasheadermetadata.h
     src/voxelgridfilter.h
     src/performance_profiler.h
-    src/MainPresenter.h
-    src/IMainView.h
-    src/IPointCloudViewer.h
-    src/IE57Writer.h
 )
 
 # Shader files
@@ -298,10 +298,19 @@ set_target_properties(CloudRegistration PROPERTIES
 # Enable testing
 enable_testing()
 
-# Find Google Test
+# Find Google Test and Google Mock
 find_package(GTest CONFIG QUIET)
 if(TARGET GTest::gtest_main)
     message(STATUS "Google Test found - building unit tests")
+
+    # Check if Google Mock is available
+    if(TARGET GTest::gmock_main)
+        message(STATUS "Google Mock found - enabling mock-based tests")
+        set(GMOCK_AVAILABLE TRUE)
+    else()
+        message(WARNING "Google Mock not found - some tests will be disabled")
+        set(GMOCK_AVAILABLE FALSE)
+    endif()
 
     # Enable code coverage if requested
     option(ENABLE_COVERAGE "Enable code coverage" OFF)
@@ -333,6 +342,25 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserTests PRIVATE src)
     add_test(NAME E57ParserTests COMMAND E57ParserTests)
+
+    # E57 Parser Library Tests (with interface testing)
+    add_executable(E57ParserLibTests
+        tests/test_e57parserlib.cpp
+        src/e57parserlib.cpp
+        src/IE57Parser.cpp
+        src/performance_profiler.cpp
+    )
+
+    target_link_libraries(E57ParserLibTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Xml
+        Qt6::Test
+        E57Format
+    )
+
+    target_include_directories(E57ParserLibTests PRIVATE src)
+    add_test(NAME E57ParserLibTests COMMAND E57ParserLibTests)
 
 
 
@@ -400,29 +428,34 @@ if(TARGET GTest::gtest_main)
     target_include_directories(RecentProjectsManagerTests PRIVATE src)
     add_test(NAME RecentProjectsManagerTests COMMAND RecentProjectsManagerTests)
 
-    # MainPresenter Tests (Sprint 4)
-    add_executable(MainPresenterTests
-        tests/test_mainpresenter.cpp
-        src/MainPresenter.cpp
-        src/projectmanager.cpp
-        src/project.cpp
-    )
+    # Sprint 5: MainPresenter Tests (requires Google Mock)
+    if(GMOCK_AVAILABLE)
+        add_executable(MainPresenterTests
+            tests/test_mainpresenter.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/performance_profiler.cpp
+        )
 
-    target_link_libraries(MainPresenterTests
-        GTest::gtest_main
-        GTest::gmock_main
-        Qt6::Core
-        Qt6::Test
-        Qt6::Widgets
-    )
+        target_link_libraries(MainPresenterTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Test
+        )
 
-    target_include_directories(MainPresenterTests PRIVATE src)
-    add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
+        target_include_directories(MainPresenterTests PRIVATE src)
+        add_test(NAME MainPresenterTests COMMAND MainPresenterTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests)
+    else()
+        set(ALL_TESTS E57ParserTests E57ParserLibTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
+    endif()
 
     # Custom target to run all tests
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests
+        DEPENDS ${ALL_TESTS}
         COMMENT "Running all unit tests"
     )
 
@@ -440,7 +473,7 @@ if(TARGET GTest::gtest_main)
                 COMMAND ${GENHTML_PATH} -o coverage_html coverage.info.cleaned
                 COMMAND ${CMAKE_COMMAND} -E remove coverage.info coverage.info.cleaned
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                DEPENDS E57ParserTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests
+                DEPENDS ${ALL_TESTS}
                 COMMENT "Generating code coverage report"
             )
             message(STATUS "Code coverage target 'coverage' available")
