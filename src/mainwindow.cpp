@@ -32,6 +32,7 @@
 #include <QGroupBox>
 #include <QCheckBox>
 #include <QSlider>
+#include <QColorDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -75,6 +76,21 @@ MainWindow::MainWindow(QWidget *parent)
     , m_minSizeLabel(nullptr)
     , m_maxSizeLabel(nullptr)
     , m_attenuationFactorLabel(nullptr)
+    , m_splattingGroupBox(nullptr)
+    , m_splattingCheckbox(nullptr)
+    , m_lightingGroupBox(nullptr)
+    , m_lightingCheckbox(nullptr)
+    , m_lightDirXSlider(nullptr)
+    , m_lightDirYSlider(nullptr)
+    , m_lightDirZSlider(nullptr)
+    , m_lightDirXLabel(nullptr)
+    , m_lightDirYLabel(nullptr)
+    , m_lightDirZLabel(nullptr)
+    , m_lightColorButton(nullptr)
+    , m_lightColorLabel(nullptr)
+    , m_ambientIntensitySlider(nullptr)
+    , m_ambientIntensityLabel(nullptr)
+    , m_currentLightColor(Qt::white)
 {
     qDebug() << "MainWindow constructor started";
 
@@ -370,6 +386,9 @@ void MainWindow::setupUI()
 
     // Sprint R3: Setup attribute rendering controls
     setupSprintR3Controls(contentLayout);
+
+    // Sprint R4: Setup splatting and lighting controls
+    setupSprintR4Controls(contentLayout);
 
     // Setup splitter
     m_projectSplitter->addWidget(m_sidebar);
@@ -1722,6 +1741,179 @@ void MainWindow::onAttenuationParamsChanged()
     }
 }
 
+// Sprint R4: Setup splatting and lighting controls (Task R4.3.1)
+void MainWindow::setupSprintR4Controls(QVBoxLayout* parentLayout)
+{
+    // Create controls widget
+    QWidget* controlsWidget = new QWidget();
+    controlsWidget->setMaximumHeight(150);
+    controlsWidget->setStyleSheet("QWidget { background-color: #f0f8ff; border: 1px solid #4169e1; }");
+
+    QHBoxLayout* controlsLayout = new QHBoxLayout(controlsWidget);
+    controlsLayout->setContentsMargins(10, 5, 10, 5);
+
+    // Splatting controls
+    m_splattingGroupBox = new QGroupBox("Point Splatting");
+    QVBoxLayout* splattingLayout = new QVBoxLayout(m_splattingGroupBox);
+
+    m_splattingCheckbox = new QCheckBox("Enable Splatting");
+    m_splattingCheckbox->setChecked(true); // Default enabled as per Sprint R4
+    splattingLayout->addWidget(m_splattingCheckbox);
+
+    // Lighting controls
+    m_lightingGroupBox = new QGroupBox("Lighting");
+    QVBoxLayout* lightingLayout = new QVBoxLayout(m_lightingGroupBox);
+
+    m_lightingCheckbox = new QCheckBox("Enable Lighting");
+    lightingLayout->addWidget(m_lightingCheckbox);
+
+    // Light direction controls
+    QHBoxLayout* lightDirLayout = new QHBoxLayout();
+
+    QVBoxLayout* xDirLayout = new QVBoxLayout();
+    m_lightDirXLabel = new QLabel("X: 0.0");
+    m_lightDirXSlider = new QSlider(Qt::Horizontal);
+    m_lightDirXSlider->setRange(-100, 100);
+    m_lightDirXSlider->setValue(0);
+    xDirLayout->addWidget(m_lightDirXLabel);
+    xDirLayout->addWidget(m_lightDirXSlider);
+
+    QVBoxLayout* yDirLayout = new QVBoxLayout();
+    m_lightDirYLabel = new QLabel("Y: 0.0");
+    m_lightDirYSlider = new QSlider(Qt::Horizontal);
+    m_lightDirYSlider->setRange(-100, 100);
+    m_lightDirYSlider->setValue(0);
+    yDirLayout->addWidget(m_lightDirYLabel);
+    yDirLayout->addWidget(m_lightDirYSlider);
+
+    QVBoxLayout* zDirLayout = new QVBoxLayout();
+    m_lightDirZLabel = new QLabel("Z: -1.0");
+    m_lightDirZSlider = new QSlider(Qt::Horizontal);
+    m_lightDirZSlider->setRange(-100, 100);
+    m_lightDirZSlider->setValue(-100);
+    zDirLayout->addWidget(m_lightDirZLabel);
+    zDirLayout->addWidget(m_lightDirZSlider);
+
+    lightDirLayout->addLayout(xDirLayout);
+    lightDirLayout->addLayout(yDirLayout);
+    lightDirLayout->addLayout(zDirLayout);
+    lightingLayout->addLayout(lightDirLayout);
+
+    // Light color and ambient intensity
+    QHBoxLayout* lightPropsLayout = new QHBoxLayout();
+
+    m_lightColorButton = new QPushButton("Light Color");
+    m_lightColorButton->setStyleSheet("QPushButton { background-color: white; }");
+    m_lightColorLabel = new QLabel("White");
+
+    QVBoxLayout* ambientLayout = new QVBoxLayout();
+    m_ambientIntensityLabel = new QLabel("Ambient: 0.3");
+    m_ambientIntensitySlider = new QSlider(Qt::Horizontal);
+    m_ambientIntensitySlider->setRange(0, 100);
+    m_ambientIntensitySlider->setValue(30);
+    ambientLayout->addWidget(m_ambientIntensityLabel);
+    ambientLayout->addWidget(m_ambientIntensitySlider);
+
+    lightPropsLayout->addWidget(m_lightColorButton);
+    lightPropsLayout->addWidget(m_lightColorLabel);
+    lightPropsLayout->addLayout(ambientLayout);
+    lightingLayout->addLayout(lightPropsLayout);
+
+    // Add groups to main layout
+    controlsLayout->addWidget(m_splattingGroupBox);
+    controlsLayout->addWidget(m_lightingGroupBox);
+    controlsLayout->addStretch();
+
+    // Add controls widget to parent layout
+    parentLayout->addWidget(controlsWidget);
+
+    // Connect signals
+    connect(m_splattingCheckbox, &QCheckBox::toggled, this, &MainWindow::onSplattingToggled);
+    connect(m_lightingCheckbox, &QCheckBox::toggled, this, &MainWindow::onLightingToggled);
+    connect(m_lightDirXSlider, &QSlider::valueChanged, this, &MainWindow::onLightDirectionChanged);
+    connect(m_lightDirYSlider, &QSlider::valueChanged, this, &MainWindow::onLightDirectionChanged);
+    connect(m_lightDirZSlider, &QSlider::valueChanged, this, &MainWindow::onLightDirectionChanged);
+    connect(m_lightColorButton, &QPushButton::clicked, this, &MainWindow::onLightColorClicked);
+    connect(m_ambientIntensitySlider, &QSlider::valueChanged, this, &MainWindow::onAmbientIntensityChanged);
+}
+
+// Sprint R4: Splatting and lighting slot implementations (Task R4.3.2)
+void MainWindow::onSplattingToggled(bool enabled)
+{
+    if (m_viewer) {
+        m_viewer->setSplattingEnabled(enabled);
+    }
+    qDebug() << "Point splatting toggled:" << enabled;
+}
+
+void MainWindow::onLightingToggled(bool enabled)
+{
+    if (m_viewer) {
+        m_viewer->setLightingEnabled(enabled);
+    }
+
+    // Enable/disable lighting controls
+    m_lightDirXSlider->setEnabled(enabled);
+    m_lightDirYSlider->setEnabled(enabled);
+    m_lightDirZSlider->setEnabled(enabled);
+    m_lightColorButton->setEnabled(enabled);
+    m_ambientIntensitySlider->setEnabled(enabled);
+
+    qDebug() << "Lighting toggled:" << enabled;
+}
+
+void MainWindow::onLightDirectionChanged()
+{
+    if (m_viewer) {
+        float x = m_lightDirXSlider->value() / 100.0f;
+        float y = m_lightDirYSlider->value() / 100.0f;
+        float z = m_lightDirZSlider->value() / 100.0f;
+
+        QVector3D direction(x, y, z);
+        if (direction.length() > 0.1f) {
+            direction.normalize();
+        } else {
+            direction = QVector3D(0, 0, -1); // Default direction
+        }
+
+        m_viewer->setLightDirection(direction);
+
+        // Update labels
+        m_lightDirXLabel->setText(QString("X: %1").arg(x, 0, 'f', 1));
+        m_lightDirYLabel->setText(QString("Y: %1").arg(y, 0, 'f', 1));
+        m_lightDirZLabel->setText(QString("Z: %1").arg(z, 0, 'f', 1));
+    }
+}
+
+void MainWindow::onLightColorClicked()
+{
+    QColor color = QColorDialog::getColor(m_currentLightColor, this, "Select Light Color");
+    if (color.isValid()) {
+        m_currentLightColor = color;
+
+        if (m_viewer) {
+            m_viewer->setLightColor(color);
+        }
+
+        // Update button color and label
+        m_lightColorButton->setStyleSheet(QString("QPushButton { background-color: %1; }").arg(color.name()));
+        m_lightColorLabel->setText(color.name());
+
+        qDebug() << "Light color changed to:" << color.name();
+    }
+}
+
+void MainWindow::onAmbientIntensityChanged(int value)
+{
+    if (m_viewer) {
+        float intensity = value / 100.0f;
+        m_viewer->setAmbientIntensity(intensity);
+
+        // Update label
+        m_ambientIntensityLabel->setText(QString("Ambient: %1").arg(intensity, 0, 'f', 2));
+    }
+}
+
 // Sprint 2.2: Performance statistics display implementation
 void MainWindow::onStatsUpdated(float fps, int visiblePoints)
 {
@@ -1753,5 +1945,6 @@ void MainWindow::onStatsUpdated(float fps, int visiblePoints)
         }
 
         m_pointsLabel->setText(pointsText);
+    }
     }
 }

@@ -25,6 +25,7 @@ class QProgressDialog;
 class QPushButton;
 class QCheckBox;
 class QSlider;
+class QGroupBox;
 struct LasHeaderMetadata;
 
 class MainWindow : public QMainWindow
@@ -85,11 +86,19 @@ private slots:
     void onAttenuationToggled(bool enabled);
     void onAttenuationParamsChanged();
 
+    // Sprint R4: Splatting and lighting slots (Task R4.3.1)
+    void onSplattingToggled(bool enabled);
+    void onLightingToggled(bool enabled);
+    void onLightDirectionChanged();
+    void onLightColorClicked();
+    void onAmbientIntensityChanged(int value);
+
 private:
     void setupUI();
     void setupMenuBar();
     void setupStatusBar();
     void setupSprintR3Controls(QVBoxLayout* parentLayout);
+    void setupSprintR4Controls(QVBoxLayout* parentLayout);
     void transitionToProjectView(const QString &projectPath);
     void updateWindowTitle(const QString &projectName = QString());
 
@@ -200,6 +209,26 @@ private:
     QLabel* m_minSizeLabel;
     QLabel* m_maxSizeLabel;
     QLabel* m_attenuationFactorLabel;
+
+    // Sprint R4: Splatting and lighting controls (Task R4.3.1)
+    QGroupBox* m_splattingGroupBox;
+    QCheckBox* m_splattingCheckbox;
+
+    QGroupBox* m_lightingGroupBox;
+    QCheckBox* m_lightingCheckbox;
+    QSlider* m_lightDirXSlider;
+    QSlider* m_lightDirYSlider;
+    QSlider* m_lightDirZSlider;
+    QLabel* m_lightDirXLabel;
+    QLabel* m_lightDirYLabel;
+    QLabel* m_lightDirZLabel;
+    QPushButton* m_lightColorButton;
+    QLabel* m_lightColorLabel;
+    QSlider* m_ambientIntensitySlider;
+    QLabel* m_ambientIntensityLabel;
+
+    // Current state
+    QColor m_currentLightColor;
 };
 
 #endif // MAINWINDOW_H

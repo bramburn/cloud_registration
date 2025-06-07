@@ -1,6 +1,7 @@
 #ifndef POINTDATA_H
 #define POINTDATA_H
 
+#include <QVector3D>
 #include "octree.h"
 
 // Vertex data structure for OpenGL (interleaved X,Y,Z,R,G,B,I as per Sprint R3 backlog)
@@ -19,6 +20,23 @@ struct VertexData {
         point.getNormalizedColor(color[0], color[1], color[2]);
         intensity = point.hasIntensity() ? point.intensity.value() : 1.0f;
     }
+};
+
+// Sprint R4: Splat vertex data structure for splatting (Task R4.1.3)
+struct SplatVertex {
+    QVector3D position;
+    QVector3D color;
+    QVector3D normal;
+    float intensity;
+    float radius;
+
+    SplatVertex() = default;
+    SplatVertex(const AggregateNodeData& data)
+        : position(data.center)
+        , color(data.averageColor)
+        , normal(data.averageNormal)
+        , intensity(data.averageIntensity)
+        , radius(data.boundingRadius) {}
 };
 
 #endif // POINTDATA_H
