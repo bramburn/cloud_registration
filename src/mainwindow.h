@@ -11,6 +11,7 @@
 #include <vector>
 #include "progressmanager.h"
 #include "projectmanager.h"
+#include "IPointCloudViewer.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
@@ -112,7 +113,7 @@ private:
     void setStatusViewChanged(const QString &viewName);
 
     // Sprint 3.2: Test helper methods
-    PointCloudViewerWidget* getPointCloudViewer() const { return m_viewer; }
+    IPointCloudViewer* getPointCloudViewer() const { return m_viewer; }
     PointCloudLoadManager* getPointCloudLoadManager() const { return m_loadManager; }
 
     // Sprint 3.4: Memory statistics display
@@ -130,8 +131,9 @@ private:
     SidebarWidget *m_sidebar;
     QWidget *m_mainContentArea;
 
-    // Legacy point cloud viewer
-    PointCloudViewerWidget *m_viewer;
+    // Point cloud viewer (interface-based for decoupling)
+    IPointCloudViewer *m_viewer;
+    PointCloudViewerWidget *m_viewerWidget; // Concrete widget for layout management
     QProgressDialog *m_progressDialog;
 
     // Project management

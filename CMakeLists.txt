@@ -143,6 +143,7 @@ set(HEADERS
     src/sidebarwidget.h
     src/project.h
     src/pointcloudviewerwidget.h
+    src/IPointCloudViewer.h
     src/e57parserlib.h
     src/IE57Parser.h
     src/lasparser.h

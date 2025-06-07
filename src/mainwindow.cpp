@@ -42,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_sidebar(nullptr)
     , m_mainContentArea(nullptr)
     , m_viewer(nullptr)
+    , m_viewerWidget(nullptr)
     , m_progressDialog(nullptr)
     , m_projectManager(new ProjectManager(this))
     , m_loadManager(new PointCloudLoadManager(this))
@@ -191,6 +192,7 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget *parent)
     , m_sidebar(nullptr)
     , m_mainContentArea(nullptr)
     , m_viewer(nullptr)
+    , m_viewerWidget(nullptr)
     , m_progressDialog(nullptr)
     , m_projectManager(new ProjectManager(this))
     , m_loadManager(new PointCloudLoadManager(this))
@@ -364,9 +366,10 @@ void MainWindow::setupUI()
     auto *contentLayout = new QVBoxLayout(m_mainContentArea);
     contentLayout->setContentsMargins(0, 0, 0, 0);
 
-    // Create legacy point cloud viewer
-    m_viewer = new PointCloudViewerWidget(this);
-    contentLayout->addWidget(m_viewer);
+    // Create point cloud viewer widget and assign to interface pointer
+    m_viewerWidget = new PointCloudViewerWidget(this);
+    m_viewer = m_viewerWidget; // Interface pointer for decoupled interaction
+    contentLayout->addWidget(m_viewerWidget);
 
     // Sprint R3: Setup attribute rendering controls
     setupSprintR3Controls(contentLayout);
@@ -538,7 +541,7 @@ void MainWindow::setupStatusBar()
 
     // Connect to viewer performance statistics
     if (m_viewer) {
-        connect(m_viewer, &PointCloudViewerWidget::statsUpdated,
+        connect(m_viewer, &IPointCloudViewer::statsUpdated,
                 this, &MainWindow::onStatsUpdated);
     }
 
@@ -666,8 +669,8 @@ void MainWindow::onOpenFileClicked()
         connect(e57Worker, &IE57Parser::colorDataExtracted, this, &MainWindow::onColorDataReceived, Qt::QueuedConnection);
 
         // Sprint 2.3: Connect to viewer for visual feedback
-        connect(e57Worker, &IE57Parser::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
-        connect(e57Worker, &IE57Parser::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::progressUpdated, m_viewer, &IPointCloudViewer::onLoadingProgress, Qt::QueuedConnection);
+        connect(e57Worker, &IE57Parser::parsingFinished, m_viewer, &IPointCloudViewer::onLoadingFinished, Qt::QueuedConnection);
 
         // Connect thread cleanup
         connect(e57Worker, &IE57Parser::parsingFinished, [this, e57Worker]() {
@@ -693,8 +696,8 @@ void MainWindow::onOpenFileClicked()
         connect(lasWorker, &LasParser::headerParsed, this, &MainWindow::onLasHeaderParsed, Qt::QueuedConnection);
 
         // Sprint 2.3: Connect to viewer for visual feedback
-        connect(lasWorker, &LasParser::progressUpdated, m_viewer, &PointCloudViewerWidget::onLoadingProgress, Qt::QueuedConnection);
-        connect(lasWorker, &LasParser::parsingFinished, m_viewer, &PointCloudViewerWidget::onLoadingFinished, Qt::QueuedConnection);
+        connect(lasWorker, &LasParser::progressUpdated, m_viewer, &IPointCloudViewer::onLoadingProgress, Qt::QueuedConnection);
+        connect(lasWorker, &LasParser::parsingFinished, m_viewer, &IPointCloudViewer::onLoadingFinished, Qt::QueuedConnection);
 
     } else {
         // Cleanup and show error
