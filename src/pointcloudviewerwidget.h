@@ -50,6 +50,7 @@ public:
     bool hasData() const override { return m_hasData; }
     size_t getPointCount() const override { return static_cast<size_t>(m_pointCount); }
     QVector3D getGlobalOffset() const override { return m_globalOffset; }
+    std::vector<Point> getCurrentPointCloudData() const override;
     float getCurrentFPS() const override { return m_fps; }
     size_t getVisiblePointCount() const override { return m_visiblePointCount; }
     void resetCamera() override;
