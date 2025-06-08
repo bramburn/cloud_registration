@@ -250,6 +250,14 @@ set(SOURCES
     src/optimization/BundleAdjustment.cpp
     src/features/FeatureExtractor.cpp
     src/analysis/DifferenceAnalysis.cpp
+    # Sprint 6: Export and Quality Assessment
+    src/export/FormatWriters/E57Writer.cpp
+    src/export/FormatWriters/LASWriter.cpp
+    src/export/FormatWriters/PLYWriter.cpp
+    src/export/FormatWriters/XYZWriter.cpp
+    src/quality/QualityAssessment.cpp
+    src/quality/PDFReportGenerator.cpp
+    src/crs/CoordinateSystemManager.cpp
 )
 
 # Header files
@@ -321,6 +329,16 @@ set(HEADERS
     src/optimization/BundleAdjustment.h
     src/features/FeatureExtractor.h
     src/analysis/DifferenceAnalysis.h
+    # Sprint 6: Export and Quality Assessment Headers
+    src/export/IFormatWriter.h
+    src/export/FormatWriters/E57Writer.h
+    src/export/FormatWriters/LASWriter.h
+    src/export/FormatWriters/PLYWriter.h
+    src/export/FormatWriters/XYZWriter.h
+    src/quality/QualityAssessment.h
+    src/quality/PDFReportGenerator.h
+    src/crs/CoordinateSystemManager.h
+    src/ui/ExportDialog.h
 )
 
 # Shader files
