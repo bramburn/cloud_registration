@@ -758,7 +758,33 @@ if(TARGET GTest::gtest_main)
         target_include_directories(UIEnhancementTests PRIVATE src)
         add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests ICPRegistrationTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests)
+        # Sprint 8: End-to-End Integration Tests
+        add_executable(EndToEndTests
+            tests/integration/end_to_end_testing.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/e57parserlib.cpp
+            src/lasparser.cpp
+            src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
+            src/voxelgridfilter.cpp
+        )
+
+        target_link_libraries(EndToEndTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+            E57Format
+        )
+
+        target_include_directories(EndToEndTests PRIVATE src)
+        add_test(NAME EndToEndTests COMMAND EndToEndTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests ICPRegistrationTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests EndToEndTests)
 
     else()
         # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
@@ -903,7 +929,32 @@ if(TARGET GTest::gtest_main)
         target_include_directories(UIEnhancementTests PRIVATE src)
         add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests)
+        # Sprint 8: End-to-End Integration Tests (without Google Mock)
+        add_executable(EndToEndTests
+            tests/integration/end_to_end_testing.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/e57parserlib.cpp
+            src/lasparser.cpp
+            src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
+            src/voxelgridfilter.cpp
+        )
+
+        target_link_libraries(EndToEndTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+            E57Format
+        )
+
+        target_include_directories(EndToEndTests PRIVATE src)
+        add_test(NAME EndToEndTests COMMAND EndToEndTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests EndToEndTests)
     endif()
 
     # Custom target to run all tests
