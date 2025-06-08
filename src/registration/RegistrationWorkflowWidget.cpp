@@ -1,588 +1,560 @@
 #include "RegistrationWorkflowWidget.h"
+#include "TargetManager.h"
 #include <QDebug>
-#include <QDateTime>
 #include <QMessageBox>
-#include <QSplitter>
+#include <QGroupBox>
+#include <QTextEdit>
 
-namespace Registration {
-
-RegistrationWorkflowWidget::RegistrationWorkflowWidget(QWidget* parent) 
-    : QWidget(parent) {
-    
-    // Initialize core components
-    m_poseGraphBuilder = std::make_unique<PoseGraphBuilder>(this);
-    m_bundleAdjustment = std::make_unique<Optimization::BundleAdjustment>(this);
-    m_featureExtractor = std::make_unique<Features::FeatureExtractor>(this);
-    m_featureRegistration = std::make_unique<FeatureBasedRegistration>(this);
-    m_differenceAnalysis = std::make_unique<Analysis::DifferenceAnalysis>(this);
-    
-    // Connect signals
-    connect(m_bundleAdjustment.get(), &Optimization::BundleAdjustment::optimizationProgress,
-            this, &RegistrationWorkflowWidget::onBundleAdjustmentProgress);
-    connect(m_bundleAdjustment.get(), &Optimization::BundleAdjustment::optimizationCompleted,
-            this, &RegistrationWorkflowWidget::onBundleAdjustmentCompleted);
-    
-    connect(m_featureRegistration.get(), &FeatureBasedRegistration::registrationProgress,
-            this, &RegistrationWorkflowWidget::onFeatureRegistrationProgress);
-    connect(m_featureRegistration.get(), &FeatureBasedRegistration::registrationCompleted,
-            this, &RegistrationWorkflowWidget::onFeatureRegistrationCompleted);
-    
-    connect(m_differenceAnalysis.get(), &Analysis::DifferenceAnalysis::analysisCompleted,
-            this, &RegistrationWorkflowWidget::onDifferenceAnalysisCompleted);
-    
+RegistrationWorkflowWidget::RegistrationWorkflowWidget(QWidget* parent)
+    : QWidget(parent)
+    , mainLayout_(nullptr)
+    , progressWidget_(nullptr)
+    , contentStack_(nullptr)
+    , navigationLayout_(nullptr)
+    , backButton_(nullptr)
+    , nextButton_(nullptr)
+    , cancelButton_(nullptr)
+    , statusLabel_(nullptr)
+    , scanSelectionWidget_(nullptr)
+    , targetDetectionWidget_(nullptr)
+    , manualAlignmentWidget_(nullptr)
+    , icpRegistrationWidget_(nullptr)
+    , qualityReviewWidget_(nullptr)
+    , exportWidget_(nullptr)
+    , stateMachine_(std::make_unique<WorkflowStateMachine>(this))
+    , targetManager_(std::make_unique<TargetManager>(this))
+    , project_(nullptr)
+    , scanComparisonView_(nullptr)
+    , targetManagementPanel_(nullptr)
+    , navigationEnabled_(true)
+{
     setupUI();
-    updateUIState();
 }
 
-void RegistrationWorkflowWidget::setProject(const Project& project) {
-    m_currentProject = project;
-    m_hasValidProject = true;
-    m_currentPoseGraph.reset();
+void RegistrationWorkflowWidget::setupUI()
+{
+    mainLayout_ = new QVBoxLayout(this);
+    mainLayout_->setContentsMargins(10, 10, 10, 10);
+    mainLayout_->setSpacing(10);
     
-    logMessage(QString("Project loaded: %1").arg(project.getName()));
-    updateUIState();
+    createProgressArea();
+    createContentArea();
+    createNavigationArea();
+    createStepWidgets();
+    setupConnections();
+    setupStyling();
+    
+    // Initialize state
+    updateCurrentStepWidget();
+    updateNavigationButtons();
 }
 
-void RegistrationWorkflowWidget::setupUI() {
-    auto* mainLayout = new QVBoxLayout(this);
-    
-    // Create main splitter
-    auto* splitter = new QSplitter(Qt::Vertical, this);
-    
-    // Create control panels
-    auto* controlsWidget = new QWidget();
-    auto* controlsLayout = new QHBoxLayout(controlsWidget);
-    
-    controlsLayout->addWidget(createGlobalOptimizationGroup());
-    controlsLayout->addWidget(createFeatureRegistrationGroup());
-    controlsLayout->addWidget(createVisualAnalysisGroup());
-    
-    splitter->addWidget(controlsWidget);
-    splitter->addWidget(createResultsDisplay());
-    
-    // Set splitter proportions
-    splitter->setSizes({300, 400});
-    
-    mainLayout->addWidget(splitter);
+void RegistrationWorkflowWidget::createProgressArea()
+{
+    progressWidget_ = new WorkflowProgressWidget(this);
+    mainLayout_->addWidget(progressWidget_);
 }
 
-QGroupBox* RegistrationWorkflowWidget::createGlobalOptimizationGroup() {
-    m_globalOptGroup = new QGroupBox("Global Optimization (Bundle Adjustment)");
-    auto* layout = new QVBoxLayout(m_globalOptGroup);
-    
-    // Parameters
-    auto* paramsLayout = new QHBoxLayout();
-    
-    paramsLayout->addWidget(new QLabel("Max Iterations:"));
-    m_maxIterationsSpin = new QSpinBox();
-    m_maxIterationsSpin->setRange(10, 1000);
-    m_maxIterationsSpin->setValue(100);
-    paramsLayout->addWidget(m_maxIterationsSpin);
-    
-    paramsLayout->addWidget(new QLabel("Convergence:"));
-    m_convergenceThresholdSpin = new QDoubleSpinBox();
-    m_convergenceThresholdSpin->setRange(1e-8, 1e-3);
-    m_convergenceThresholdSpin->setDecimals(8);
-    m_convergenceThresholdSpin->setValue(1e-6);
-    m_convergenceThresholdSpin->setSingleStep(1e-7);
-    paramsLayout->addWidget(m_convergenceThresholdSpin);
-    
-    m_fixFirstPoseCheck = new QCheckBox("Fix First Pose");
-    m_fixFirstPoseCheck->setChecked(true);
-    paramsLayout->addWidget(m_fixFirstPoseCheck);
-    
-    layout->addLayout(paramsLayout);
-    
-    // Control button
-    m_globalOptimizeButton = new QPushButton("Globally Optimize Project");
-    connect(m_globalOptimizeButton, &QPushButton::clicked,
-            this, &RegistrationWorkflowWidget::onGloballyOptimizeProject);
-    layout->addWidget(m_globalOptimizeButton);
-    
-    // Progress and status
-    m_globalOptProgress = new QProgressBar();
-    m_globalOptProgress->setVisible(false);
-    layout->addWidget(m_globalOptProgress);
-    
-    m_globalOptStatus = new QLabel("Ready");
-    layout->addWidget(m_globalOptStatus);
-    
-    return m_globalOptGroup;
+void RegistrationWorkflowWidget::createContentArea()
+{
+    contentStack_ = new QStackedWidget(this);
+    contentStack_->setMinimumHeight(400);
+    mainLayout_->addWidget(contentStack_, 1); // Give it stretch factor
 }
 
-QGroupBox* RegistrationWorkflowWidget::createFeatureRegistrationGroup() {
-    m_featureRegGroup = new QGroupBox("Feature-Based Registration");
-    auto* layout = new QVBoxLayout(m_featureRegGroup);
+void RegistrationWorkflowWidget::createNavigationArea()
+{
+    navigationLayout_ = new QHBoxLayout();
     
-    // Parameters
-    auto* paramsLayout = new QHBoxLayout();
+    // Status label
+    statusLabel_ = new QLabel("Ready to start registration workflow");
+    statusLabel_->setStyleSheet("color: #666; font-style: italic;");
     
-    paramsLayout->addWidget(new QLabel("Max Planes:"));
-    m_maxPlanesSpin = new QSpinBox();
-    m_maxPlanesSpin->setRange(3, 20);
-    m_maxPlanesSpin->setValue(10);
-    paramsLayout->addWidget(m_maxPlanesSpin);
+    // Navigation buttons
+    backButton_ = new QPushButton("← Back");
+    nextButton_ = new QPushButton("Next →");
+    cancelButton_ = new QPushButton("Cancel");
     
-    paramsLayout->addWidget(new QLabel("Distance Threshold:"));
-    m_planeDistanceThresholdSpin = new QDoubleSpinBox();
-    m_planeDistanceThresholdSpin->setRange(0.001, 0.1);
-    m_planeDistanceThresholdSpin->setDecimals(3);
-    m_planeDistanceThresholdSpin->setValue(0.02);
-    m_planeDistanceThresholdSpin->setSingleStep(0.001);
-    paramsLayout->addWidget(m_planeDistanceThresholdSpin);
+    backButton_->setMinimumWidth(100);
+    nextButton_->setMinimumWidth(100);
+    cancelButton_->setMinimumWidth(100);
     
-    paramsLayout->addWidget(new QLabel("Min Inliers:"));
-    m_minInliersSpin = new QSpinBox();
-    m_minInliersSpin->setRange(50, 1000);
-    m_minInliersSpin->setValue(100);
-    paramsLayout->addWidget(m_minInliersSpin);
+    // Layout
+    navigationLayout_->addWidget(statusLabel_);
+    navigationLayout_->addStretch();
+    navigationLayout_->addWidget(backButton_);
+    navigationLayout_->addWidget(nextButton_);
+    navigationLayout_->addWidget(cancelButton_);
     
-    layout->addLayout(paramsLayout);
-    
-    // Control button
-    m_alignByFeaturesButton = new QPushButton("Align by Features");
-    connect(m_alignByFeaturesButton, &QPushButton::clicked,
-            this, &RegistrationWorkflowWidget::onAlignByFeatures);
-    layout->addWidget(m_alignByFeaturesButton);
-    
-    // Progress and status
-    m_featureRegProgress = new QProgressBar();
-    m_featureRegProgress->setVisible(false);
-    layout->addWidget(m_featureRegProgress);
-    
-    m_featureRegStatus = new QLabel("Ready");
-    layout->addWidget(m_featureRegStatus);
-    
-    return m_featureRegGroup;
+    mainLayout_->addLayout(navigationLayout_);
 }
 
-QGroupBox* RegistrationWorkflowWidget::createVisualAnalysisGroup() {
-    m_visualAnalysisGroup = new QGroupBox("Visual Registration Analysis");
-    auto* layout = new QVBoxLayout(m_visualAnalysisGroup);
+void RegistrationWorkflowWidget::createStepWidgets()
+{
+    scanSelectionWidget_ = createScanSelectionWidget();
+    targetDetectionWidget_ = createTargetDetectionWidget();
+    manualAlignmentWidget_ = createManualAlignmentWidget();
+    icpRegistrationWidget_ = createICPRegistrationWidget();
+    qualityReviewWidget_ = createQualityReviewWidget();
+    exportWidget_ = createExportWidget();
     
-    // Heat map toggle
-    m_showDifferenceHeatMapCheck = new QCheckBox("Show Difference Heat Map");
-    connect(m_showDifferenceHeatMapCheck, &QCheckBox::toggled,
-            this, &RegistrationWorkflowWidget::onShowDifferenceHeatMap);
-    layout->addWidget(m_showDifferenceHeatMapCheck);
-    
-    // Parameters
-    auto* paramsLayout = new QHBoxLayout();
-    
-    paramsLayout->addWidget(new QLabel("Max Search Distance:"));
-    m_maxSearchDistanceSpin = new QDoubleSpinBox();
-    m_maxSearchDistanceSpin->setRange(0.01, 10.0);
-    m_maxSearchDistanceSpin->setDecimals(2);
-    m_maxSearchDistanceSpin->setValue(1.0);
-    m_maxSearchDistanceSpin->setSingleStep(0.1);
-    paramsLayout->addWidget(m_maxSearchDistanceSpin);
-    
-    m_useKDTreeCheck = new QCheckBox("Use KD-Tree");
-    m_useKDTreeCheck->setChecked(true);
-    paramsLayout->addWidget(m_useKDTreeCheck);
-    
-    layout->addLayout(paramsLayout);
-    
-    // Analysis button
-    m_analyzeQualityButton = new QPushButton("Analyze Registration Quality");
-    connect(m_analyzeQualityButton, &QPushButton::clicked,
-            this, &RegistrationWorkflowWidget::onAnalyzeRegistrationQuality);
-    layout->addWidget(m_analyzeQualityButton);
-    
-    // Status
-    m_analysisStatus = new QLabel("Ready");
-    layout->addWidget(m_analysisStatus);
-    
-    return m_visualAnalysisGroup;
+    contentStack_->addWidget(scanSelectionWidget_);
+    contentStack_->addWidget(targetDetectionWidget_);
+    contentStack_->addWidget(manualAlignmentWidget_);
+    contentStack_->addWidget(icpRegistrationWidget_);
+    contentStack_->addWidget(qualityReviewWidget_);
+    contentStack_->addWidget(exportWidget_);
 }
 
-QWidget* RegistrationWorkflowWidget::createResultsDisplay() {
-    m_resultsTabWidget = new QTabWidget();
+void RegistrationWorkflowWidget::setupConnections()
+{
+    // State machine connections
+    connect(stateMachine_.get(), &WorkflowStateMachine::stepChanged,
+            this, &RegistrationWorkflowWidget::onStateMachineStepChanged);
+    connect(stateMachine_.get(), &WorkflowStateMachine::transitionBlocked,
+            this, &RegistrationWorkflowWidget::onStateMachineTransitionBlocked);
+    connect(stateMachine_.get(), &WorkflowStateMachine::stepValidationChanged,
+            this, &RegistrationWorkflowWidget::onStepValidationChanged);
     
-    // Log tab
-    m_logTextEdit = new QTextEdit();
-    m_logTextEdit->setReadOnly(true);
-    m_logTextEdit->setMaximumBlockCount(1000); // Limit log size
-    m_resultsTabWidget->addTab(m_logTextEdit, "Log");
+    // Progress widget connections
+    connect(progressWidget_, &WorkflowProgressWidget::stepClicked,
+            this, &RegistrationWorkflowWidget::onProgressWidgetStepClicked);
     
-    // Statistics tab
-    m_statisticsTextEdit = new QTextEdit();
-    m_statisticsTextEdit->setReadOnly(true);
-    m_resultsTabWidget->addTab(m_statisticsTextEdit, "Statistics");
-    
-    // Summary
-    auto* summaryWidget = new QWidget();
-    auto* summaryLayout = new QVBoxLayout(summaryWidget);
-    
-    m_summaryLabel = new QLabel("No registration results available");
-    m_summaryLabel->setWordWrap(true);
-    m_summaryLabel->setAlignment(Qt::AlignTop);
-    summaryLayout->addWidget(m_summaryLabel);
-    summaryLayout->addStretch();
-    
-    m_resultsTabWidget->addTab(summaryWidget, "Summary");
-    
-    return m_resultsTabWidget;
+    // Navigation button connections
+    connect(backButton_, &QPushButton::clicked, this, &RegistrationWorkflowWidget::goBack);
+    connect(nextButton_, &QPushButton::clicked, this, &RegistrationWorkflowWidget::goNext);
+    connect(cancelButton_, &QPushButton::clicked, this, &RegistrationWorkflowWidget::resetWorkflow);
 }
 
-void RegistrationWorkflowWidget::updateUIState() {
-    bool hasProject = m_hasValidProject;
-    bool hasGraph = (m_currentPoseGraph != nullptr);
+void RegistrationWorkflowWidget::setupStyling()
+{
+    setStyleSheet(
+        "QGroupBox { "
+        "font-weight: bold; "
+        "border: 2px solid #CCCCCC; "
+        "border-radius: 5px; "
+        "margin-top: 1ex; "
+        "} "
+        "QGroupBox::title { "
+        "subcontrol-origin: margin; "
+        "left: 10px; "
+        "padding: 0 5px 0 5px; "
+        "} "
+        "QPushButton { "
+        "padding: 8px 16px; "
+        "border: 1px solid #CCCCCC; "
+        "border-radius: 4px; "
+        "background-color: #F5F5F5; "
+        "} "
+        "QPushButton:hover { "
+        "background-color: #E0E0E0; "
+        "} "
+        "QPushButton:pressed { "
+        "background-color: #D0D0D0; "
+        "} "
+        "QPushButton:disabled { "
+        "background-color: #F9F9F9; "
+        "color: #CCCCCC; "
+        "}"
+    );
+}
+
+QWidget* RegistrationWorkflowWidget::createScanSelectionWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("Select Scans for Registration");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
     
-    // Global optimization requires a project with scans
-    m_globalOptimizeButton->setEnabled(hasProject);
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::SelectScans));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
     
-    // Feature registration requires a project with scans
-    m_alignByFeaturesButton->setEnabled(hasProject);
+    // Placeholder for scan selection UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("Scan selection interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- List of available scans in the project\n"
+                             "- Multi-selection capability\n"
+                             "- Scan preview thumbnails\n"
+                             "- Scan metadata display");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
     
-    // Analysis requires registration results
-    m_analyzeQualityButton->setEnabled(hasGraph);
-    m_showDifferenceHeatMapCheck->setEnabled(hasGraph);
+    layout->addStretch();
+    return groupBox;
+}
+
+QWidget* RegistrationWorkflowWidget::createTargetDetectionWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("Target Detection");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
     
-    if (!hasProject) {
-        m_globalOptStatus->setText("No project loaded");
-        m_featureRegStatus->setText("No project loaded");
-        m_analysisStatus->setText("No project loaded");
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::TargetDetection));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+    
+    // Placeholder for target detection UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("Target detection interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- Automatic sphere detection\n"
+                             "- Checkerboard pattern detection\n"
+                             "- Manual point selection tools\n"
+                             "- Target quality assessment");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
+    
+    layout->addStretch();
+    return groupBox;
+}
+
+QWidget* RegistrationWorkflowWidget::createManualAlignmentWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("Manual Alignment");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
+    
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::ManualAlignment));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+    
+    // Placeholder for manual alignment UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("Manual alignment interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- Side-by-side scan comparison\n"
+                             "- Target correspondence creation\n"
+                             "- Real-time transformation preview\n"
+                             "- Alignment quality metrics");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
+    
+    layout->addStretch();
+    return groupBox;
+}
+
+QWidget* RegistrationWorkflowWidget::createICPRegistrationWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("ICP Registration");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
+
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::ICPRegistration));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+
+    // Placeholder for ICP registration UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("ICP registration interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- ICP algorithm configuration\n"
+                             "- Progress monitoring\n"
+                             "- Convergence visualization\n"
+                             "- Result validation");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
+
+    layout->addStretch();
+    return groupBox;
+}
+
+QWidget* RegistrationWorkflowWidget::createQualityReviewWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("Quality Review");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
+
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::QualityReview));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+
+    // Placeholder for quality review UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("Quality review interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- Registration accuracy metrics\n"
+                             "- Error visualization\n"
+                             "- Quality assessment reports\n"
+                             "- Acceptance/rejection controls");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
+
+    layout->addStretch();
+    return groupBox;
+}
+
+QWidget* RegistrationWorkflowWidget::createExportWidget()
+{
+    QGroupBox* groupBox = new QGroupBox("Export Results");
+    QVBoxLayout* layout = new QVBoxLayout(groupBox);
+
+    QLabel* instructions = new QLabel(getStepInstructions(RegistrationStep::Export));
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+
+    // Placeholder for export UI
+    QTextEdit* placeholder = new QTextEdit();
+    placeholder->setPlainText("Export interface will be implemented here.\n\n"
+                             "This will include:\n"
+                             "- File format selection\n"
+                             "- Export options configuration\n"
+                             "- Progress monitoring\n"
+                             "- Result validation");
+    placeholder->setMaximumHeight(200);
+    placeholder->setReadOnly(true);
+    layout->addWidget(placeholder);
+
+    layout->addStretch();
+    return groupBox;
+}
+
+void RegistrationWorkflowWidget::setProject(RegistrationProject* project)
+{
+    if (project_ != project) {
+        project_ = project;
+        emit projectChanged();
+        qDebug() << "RegistrationWorkflowWidget: Project set";
+    }
+}
+
+void RegistrationWorkflowWidget::startWorkflow()
+{
+    resetWorkflow();
+    emit workflowStarted();
+    qDebug() << "RegistrationWorkflowWidget: Workflow started";
+}
+
+void RegistrationWorkflowWidget::resetWorkflow()
+{
+    stateMachine_->transitionTo(RegistrationStep::SelectScans);
+
+    // Reset step completion status
+    for (auto step : {RegistrationStep::SelectScans, RegistrationStep::TargetDetection,
+                     RegistrationStep::ManualAlignment, RegistrationStep::ICPRegistration,
+                     RegistrationStep::QualityReview, RegistrationStep::Export}) {
+        setStepComplete(step, false);
+    }
+
+    updateNavigationButtons();
+    statusLabel_->setText("Workflow reset - ready to start");
+    qDebug() << "RegistrationWorkflowWidget: Workflow reset";
+}
+
+void RegistrationWorkflowWidget::goToStep(RegistrationStep step)
+{
+    stateMachine_->transitionTo(step);
+}
+
+RegistrationStep RegistrationWorkflowWidget::currentStep() const
+{
+    return stateMachine_->currentStep();
+}
+
+void RegistrationWorkflowWidget::setStepComplete(RegistrationStep step, bool complete)
+{
+    if (stepCompletionStatus_.value(step, false) != complete) {
+        stepCompletionStatus_[step] = complete;
+        stateMachine_->setStepComplete(step, complete);
+        progressWidget_->setStepComplete(step, complete);
+        updateNavigationButtons();
+        qDebug() << "RegistrationWorkflowWidget: Step" << static_cast<int>(step)
+                 << "completion set to" << complete;
+    }
+}
+
+bool RegistrationWorkflowWidget::isStepComplete(RegistrationStep step) const
+{
+    return stepCompletionStatus_.value(step, false);
+}
+
+bool RegistrationWorkflowWidget::canGoNext() const
+{
+    return navigationEnabled_ && stateMachine_->canTransitionTo(stateMachine_->getNextStep());
+}
+
+bool RegistrationWorkflowWidget::canGoBack() const
+{
+    return navigationEnabled_ && stateMachine_->canTransitionTo(stateMachine_->getPreviousStep());
+}
+
+void RegistrationWorkflowWidget::enableNavigation(bool enabled)
+{
+    navigationEnabled_ = enabled;
+    updateNavigationButtons();
+}
+
+void RegistrationWorkflowWidget::goNext()
+{
+    if (canGoNext() && validateCurrentStep()) {
+        RegistrationStep nextStep = stateMachine_->getNextStep();
+        stateMachine_->transitionTo(nextStep);
+    }
+}
+
+void RegistrationWorkflowWidget::goBack()
+{
+    if (canGoBack()) {
+        RegistrationStep previousStep = stateMachine_->getPreviousStep();
+        stateMachine_->transitionTo(previousStep);
+    }
+}
+
+void RegistrationWorkflowWidget::onStateMachineStepChanged(RegistrationStep step)
+{
+    progressWidget_->updateCurrentStep(step);
+    updateCurrentStepWidget();
+    updateNavigationButtons();
+
+    statusLabel_->setText(QString("Current step: %1").arg(getStepTitle(step)));
+    emit stepChanged(step);
+
+    qDebug() << "RegistrationWorkflowWidget: Step changed to" << static_cast<int>(step);
+}
+
+void RegistrationWorkflowWidget::onStateMachineTransitionBlocked(const QString& reason)
+{
+    QMessageBox::warning(this, "Transition Blocked", reason);
+    qDebug() << "RegistrationWorkflowWidget: Transition blocked:" << reason;
+}
+
+void RegistrationWorkflowWidget::onProgressWidgetStepClicked(RegistrationStep step)
+{
+    if (stateMachine_->canTransitionTo(step)) {
+        stateMachine_->transitionTo(step);
     } else {
-        m_globalOptStatus->setText("Ready");
-        m_featureRegStatus->setText("Ready");
-        m_analysisStatus->setText(hasGraph ? "Ready" : "No registration results");
+        QMessageBox::information(this, "Step Not Available",
+                                QString("Cannot navigate to %1 at this time.").arg(getStepTitle(step)));
     }
 }
 
-void RegistrationWorkflowWidget::logMessage(const QString& message) {
-    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
-    QString logEntry = QString("[%1] %2").arg(timestamp, message);
-    
-    m_logTextEdit->append(logEntry);
-    qDebug() << logEntry;
+void RegistrationWorkflowWidget::onStepValidationChanged(RegistrationStep step, bool isValid)
+{
+    progressWidget_->setStepValid(step, isValid);
+    updateNavigationButtons();
+    qDebug() << "RegistrationWorkflowWidget: Step" << static_cast<int>(step)
+             << "validation changed to" << isValid;
 }
 
-void RegistrationWorkflowWidget::clearResults() {
-    m_logTextEdit->clear();
-    m_statisticsTextEdit->clear();
-    m_summaryLabel->setText("No registration results available");
-}
+void RegistrationWorkflowWidget::updateCurrentStepWidget()
+{
+    RegistrationStep currentStep = stateMachine_->currentStep();
+    int index = static_cast<int>(currentStep);
 
-void RegistrationWorkflowWidget::onGloballyOptimizeProject() {
-    if (!m_hasValidProject) {
-        QMessageBox::warning(this, "Warning", "No project loaded for optimization");
-        return;
-    }
-
-    logMessage("Starting global optimization (bundle adjustment)...");
-
-    // Disable UI during optimization
-    m_globalOptimizeButton->setEnabled(false);
-    m_globalOptProgress->setVisible(true);
-    m_globalOptProgress->setValue(0);
-    m_globalOptStatus->setText("Building pose graph...");
-
-    try {
-        // Build pose graph from project
-        auto poseGraph = m_poseGraphBuilder->build(m_currentProject);
-
-        if (!poseGraph || poseGraph->isEmpty()) {
-            logMessage("ERROR: Failed to build pose graph from project");
-            m_globalOptStatus->setText("Failed to build pose graph");
-            m_globalOptimizeButton->setEnabled(true);
-            m_globalOptProgress->setVisible(false);
-            return;
-        }
-
-        logMessage(QString("Built pose graph with %1 nodes and %2 edges")
-                  .arg(poseGraph->nodeCount()).arg(poseGraph->edgeCount()));
-
-        // Setup optimization parameters
-        Optimization::BundleAdjustment::Parameters params;
-        params.maxIterations = m_maxIterationsSpin->value();
-        params.convergenceThreshold = m_convergenceThresholdSpin->value();
-        params.fixFirstPose = m_fixFirstPoseCheck->isChecked();
-        params.verbose = true;
-
-        m_globalOptStatus->setText("Optimizing poses...");
-
-        // Start optimization (this will trigger progress signals)
-        auto [optimizedGraph, result] = m_bundleAdjustment->optimize(*poseGraph, params);
-
-        // The completion will be handled in onBundleAdjustmentCompleted
-
-    } catch (const std::exception& e) {
-        logMessage(QString("ERROR: Global optimization failed: %1").arg(e.what()));
-        m_globalOptStatus->setText("Optimization failed");
-        m_globalOptimizeButton->setEnabled(true);
-        m_globalOptProgress->setVisible(false);
+    if (index >= 0 && index < contentStack_->count()) {
+        contentStack_->setCurrentIndex(index);
     }
 }
 
-void RegistrationWorkflowWidget::onAlignByFeatures() {
-    if (!m_hasValidProject) {
-        QMessageBox::warning(this, "Warning", "No project loaded for feature alignment");
-        return;
-    }
+void RegistrationWorkflowWidget::updateNavigationButtons()
+{
+    backButton_->setEnabled(canGoBack());
+    nextButton_->setEnabled(canGoNext());
 
-    logMessage("Starting feature-based registration...");
-
-    // Disable UI during registration
-    m_alignByFeaturesButton->setEnabled(false);
-    m_featureRegProgress->setVisible(true);
-    m_featureRegProgress->setValue(0);
-    m_featureRegStatus->setText("Loading point clouds...");
-
-    try {
-        // Get scan list from project
-        QStringList scanIds = m_currentProject.getScans();
-
-        if (scanIds.size() < 2) {
-            logMessage("ERROR: Need at least 2 scans for feature-based registration");
-            m_featureRegStatus->setText("Insufficient scans");
-            m_alignByFeaturesButton->setEnabled(true);
-            m_featureRegProgress->setVisible(false);
-            return;
-        }
-
-        // For demonstration, align first two scans
-        // In a full implementation, this would iterate through all scan pairs
-        QString sourceScanId = scanIds[0];
-        QString targetScanId = scanIds[1];
-
-        logMessage(QString("Aligning scans: %1 -> %2").arg(sourceScanId, targetScanId));
-
-        // Load point clouds (placeholder - would load actual data)
-        std::vector<Point3D> sourcePoints; // TODO: Load from project
-        std::vector<Point3D> targetPoints; // TODO: Load from project
-
-        // Setup registration parameters
-        FeatureBasedRegistration::Parameters params;
-        params.extractionParams.maxPlanes = m_maxPlanesSpin->value();
-        params.extractionParams.distanceThreshold = static_cast<float>(m_planeDistanceThresholdSpin->value());
-        params.extractionParams.minInliers = m_minInliersSpin->value();
-
-        m_featureRegStatus->setText("Extracting features...");
-
-        // Start registration (this will trigger progress signals)
-        auto result = m_featureRegistration->registerPointClouds(sourcePoints, targetPoints, params);
-
-        // The completion will be handled in onFeatureRegistrationCompleted
-
-    } catch (const std::exception& e) {
-        logMessage(QString("ERROR: Feature registration failed: %1").arg(e.what()));
-        m_featureRegStatus->setText("Registration failed");
-        m_alignByFeaturesButton->setEnabled(true);
-        m_featureRegProgress->setVisible(false);
-    }
-}
-
-void RegistrationWorkflowWidget::onShowDifferenceHeatMap(bool enabled) {
-    if (!m_currentPoseGraph) {
-        m_showDifferenceHeatMapCheck->setChecked(false);
-        QMessageBox::information(this, "Information", "No registration results available for heat map");
-        return;
-    }
-
-    logMessage(QString("Difference heat map %1").arg(enabled ? "enabled" : "disabled"));
-
-    // TODO: Implement heat map visualization in 3D viewer
-    // This would typically involve:
-    // 1. Calculate point-to-point distances
-    // 2. Generate color map values
-    // 3. Apply colors to point cloud visualization
-
-    if (enabled) {
-        m_analysisStatus->setText("Heat map enabled");
+    // Update button text based on current step
+    RegistrationStep currentStep = stateMachine_->currentStep();
+    if (currentStep == RegistrationStep::Export) {
+        nextButton_->setText("Finish");
     } else {
-        m_analysisStatus->setText("Heat map disabled");
+        nextButton_->setText("Next →");
     }
 }
 
-void RegistrationWorkflowWidget::onAnalyzeRegistrationQuality() {
-    if (!m_currentPoseGraph) {
-        QMessageBox::warning(this, "Warning", "No registration results available for analysis");
-        return;
-    }
+void RegistrationWorkflowWidget::updateStepValidation()
+{
+    RegistrationStep currentStep = stateMachine_->currentStep();
+    bool isValid = validateCurrentStep();
+    stateMachine_->setStepValid(currentStep, isValid);
+}
 
-    logMessage("Starting registration quality analysis...");
-    m_analysisStatus->setText("Analyzing registration quality...");
+bool RegistrationWorkflowWidget::validateCurrentStep() const
+{
+    RegistrationStep currentStep = stateMachine_->currentStep();
 
-    try {
-        // Setup analysis parameters
-        Analysis::DifferenceAnalysis::Parameters params;
-        params.maxSearchDistance = static_cast<float>(m_maxSearchDistanceSpin->value());
-        params.useKDTree = m_useKDTreeCheck->isChecked();
-
-        // TODO: Load actual point cloud data for analysis
-        std::vector<Point3D> sourcePoints; // TODO: Load from project
-        std::vector<Point3D> targetPoints; // TODO: Load from project
-
-        // Calculate distances (this will trigger completion signal)
-        QVector<float> distances = m_differenceAnalysis->calculateDistances(
-            sourcePoints, targetPoints, QMatrix4x4(), params);
-
-        // The completion will be handled in onDifferenceAnalysisCompleted
-
-    } catch (const std::exception& e) {
-        logMessage(QString("ERROR: Quality analysis failed: %1").arg(e.what()));
-        m_analysisStatus->setText("Analysis failed");
+    switch (currentStep) {
+        case RegistrationStep::SelectScans:
+            return validateScanSelection();
+        case RegistrationStep::TargetDetection:
+            return validateTargetDetection();
+        case RegistrationStep::ManualAlignment:
+            return validateManualAlignment();
+        case RegistrationStep::ICPRegistration:
+            return validateICPRegistration();
+        case RegistrationStep::QualityReview:
+            return validateQualityReview();
+        case RegistrationStep::Export:
+            return true; // Export step is always valid
+        default:
+            return false;
     }
 }
 
-void RegistrationWorkflowWidget::onBundleAdjustmentProgress(int iteration, double currentError, double lambda) {
-    // Update progress bar based on iteration count
-    int maxIterations = m_maxIterationsSpin->value();
-    int progress = (iteration * 100) / maxIterations;
-    m_globalOptProgress->setValue(std::min(progress, 99)); // Keep at 99% until completion
+bool RegistrationWorkflowWidget::validateScanSelection() const
+{
+    // TODO: Implement actual validation
+    return project_ != nullptr;
+}
 
-    m_globalOptStatus->setText(QString("Iteration %1: Error=%2, λ=%3")
-                              .arg(iteration)
-                              .arg(currentError, 0, 'e', 3)
-                              .arg(lambda, 0, 'e', 3));
+bool RegistrationWorkflowWidget::validateTargetDetection() const
+{
+    // TODO: Implement actual validation
+    return true;
+}
 
-    if (iteration % 10 == 0) { // Log every 10th iteration
-        logMessage(QString("Bundle adjustment iteration %1: error=%2")
-                  .arg(iteration).arg(currentError, 0, 'e', 3));
+bool RegistrationWorkflowWidget::validateManualAlignment() const
+{
+    // TODO: Implement actual validation
+    return true;
+}
+
+bool RegistrationWorkflowWidget::validateICPRegistration() const
+{
+    // TODO: Implement actual validation
+    return true;
+}
+
+bool RegistrationWorkflowWidget::validateQualityReview() const
+{
+    // TODO: Implement actual validation
+    return true;
+}
+
+QString RegistrationWorkflowWidget::getStepTitle(RegistrationStep step) const
+{
+    switch (step) {
+        case RegistrationStep::SelectScans:
+            return "Select Scans";
+        case RegistrationStep::TargetDetection:
+            return "Target Detection";
+        case RegistrationStep::ManualAlignment:
+            return "Manual Alignment";
+        case RegistrationStep::ICPRegistration:
+            return "ICP Registration";
+        case RegistrationStep::QualityReview:
+            return "Quality Review";
+        case RegistrationStep::Export:
+            return "Export Results";
+        default:
+            return "Unknown Step";
     }
 }
 
-void RegistrationWorkflowWidget::onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result) {
-    // Re-enable UI
-    m_globalOptimizeButton->setEnabled(true);
-    m_globalOptProgress->setVisible(false);
-
-    if (result.converged) {
-        logMessage(QString("Bundle adjustment completed successfully in %1 iterations")
-                  .arg(result.iterations));
-        logMessage(QString("Error reduction: %1% (from %2 to %3)")
-                  .arg(result.improvementRatio * 100.0, 0, 'f', 2)
-                  .arg(result.initialError, 0, 'e', 3)
-                  .arg(result.finalError, 0, 'e', 3));
-
-        m_globalOptStatus->setText(QString("Completed: %1% improvement")
-                                  .arg(result.improvementRatio * 100.0, 0, 'f', 1));
-
-        // Update current pose graph (would be set from optimization result)
-        // m_currentPoseGraph = optimizedGraph;
-        updateUIState();
-
-        // Update summary
-        QString summary = QString(
-            "Global Optimization Results:\n"
-            "• Converged: %1\n"
-            "• Iterations: %2\n"
-            "• Initial Error: %3\n"
-            "• Final Error: %4\n"
-            "• Improvement: %5%\n"
-            "• Time: %6 seconds"
-        ).arg(result.converged ? "Yes" : "No")
-         .arg(result.iterations)
-         .arg(result.initialError, 0, 'e', 3)
-         .arg(result.finalError, 0, 'e', 3)
-         .arg(result.improvementRatio * 100.0, 0, 'f', 2)
-         .arg(result.optimizationTimeSeconds, 0, 'f', 2);
-
-        m_summaryLabel->setText(summary);
-
-        emit globalOptimizationCompleted(true);
-
-    } else {
-        logMessage(QString("Bundle adjustment failed: %1").arg(result.statusMessage));
-        m_globalOptStatus->setText("Optimization failed");
-
-        emit globalOptimizationCompleted(false);
+QString RegistrationWorkflowWidget::getStepInstructions(RegistrationStep step) const
+{
+    switch (step) {
+        case RegistrationStep::SelectScans:
+            return "Select the scans you want to register. Choose a reference scan and one or more scans to align to it.";
+        case RegistrationStep::TargetDetection:
+            return "Detect or manually select registration targets (spheres, checkerboards, or natural features) in your scans.";
+        case RegistrationStep::ManualAlignment:
+            return "Create correspondences between targets in different scans to establish an initial alignment.";
+        case RegistrationStep::ICPRegistration:
+            return "Refine the registration using the Iterative Closest Point (ICP) algorithm for precise alignment.";
+        case RegistrationStep::QualityReview:
+            return "Review the registration quality, examine error metrics, and decide whether to accept or refine the results.";
+        case RegistrationStep::Export:
+            return "Export the registered point clouds and transformation matrices in your preferred format.";
+        default:
+            return "No instructions available for this step.";
     }
 }
-
-void RegistrationWorkflowWidget::onFeatureRegistrationProgress(int percentage) {
-    m_featureRegProgress->setValue(percentage);
-
-    if (percentage == 25) {
-        m_featureRegStatus->setText("Extracting source features...");
-    } else if (percentage == 50) {
-        m_featureRegStatus->setText("Extracting target features...");
-    } else if (percentage == 75) {
-        m_featureRegStatus->setText("Finding correspondences...");
-    } else if (percentage == 90) {
-        m_featureRegStatus->setText("Computing transformation...");
-    }
-}
-
-void RegistrationWorkflowWidget::onFeatureRegistrationCompleted(const FeatureBasedRegistration::Result& result) {
-    // Re-enable UI
-    m_alignByFeaturesButton->setEnabled(true);
-    m_featureRegProgress->setVisible(false);
-
-    if (result.success) {
-        logMessage(QString("Feature-based registration completed successfully"));
-        logMessage(QString("Found %1 source planes, %2 target planes, %3 correspondences")
-                  .arg(result.sourcePlanesFound)
-                  .arg(result.targetPlanesFound)
-                  .arg(result.correspondencesFound));
-        logMessage(QString("Registration quality: %1").arg(result.quality, 0, 'f', 3));
-
-        m_featureRegStatus->setText(QString("Completed: Quality=%1")
-                                   .arg(result.quality, 0, 'f', 2));
-
-        // Update summary
-        QString summary = QString(
-            "Feature Registration Results:\n"
-            "• Success: %1\n"
-            "• Source Planes: %2\n"
-            "• Target Planes: %3\n"
-            "• Correspondences: %4\n"
-            "• Quality Score: %5"
-        ).arg(result.success ? "Yes" : "No")
-         .arg(result.sourcePlanesFound)
-         .arg(result.targetPlanesFound)
-         .arg(result.correspondencesFound)
-         .arg(result.quality, 0, 'f', 3);
-
-        m_summaryLabel->setText(summary);
-
-        emit featureRegistrationCompleted(true);
-
-    } else {
-        logMessage(QString("Feature-based registration failed: %1").arg(result.errorMessage));
-        m_featureRegStatus->setText("Registration failed");
-
-        emit featureRegistrationCompleted(false);
-    }
-}
-
-void RegistrationWorkflowWidget::onDifferenceAnalysisCompleted(const Analysis::DifferenceAnalysis::Statistics& stats) {
-    m_analysisStatus->setText("Analysis completed");
-
-    logMessage(QString("Registration quality analysis completed"));
-    logMessage(QString("Mean distance: %1m, RMS: %2m, Outliers: %3%")
-              .arg(stats.meanDistance, 0, 'f', 4)
-              .arg(stats.rmsDistance, 0, 'f', 4)
-              .arg(stats.outlierPercentage, 0, 'f', 1));
-
-    // Generate detailed report
-    QString report = m_differenceAnalysis->generateAnalysisReport(stats);
-    m_statisticsTextEdit->setPlainText(report);
-
-    // Update summary
-    float quality = m_differenceAnalysis->assessRegistrationQuality(stats);
-    QString summary = QString(
-        "Registration Quality Analysis:\n"
-        "• Total Points: %1\n"
-        "• Valid Distances: %2\n"
-        "• Mean Distance: %3 m\n"
-        "• RMS Distance: %4 m\n"
-        "• Outliers: %5%\n"
-        "• Quality Score: %6"
-    ).arg(stats.totalPoints)
-     .arg(stats.validDistances)
-     .arg(stats.meanDistance, 0, 'f', 4)
-     .arg(stats.rmsDistance, 0, 'f', 4)
-     .arg(stats.outlierPercentage, 0, 'f', 1)
-     .arg(quality, 0, 'f', 3);
-
-    m_summaryLabel->setText(summary);
-
-    // Switch to statistics tab to show results
-    m_resultsTabWidget->setCurrentIndex(1);
-
-    emit analysisCompleted(stats);
-}
-
-} // namespace Registration

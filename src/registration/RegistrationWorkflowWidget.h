@@ -1,156 +1,142 @@
-#pragma once
-
-#include "PoseGraph.h"
-#include "PoseGraphBuilder.h"
-#include "../optimization/BundleAdjustment.h"
-#include "../features/FeatureExtractor.h"
-#include "FeatureBasedRegistration.h"
-#include "../analysis/DifferenceAnalysis.h"
-#include "../project.h"
+#ifndef REGISTRATIONWORKFLOWWIDGET_H
+#define REGISTRATIONWORKFLOWWIDGET_H
 
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGroupBox>
+#include <QStackedWidget>
 #include <QPushButton>
-#include <QProgressBar>
 #include <QLabel>
-#include <QTextEdit>
-#include <QCheckBox>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QComboBox>
-#include <QTabWidget>
+#include <QSplitter>
 #include <memory>
+#include "WorkflowStateMachine.h"
+#include "../ui/WorkflowProgressWidget.h"
 
-namespace Registration {
+// Forward declarations
+class TargetManager;
+class RegistrationProject;
+class ScanComparisonView;
+class TargetManagementPanel;
 
 /**
- * @brief Main widget for Sprint 9 advanced registration workflow
- * 
- * Integrates global optimization, feature-based registration, and visual analysis tools
+ * @brief Main widget for registration workflow management
+ *
+ * This widget provides the complete user interface for the registration workflow.
+ * It contains the progress indicator, step-specific content areas, and navigation
+ * controls. It coordinates between the state machine and the various UI components.
+ *
+ * Sprint 2 Implementation: Registration workflow UI foundation
  */
-class RegistrationWorkflowWidget : public QWidget {
+class RegistrationWorkflowWidget : public QWidget
+{
     Q_OBJECT
-    
+
 public:
     explicit RegistrationWorkflowWidget(QWidget* parent = nullptr);
-    
-    /**
-     * @brief Set the current project for registration operations
-     * @param project Project containing scan data
-     */
-    void setProject(const Project& project);
-    
-    /**
-     * @brief Get current registration results
-     * @return Current pose graph if available
-     */
-    std::shared_ptr<PoseGraph> getCurrentPoseGraph() const { return m_currentPoseGraph; }
-    
+    virtual ~RegistrationWorkflowWidget() = default;
+
+    // Project management
+    void setProject(RegistrationProject* project);
+    RegistrationProject* project() const { return project_; }
+
+    // Workflow control
+    void startWorkflow();
+    void resetWorkflow();
+    void goToStep(RegistrationStep step);
+    RegistrationStep currentStep() const;
+
+    // Step completion
+    void setStepComplete(RegistrationStep step, bool complete);
+    bool isStepComplete(RegistrationStep step) const;
+
+    // Navigation
+    bool canGoNext() const;
+    bool canGoBack() const;
+    void enableNavigation(bool enabled);
+
 signals:
-    void registrationCompleted(bool success);
-    void globalOptimizationCompleted(bool success);
-    void featureRegistrationCompleted(bool success);
-    void analysisCompleted(const Analysis::DifferenceAnalysis::Statistics& stats);
-    
+    void workflowStarted();
+    void workflowCompleted();
+    void stepChanged(RegistrationStep step);
+    void projectChanged();
+
 public slots:
-    void onGloballyOptimizeProject();
-    void onAlignByFeatures();
-    void onShowDifferenceHeatMap(bool enabled);
-    void onAnalyzeRegistrationQuality();
-    
+    void goNext();
+    void goBack();
+
 private slots:
-    void onBundleAdjustmentProgress(int iteration, double currentError, double lambda);
-    void onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result);
-    void onFeatureRegistrationProgress(int percentage);
-    void onFeatureRegistrationCompleted(const FeatureBasedRegistration::Result& result);
-    void onDifferenceAnalysisCompleted(const Analysis::DifferenceAnalysis::Statistics& stats);
-    
+    void onStateMachineStepChanged(RegistrationStep step);
+    void onStateMachineTransitionBlocked(const QString& reason);
+    void onProgressWidgetStepClicked(RegistrationStep step);
+    void onStepValidationChanged(RegistrationStep step, bool isValid);
+
 private:
-    /**
-     * @brief Setup the user interface
-     */
+    // UI setup
     void setupUI();
-    
-    /**
-     * @brief Create global optimization controls
-     */
-    QGroupBox* createGlobalOptimizationGroup();
-    
-    /**
-     * @brief Create feature-based registration controls
-     */
-    QGroupBox* createFeatureRegistrationGroup();
-    
-    /**
-     * @brief Create visual analysis controls
-     */
-    QGroupBox* createVisualAnalysisGroup();
-    
-    /**
-     * @brief Create results display area
-     */
-    QWidget* createResultsDisplay();
-    
-    /**
-     * @brief Update UI state based on current project
-     */
-    void updateUIState();
-    
-    /**
-     * @brief Log message to results display
-     */
-    void logMessage(const QString& message);
-    
-    /**
-     * @brief Clear results display
-     */
-    void clearResults();
-    
+    void createProgressArea();
+    void createContentArea();
+    void createNavigationArea();
+    void createStepWidgets();
+    void setupConnections();
+    void setupStyling();
+
+    // Step management
+    void updateCurrentStepWidget();
+    void updateNavigationButtons();
+    void updateStepValidation();
+
+    // Step widget creation
+    QWidget* createScanSelectionWidget();
+    QWidget* createTargetDetectionWidget();
+    QWidget* createManualAlignmentWidget();
+    QWidget* createICPRegistrationWidget();
+    QWidget* createQualityReviewWidget();
+    QWidget* createExportWidget();
+
+    // Validation
+    bool validateCurrentStep() const;
+    bool validateScanSelection() const;
+    bool validateTargetDetection() const;
+    bool validateManualAlignment() const;
+    bool validateICPRegistration() const;
+    bool validateQualityReview() const;
+
+    // Utility
+    QString getStepTitle(RegistrationStep step) const;
+    QString getStepInstructions(RegistrationStep step) const;
+
+    // Main layout components
+    QVBoxLayout* mainLayout_;
+    WorkflowProgressWidget* progressWidget_;
+    QStackedWidget* contentStack_;
+    QHBoxLayout* navigationLayout_;
+
+    // Navigation controls
+    QPushButton* backButton_;
+    QPushButton* nextButton_;
+    QPushButton* cancelButton_;
+    QLabel* statusLabel_;
+
+    // Step widgets
+    QWidget* scanSelectionWidget_;
+    QWidget* targetDetectionWidget_;
+    QWidget* manualAlignmentWidget_;
+    QWidget* icpRegistrationWidget_;
+    QWidget* qualityReviewWidget_;
+    QWidget* exportWidget_;
+
     // Core components
-    std::unique_ptr<PoseGraphBuilder> m_poseGraphBuilder;
-    std::unique_ptr<Optimization::BundleAdjustment> m_bundleAdjustment;
-    std::unique_ptr<Features::FeatureExtractor> m_featureExtractor;
-    std::unique_ptr<FeatureBasedRegistration> m_featureRegistration;
-    std::unique_ptr<Analysis::DifferenceAnalysis> m_differenceAnalysis;
-    
-    // Current state
-    Project m_currentProject;
-    std::shared_ptr<PoseGraph> m_currentPoseGraph;
-    bool m_hasValidProject = false;
-    
-    // UI Components - Global Optimization
-    QGroupBox* m_globalOptGroup;
-    QPushButton* m_globalOptimizeButton;
-    QSpinBox* m_maxIterationsSpin;
-    QDoubleSpinBox* m_convergenceThresholdSpin;
-    QCheckBox* m_fixFirstPoseCheck;
-    QProgressBar* m_globalOptProgress;
-    QLabel* m_globalOptStatus;
-    
-    // UI Components - Feature Registration
-    QGroupBox* m_featureRegGroup;
-    QPushButton* m_alignByFeaturesButton;
-    QSpinBox* m_maxPlanesSpin;
-    QDoubleSpinBox* m_planeDistanceThresholdSpin;
-    QSpinBox* m_minInliersSpin;
-    QProgressBar* m_featureRegProgress;
-    QLabel* m_featureRegStatus;
-    
-    // UI Components - Visual Analysis
-    QGroupBox* m_visualAnalysisGroup;
-    QCheckBox* m_showDifferenceHeatMapCheck;
-    QPushButton* m_analyzeQualityButton;
-    QDoubleSpinBox* m_maxSearchDistanceSpin;
-    QCheckBox* m_useKDTreeCheck;
-    QLabel* m_analysisStatus;
-    
-    // UI Components - Results
-    QTabWidget* m_resultsTabWidget;
-    QTextEdit* m_logTextEdit;
-    QTextEdit* m_statisticsTextEdit;
-    QLabel* m_summaryLabel;
+    std::unique_ptr<WorkflowStateMachine> stateMachine_;
+    std::unique_ptr<TargetManager> targetManager_;
+    RegistrationProject* project_;
+
+    // Specialized UI components (to be implemented in future sprints)
+    ScanComparisonView* scanComparisonView_;
+    TargetManagementPanel* targetManagementPanel_;
+
+    // State
+    bool navigationEnabled_;
+    QMap<RegistrationStep, bool> stepCompletionStatus_;
 };
 
-} // namespace Registration
+#endif // REGISTRATIONWORKFLOWWIDGET_H
