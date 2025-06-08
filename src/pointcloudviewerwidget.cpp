@@ -1,5 +1,7 @@
 #include "pointcloudviewerwidget.h"
 #include "performance_profiler.h"
+// Sprint 6: Include for Point struct
+#include "export/IFormatWriter.h"
 #include <QDebug>
 #include <QDir>
 #include <QCoreApplication>
@@ -80,6 +82,7 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
     m_modelMatrix.setToIdentity();
     m_viewMatrix.setToIdentity();
     m_projectionMatrix.setToIdentity();
+    m_dynamicTransform.setToIdentity();  // Sprint 4: Initialize dynamic transformation
 
     // Sprint 2.3: Setup loading animation timer
     m_loadingTimer = new QTimer(this);
@@ -277,8 +280,8 @@ void PointCloudViewerWidget::paintGL()
                 qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
             }
 
-            // Calculate MVP matrix
-            QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+            // Calculate MVP matrix with dynamic transformation for Sprint 4 alignment preview
+            QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_dynamicTransform * m_modelMatrix;
 
             // Set uniforms with error checking
             m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
@@ -2690,8 +2693,8 @@ void PointCloudViewerWidget::renderMultipleScans() {
             continue;
         }
 
-        // Set uniforms
-        QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
+        // Set uniforms with dynamic transformation for Sprint 4 alignment preview
+        QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_dynamicTransform * m_modelMatrix;
         m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
         m_shaderProgram->setUniformValue(m_colorLocation, scanColor);
         m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
@@ -2775,4 +2778,71 @@ QColor PointCloudViewerWidget::generateScanColor(int scanIndex) {
 
         return QColor::fromHsvF(hue, 0.8f, 0.9f);
     }
+}
+
+// Sprint 6: Export support implementation
+std::vector<Point> PointCloudViewerWidget::getCurrentPointCloudData() const
+{
+    std::vector<Point> points;
+
+    if (!m_hasData || m_pointData.empty()) {
+        return points;
+    }
+
+    // Convert internal point data to Point structures for export
+    points.reserve(m_pointCount);
+
+    for (int i = 0; i < m_pointCount; ++i) {
+        size_t index = i * 3;
+        if (index + 2 < m_pointData.size()) {
+            Point point;
+
+            // Apply inverse global offset to get original coordinates
+            point.x = m_pointData[index] + m_globalOffset.x();
+            point.y = m_pointData[index + 1] + m_globalOffset.y();
+            point.z = m_pointData[index + 2] + m_globalOffset.z();
+
+            // Set default color and intensity values
+            // In a full implementation, these would come from actual point attributes
+            point.r = 255;
+            point.g = 255;
+            point.b = 255;
+            point.intensity = 1.0f;
+
+            // If we have vertex data with attributes, use those instead
+            if (i < static_cast<int>(m_vertexData.size())) {
+                const VertexData& vertexData = m_vertexData[i];
+                point.r = static_cast<uint8_t>(vertexData.color.x() * 255);
+                point.g = static_cast<uint8_t>(vertexData.color.y() * 255);
+                point.b = static_cast<uint8_t>(vertexData.color.z() * 255);
+                point.intensity = vertexData.intensity;
+            }
+
+            points.push_back(point);
+        }
+    }
+
+    qDebug() << "PointCloudViewerWidget: Exported" << points.size() << "points for export/analysis";
+    return points;
+}
+
+// Sprint 4: Dynamic transformation support for real-time alignment preview
+void PointCloudViewerWidget::setDynamicTransform(const QMatrix4x4& transform)
+{
+    m_dynamicTransform = transform;
+
+    qDebug() << "Dynamic transformation updated for real-time alignment preview";
+
+    // Trigger immediate repaint for real-time feedback
+    update();
+}
+
+void PointCloudViewerWidget::clearDynamicTransform()
+{
+    m_dynamicTransform.setToIdentity();
+
+    qDebug() << "Dynamic transformation cleared";
+
+    // Trigger repaint to show original position
+    update();
 }
