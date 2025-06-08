@@ -147,7 +147,7 @@ endif()
 
 # Find Qt6 components - require minimum version 6.5.0 for better Linux compatibility
 # Note: 6.9.0 is preferred on Windows, but 6.5.0+ is acceptable for Linux distributions
-find_package(Qt6 6.5.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
+find_package(Qt6 6.2.0 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets Test Xml Network Sql Concurrent)
 
 # Check Qt6 version and warn if using older version
 if(Qt6_VERSION VERSION_LESS "6.9.0")
@@ -159,7 +159,10 @@ endif()
 # find_package(Vulkan REQUIRED)
 
 # Find E57Format library for enhanced E57 parsing
-find_package(E57Format CONFIG REQUIRED)
+# find_package(E57Format CONFIG REQUIRED)  # Temporarily disabled for Sprint 4 testing
+
+# Find Eigen3 library for Sprint 4 alignment algorithms
+find_package(Eigen3 REQUIRED NO_MODULE)
 
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
@@ -205,9 +208,41 @@ set(SOURCES
     src/sqlitemanager.cpp
     src/projecttreemodel.cpp
     src/scanimportmanager.cpp
-    src/E57ParserCore.cpp
+    # src/E57ParserCore.cpp  # Temporarily disabled for Sprint 4 testing
     src/ProjectStateService.cpp
     src/rendering/GpuCuller.cpp
+    # Sprint 1: 3D Point Cloud Visualization
+    src/rendering/OpenGLRenderer.cpp
+    src/camera/CameraController.cpp
+    src/rendering/LODManager.cpp
+    src/ui/ViewerToolbar.cpp
+    # Sprint 2: Registration workflow components
+    src/registration/WorkflowStateMachine.cpp
+    src/registration/Target.cpp
+    src/registration/TargetCorrespondence.cpp
+    src/registration/TargetManager.cpp
+    src/registration/RegistrationProject.cpp
+    src/registration/RegistrationWorkflowWidget.cpp
+    src/ui/WorkflowProgressWidget.cpp
+    # Sprint 3: Target Detection and Registration
+    src/detection/TargetDetectionBase.cpp
+    src/detection/SphereDetector.cpp
+    src/detection/NaturalPointSelector.cpp
+    src/ui/TargetDetectionDialog.cpp
+    # Sprint 4: Manual Alignment Implementation
+    src/algorithms/LeastSquaresAlignment.cpp
+    src/registration/AlignmentEngine.cpp
+    src/registration/ErrorAnalysis.cpp
+    src/ui/AlignmentControlPanel.cpp
+    # Sprint 5: ICP Registration Algorithm
+    src/algorithms/ICPRegistration.cpp
+    src/algorithms/PointToPlaneICP.cpp
+    src/ui/ICPProgressWidget.cpp
+    # Sprint 7: Performance Optimization & UI Polish
+    src/performance/MemoryManager.cpp
+    src/performance/ParallelProcessing.cpp
+    src/ui/UIThemeManager.cpp
+    src/ui/UserPreferences.cpp
 )
 
 # Header files
@@ -238,14 +273,49 @@ set(HEADERS
     src/sqlitemanager.h
     src/projecttreemodel.h
     src/scanimportmanager.h
-    src/E57ParserCore.h
+    # src/E57ParserCore.h  # Temporarily disabled for Sprint 4 testing
     src/ProjectStateService.h
+    # Sprint 1: 3D Point Cloud Visualization
+    src/rendering/OpenGLRenderer.h
+    src/camera/CameraController.h
+    src/rendering/LODManager.h
+    src/ui/ViewerToolbar.h
+    # Sprint 2: Registration workflow headers
+    src/registration/WorkflowStateMachine.h
+    src/registration/Target.h
+    src/registration/TargetCorrespondence.h
+    src/registration/TargetManager.h
+    src/registration/RegistrationProject.h
+    src/registration/RegistrationWorkflowWidget.h
+    src/ui/WorkflowProgressWidget.h
+    # Sprint 3: Target Detection and Registration Headers
+    src/detection/TargetDetectionBase.h
+    src/detection/SphereDetector.h
+    src/detection/NaturalPointSelector.h
+    src/ui/TargetDetectionDialog.h
+    # Sprint 4: Manual Alignment Implementation
+    src/algorithms/LeastSquaresAlignment.h
+    src/registration/AlignmentEngine.h
+    src/registration/ErrorAnalysis.h
+    src/ui/AlignmentControlPanel.h
+    # Sprint 5: ICP Registration Algorithm
+    src/algorithms/ICPRegistration.h
+    src/algorithms/PointToPlaneICP.h
+    src/ui/ICPProgressWidget.h
+    # Sprint 7: Performance Optimization & UI Polish
+    src/performance/MemoryManager.h
+    src/performance/ParallelProcessing.h
+    src/ui/UIThemeManager.h
+    src/ui/UserPreferences.h
 )
 
 # Shader files
 set(SHADERS
     shaders/point.vert
     shaders/point.frag
+    # Sprint 1: Enhanced shaders
+    shaders/pointcloud.vert
+    shaders/pointcloud.frag
 )
 
 # Resource files
@@ -256,7 +326,7 @@ set(RESOURCES
 # Create the executable
 add_executable(CloudRegistration ${SOURCES} ${HEADERS} ${RESOURCES})
 
-# Link Qt6 libraries and E57Format
+# Link Qt6 libraries, E57Format, and Eigen3
 target_link_libraries(CloudRegistration
     Qt6::Core
     Qt6::Widgets
@@ -265,7 +335,8 @@ target_link_libraries(CloudRegistration
     Qt6::Xml
     Qt6::Sql
     Qt6::Concurrent
-    E57Format
+    # E57Format  # Temporarily disabled for Sprint 4 testing
+    Eigen3::Eigen
 )
 
 # Platform-specific linking
@@ -297,10 +368,10 @@ elseif(APPLE)
 endif()
 
 # Ensure E57Format include directories are available
-get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)
-if(E57_INCLUDE_DIRS)
-    target_include_directories(CloudRegistration PRIVATE ${E57_INCLUDE_DIRS})
-endif()
+# get_target_property(E57_INCLUDE_DIRS E57Format INTERFACE_INCLUDE_DIRECTORIES)  # Temporarily disabled for Sprint 4 testing
+# if(E57_INCLUDE_DIRS)
+#     target_include_directories(CloudRegistration PRIVATE ${E57_INCLUDE_DIRS})
+# endif()
 
 
 
@@ -392,6 +463,30 @@ if(TARGET GTest::gtest_main)
 
     target_include_directories(E57ParserCoreTests PRIVATE src)
     add_test(NAME E57ParserCoreTests COMMAND E57ParserCoreTests)
+
+    # Sprint 2: Registration Workflow Tests
+    add_executable(RegistrationWorkflowTests
+        tests/test_registration_workflow.cpp
+        src/registration/WorkflowStateMachine.cpp
+        src/registration/Target.cpp
+        src/registration/TargetCorrespondence.cpp
+        src/registration/TargetManager.cpp
+        src/registration/RegistrationProject.cpp
+        src/registration/RegistrationWorkflowWidget.cpp
+        src/ui/WorkflowProgressWidget.cpp
+        src/project.cpp
+    )
+
+    target_link_libraries(RegistrationWorkflowTests
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
+        Qt6::Test
+    )
+
+    target_include_directories(RegistrationWorkflowTests PRIVATE src)
+    add_test(NAME RegistrationWorkflowTests COMMAND RegistrationWorkflowTests)
 
 
 
@@ -499,6 +594,169 @@ if(TARGET GTest::gtest_main)
 
         target_include_directories(GpuCullerTests PRIVATE src)
         add_test(NAME GpuCullerTests COMMAND GpuCullerTests)
+        # Sprint 1: OpenGL Renderer Tests
+        add_executable(OpenGLRendererTests
+            tests/test_opengl_renderer.cpp
+            src/rendering/OpenGLRenderer.cpp
+        )
+
+        target_link_libraries(OpenGLRendererTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::OpenGL
+            Qt6::OpenGLWidgets
+        )
+
+        target_include_directories(OpenGLRendererTests PRIVATE src)
+        add_test(NAME OpenGLRendererTests COMMAND OpenGLRendererTests)
+
+        # Sprint 1: Camera Controller Tests
+        add_executable(CameraControllerTests
+            tests/test_camera_controller.cpp
+            src/camera/CameraController.cpp
+        )
+
+        target_link_libraries(CameraControllerTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+        )
+
+        target_include_directories(CameraControllerTests PRIVATE src)
+        add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
+
+        # Sprint 3: Target Detection and Registration Tests
+        add_executable(TargetTests
+            tests/test_target.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetTests PRIVATE src)
+        add_test(NAME TargetTests COMMAND TargetTests)
+
+        add_executable(TargetManagerTests
+            tests/test_targetmanager.cpp
+            src/registration/TargetManager.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetManagerTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetManagerTests PRIVATE src)
+        add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+        add_executable(SphereDetectorTests
+            tests/test_spheredetector.cpp
+            src/detection/SphereDetector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(SphereDetectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(SphereDetectorTests PRIVATE src)
+        add_test(NAME SphereDetectorTests COMMAND SphereDetectorTests)
+
+        add_executable(NaturalPointSelectorTests
+            tests/test_naturalpointselector.cpp
+            src/detection/NaturalPointSelector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(NaturalPointSelectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(NaturalPointSelectorTests PRIVATE src)
+        add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
+
+        # Sprint 5: ICP Registration Tests
+        add_executable(ICPRegistrationTests
+            tests/test_icp_registration.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+            src/registration/AlignmentEngine.cpp
+            src/ui/ICPProgressWidget.cpp
+        )
+
+        target_link_libraries(ICPRegistrationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Widgets
+            Qt6::Test
+        )
+
+        target_include_directories(ICPRegistrationTests PRIVATE src)
+        add_test(NAME ICPRegistrationTests COMMAND ICPRegistrationTests)
+
+        # Sprint 5: Point-to-Plane ICP Tests
+        add_executable(PointToPlaneICPTests
+            tests/test_point_to_plane_icp.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/PointToPlaneICP.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+        )
+
+        target_link_libraries(PointToPlaneICPTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Test
+        )
+
+        target_include_directories(PointToPlaneICPTests PRIVATE src)
+        add_test(NAME PointToPlaneICPTests COMMAND PointToPlaneICPTests)
+
+        # Sprint 7: Performance Optimization Tests
+        add_executable(PerformanceOptimizationTests
+            tests/test_performance_optimization.cpp
+            src/performance/MemoryManager.cpp
+            src/performance/ParallelProcessing.cpp
+        )
+
+        target_link_libraries(PerformanceOptimizationTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Test
+            Qt6::Concurrent
+        )
+
+        target_include_directories(PerformanceOptimizationTests PRIVATE src)
+        add_test(NAME PerformanceOptimizationTests COMMAND PerformanceOptimizationTests)
+
+        # Sprint 7: UI Enhancement Tests
+        add_executable(UIEnhancementTests
+            tests/test_ui_enhancement.cpp
+            src/ui/UIThemeManager.cpp
+            src/ui/UserPreferences.cpp
+        )
+
+        target_link_libraries(UIEnhancementTests
+            GTest::gtest_main
+            GTest::gmock_main
+            Qt6::Core
+            Qt6::Widgets
+            Qt6::Gui
+            Qt6::Test
+        )
+
+        target_include_directories(UIEnhancementTests PRIVATE src)
+        add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
 
         # Sprint 8: End-to-End Integration Tests
         add_executable(EndToEndTests
@@ -526,10 +784,177 @@ if(TARGET GTest::gtest_main)
         target_include_directories(EndToEndTests PRIVATE src)
         add_test(NAME EndToEndTests COMMAND EndToEndTests)
 
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests EndToEndTests)
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests MainPresenterTests GpuCullerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests ICPRegistrationTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests EndToEndTests)
 
     else()
-        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests)
+        # Sprint 1: OpenGL Renderer Tests (without mock dependencies)
+        add_executable(OpenGLRendererTests
+            tests/test_opengl_renderer.cpp
+            src/rendering/OpenGLRenderer.cpp
+        )
+
+        target_link_libraries(OpenGLRendererTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::OpenGL
+            Qt6::OpenGLWidgets
+        )
+
+        target_include_directories(OpenGLRendererTests PRIVATE src)
+        add_test(NAME OpenGLRendererTests COMMAND OpenGLRendererTests)
+
+        # Sprint 1: Camera Controller Tests (without mock dependencies)
+        add_executable(CameraControllerTests
+            tests/test_camera_controller.cpp
+            src/camera/CameraController.cpp
+        )
+
+        target_link_libraries(CameraControllerTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+        )
+
+        target_include_directories(CameraControllerTests PRIVATE src)
+        add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
+
+        # Sprint 3: Target Detection and Registration Tests (without mock dependencies)
+        add_executable(TargetTests
+            tests/test_target.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetTests PRIVATE src)
+        add_test(NAME TargetTests COMMAND TargetTests)
+
+        add_executable(TargetManagerTests
+            tests/test_targetmanager.cpp
+            src/registration/TargetManager.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(TargetManagerTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(TargetManagerTests PRIVATE src)
+        add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+        add_executable(SphereDetectorTests
+            tests/test_spheredetector.cpp
+            src/detection/SphereDetector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(SphereDetectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(SphereDetectorTests PRIVATE src)
+        add_test(NAME SphereDetectorTests COMMAND SphereDetectorTests)
+
+        add_executable(NaturalPointSelectorTests
+            tests/test_naturalpointselector.cpp
+            src/detection/NaturalPointSelector.cpp
+            src/detection/TargetDetectionBase.cpp
+            src/registration/Target.cpp
+        )
+
+        target_link_libraries(NaturalPointSelectorTests
+            GTest::gtest_main
+            Qt6::Core
+        )
+
+        target_include_directories(NaturalPointSelectorTests PRIVATE src)
+        add_test(NAME NaturalPointSelectorTests COMMAND NaturalPointSelectorTests)
+
+        # Sprint 5: Point-to-Plane ICP Tests (without Google Mock)
+        add_executable(PointToPlaneICPTests
+            tests/test_point_to_plane_icp.cpp
+            src/algorithms/ICPRegistration.cpp
+            src/algorithms/PointToPlaneICP.cpp
+            src/algorithms/LeastSquaresAlignment.cpp
+        )
+
+        target_link_libraries(PointToPlaneICPTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Test
+        )
+
+        target_include_directories(PointToPlaneICPTests PRIVATE src)
+        add_test(NAME PointToPlaneICPTests COMMAND PointToPlaneICPTests)
+
+        # Sprint 7: Performance Optimization Tests (without Google Mock)
+        add_executable(PerformanceOptimizationTests
+            tests/test_performance_optimization.cpp
+            src/performance/MemoryManager.cpp
+            src/performance/ParallelProcessing.cpp
+        )
+
+        target_link_libraries(PerformanceOptimizationTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Test
+            Qt6::Concurrent
+        )
+
+        target_include_directories(PerformanceOptimizationTests PRIVATE src)
+        add_test(NAME PerformanceOptimizationTests COMMAND PerformanceOptimizationTests)
+
+        # Sprint 7: UI Enhancement Tests (without Google Mock)
+        add_executable(UIEnhancementTests
+            tests/test_ui_enhancement.cpp
+            src/ui/UIThemeManager.cpp
+            src/ui/UserPreferences.cpp
+        )
+
+        target_link_libraries(UIEnhancementTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Widgets
+            Qt6::Gui
+            Qt6::Test
+        )
+
+        target_include_directories(UIEnhancementTests PRIVATE src)
+        add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
+
+        # Sprint 8: End-to-End Integration Tests (without Google Mock)
+        add_executable(EndToEndTests
+            tests/integration/end_to_end_testing.cpp
+            src/MainPresenter.cpp
+            src/IE57Parser.cpp
+            src/e57parserlib.cpp
+            src/lasparser.cpp
+            src/performance_profiler.cpp
+            src/pointcloudloadmanager.cpp
+            src/projectmanager.cpp
+            src/project.cpp
+            src/voxelgridfilter.cpp
+        )
+
+        target_link_libraries(EndToEndTests
+            GTest::gtest_main
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+            E57Format
+        )
+
+        target_include_directories(EndToEndTests PRIVATE src)
+        add_test(NAME EndToEndTests COMMAND EndToEndTests)
+
+        set(ALL_TESTS E57ParserTests E57ParserLibTests E57ParserCoreTests RegistrationWorkflowTests LasParserTests VoxelGridFilterTests ProjectManagerTests RecentProjectsManagerTests OpenGLRendererTests CameraControllerTests TargetTests TargetManagerTests SphereDetectorTests NaturalPointSelectorTests PointToPlaneICPTests PerformanceOptimizationTests UIEnhancementTests EndToEndTests)
     endif()
 
     # Custom target to run all tests
