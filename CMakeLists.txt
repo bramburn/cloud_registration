@@ -47,10 +47,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # F1-S2-03: Find and link Qt6 components
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Test)
 
-# Sprint 2: Task 4.2 - Find third-party libraries (required for full Sprint 2)
-find_package(Eigen3 CONFIG REQUIRED)
-find_package(E57Format CONFIG REQUIRED)
-find_package(XercesC REQUIRED)
+# Sprint 2: Task 4.2 - Find third-party libraries (optional for basic Sprint 2 build)
+# find_package(Eigen3 CONFIG REQUIRED)
+# find_package(E57Format CONFIG REQUIRED)
+# find_package(XercesC REQUIRED)
 
 # Sprint 3: Task 1.1 - Enable testing in CMake
 enable_testing()
@@ -68,10 +68,12 @@ else()
 endif()
 
 # Sprint 2: Task 3.2 - Incrementally add source files (compile after each group)
-# Start with absolute minimum for Qt integration, then add components gradually
+# Start with minimal working Qt application, then add components gradually
 set(APP_SOURCES
     # Main application entry point
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+
+    # Sprint 2: Task 2.3 - Use simplified mainwindow for initial Sprint 2 build
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.h
 
@@ -89,20 +91,25 @@ set(APP_SOURCES
     # Basic parsers (working ones only)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lasparser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lasparser.h
+
+    # Sprint 2: Task 3.3 - Add basic project management components (minimal set)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.h
 )
 
 # Sprint 2: Task 3.4 - Create executable using the APP_SOURCES variable
 add_executable(CloudRegistration ${APP_SOURCES})
 
-# Sprint 2: Task 4.5 - Link all required libraries including third-party dependencies
+# Sprint 2: Task 2.5 - Link Qt libraries for basic Sprint 2 build
 target_link_libraries(CloudRegistration PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
     Qt6::OpenGLWidgets
-    Eigen3::Eigen
-    E57Format
-    XercesC::XercesC
 )
 
 # Sprint 3: Task 3 - Create Test Executable Targets
