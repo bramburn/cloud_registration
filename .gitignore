@@ -73,3 +73,5 @@ vcpkg_installed
 build-test
 build_test
 Testing
+
+.qt

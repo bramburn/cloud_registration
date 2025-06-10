@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-
+set(CMAKE_TOOLCHAIN_FILE "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake")
 # Enable IDE folders
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -162,7 +162,8 @@ endif()
 # find_package(E57Format CONFIG REQUIRED)  # Temporarily disabled for Sprint 4 testing
 
 # Find Eigen3 library for Sprint 4 alignment algorithms
-find_package(Eigen3 REQUIRED NO_MODULE)
+set(Eigen3_DIR "C:/Libs/eigen3/share/eigen3/cmake") # todo: update to use vcpkg and allow for eigen to be built on linux
+find_package(Eigen3 REQUIRED)
 
 # Add compile definitions to disable deprecated APIs up to Qt 5.15
 add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)

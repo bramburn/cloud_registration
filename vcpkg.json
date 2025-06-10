@@ -5,6 +5,8 @@
     "libe57format",
     "xerces-c",
     "gtest",
+    "eigen3",
     "vulkan"
   ]
 }
+
