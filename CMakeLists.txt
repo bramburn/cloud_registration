@@ -335,7 +335,7 @@ set(ALL_TESTS
 
 # Sprint 4: Task 4.3 - Enhanced test runner with better output
 add_custom_target(run_all_tests
-    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C Debug
     DEPENDS ${ALL_TESTS}
     COMMENT "Running all unit tests with modular library dependencies"
 )
