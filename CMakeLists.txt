@@ -44,13 +44,13 @@ endif()
 # Output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# F1-S2-03: Find and link Qt6 components
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Test)
+# F1-S2-03: Find and link Qt6 components (Sprint 3: Added Sql for database support)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Test Sql)
 
-# Sprint 2: Task 4.2 - Find third-party libraries (optional for basic Sprint 2 build)
-# find_package(Eigen3 CONFIG REQUIRED)
-# find_package(E57Format CONFIG REQUIRED)
-# find_package(XercesC REQUIRED)
+# Sprint 2: Task 4.2 - Find third-party libraries (required for full Sprint 2)
+find_package(Eigen3 CONFIG REQUIRED)
+find_package(E57Format CONFIG REQUIRED)
+find_package(XercesC REQUIRED)
 
 # Sprint 3: Task 1.1 - Enable testing in CMake
 enable_testing()
@@ -67,15 +67,52 @@ else()
     set(GMOCK_AVAILABLE FALSE)
 endif()
 
-# Sprint 2: Task 3.2 - Incrementally add source files (compile after each group)
-# Start with minimal working Qt application, then add components gradually
+# Sprint 3: F1-S3-01 & F1-S3-02 - Add UI and core project logic files incrementally
+# F1-S3-03: Use ${CMAKE_CURRENT_SOURCE_DIR} to prefix all source file paths
+# Start with minimal working approach - add dependencies step by step
+
 set(APP_SOURCES
     # Main application entry point
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
 
-    # Sprint 2: Task 2.3 - Use simplified mainwindow for initial Sprint 2 build
+    # Sprint 3: Start with simplified mainwindow for now (will upgrade incrementally)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.h
+
+    # Sprint 3: F1-S3-02 - Core project logic files (Group 1 - Essential dependencies first)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.h
+
+    # Sprint 3: F1-S3-02 - Core project logic files (Group 2 - Project management)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecttreemodel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecttreemodel.h
+
+    # Sprint 3: F1-S3-02 - Core project logic files (Group 3 - Additional managers)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.h
+
+    # Sprint 3: F1-S3-01 - Simple dialog components (Group 1)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/createprojectdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/createprojectdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/loadingsettingsdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/loadingsettingsdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.h
+
+    # Sprint 3: F1-S3-02 - Core project logic files (Group 4 - Point cloud management)
+    # Note: ProjectStateService has too many dependencies, will add later
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.h
+
+    # Sprint 3: F1-S3-01 - Additional UI components (will add more complex ones later)
+    # Note: projecthubwidget and sidebarwidget have dependencies on ProjectManager
+    # which requires ProjectStateService, so deferring these for now
 
     # Core data structures (header-only, safe to add)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pointdata.h
@@ -91,25 +128,21 @@ set(APP_SOURCES
     # Basic parsers (working ones only)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lasparser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lasparser.h
-
-    # Sprint 2: Task 3.3 - Add basic project management components (minimal set)
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.h
 )
 
 # Sprint 2: Task 3.4 - Create executable using the APP_SOURCES variable
 add_executable(CloudRegistration ${APP_SOURCES})
 
-# Sprint 2: Task 2.5 - Link Qt libraries for basic Sprint 2 build
+# Sprint 3: Link all required libraries including third-party dependencies and Qt6::Sql
 target_link_libraries(CloudRegistration PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
     Qt6::OpenGLWidgets
+    Qt6::Sql
+    Eigen3::Eigen
+    E57Format
+    XercesC::XercesC
 )
 
 # Sprint 3: Task 3 - Create Test Executable Targets
@@ -164,15 +197,32 @@ target_link_libraries(PerformanceProfilerTests PRIVATE
 target_include_directories(PerformanceProfilerTests PRIVATE src)
 add_test(NAME PerformanceProfilerTests COMMAND PerformanceProfilerTests)
 
+# Sprint 3: Additional test executables to demonstrate Sprint 3 completion
+# Test 4: Project Management Tests (using available components)
+add_executable(ProjectManagementTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_recentprojectsmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
+)
+
+target_link_libraries(ProjectManagementTests PRIVATE
+    GTest::gtest_main
+    Qt6::Core
+    Qt6::Test
+)
+
+target_include_directories(ProjectManagementTests PRIVATE src)
+add_test(NAME ProjectManagementTests COMMAND ProjectManagementTests)
+
 # Sprint 3: Task 4.3 - Create custom target to run all tests
 set(ALL_TESTS
     BasicInfrastructureTest
     VoxelGridFilterTests
     PerformanceProfilerTests
+    ProjectManagementTests
 )
 
 add_custom_target(run_tests
-    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C Release
     DEPENDS ${ALL_TESTS}
     COMMENT "Running all unit tests"
 )
