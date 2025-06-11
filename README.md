@@ -70,156 +70,62 @@ CloudRegistration is a comprehensive desktop application for loading, visualizin
 - **Boost**: System and filesystem libraries (Linux)
 - **Mesa**: OpenGL implementation (Linux)
 
-## Quick Start
+## Building
 
-### **Linux (Recommended for Development)**
+For detailed build instructions, dependency setup, and troubleshooting, see **[BUILDING.md](BUILDING.md)**.
+
+### Quick Start
+
+**Prerequisites**: CMake 3.16+, C++17 compiler, vcpkg, Qt6
+
 ```bash
 # Clone the repository
 git clone https://github.com/bramburn/cloud_registration.git
 cd cloud_registration
 
-# Run automated setup (installs dependencies, configures, and builds)
-./setup.sh
+# Configure with vcpkg toolchain
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="path/to/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-# Or use the Linux build script for more control
-./scripts/build-linux.sh --help
+# Build the application
+cmake --build build --config Release
+
+# Run tests
+cd build && ctest --output-on-failure
 ```
 
-### **Windows Setup**
-See [Windows Setup Guide](docs/WINDOWS_SETUP_GUIDE.md) for detailed instructions.
+### Platform-Specific Quick Setup
+
+#### **Linux (Recommended for Development)**
+```bash
+# Install dependencies
+sudo apt-get install -y build-essential cmake ninja-build qt6-base-dev qt6-opengl-dev
+
+# Clone and build
+git clone https://github.com/bramburn/cloud_registration.git
+cd cloud_registration
+./setup.sh
+```
+
+#### **Windows**
+```powershell
+# Prerequisites: Visual Studio 2022, Qt6, vcpkg
+git clone https://github.com/bramburn/cloud_registration.git
+cd cloud_registration
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+cmake --build build --config Release
+```
+
+For complete setup instructions including dependency installation, see **[BUILDING.md](BUILDING.md)**.
 
 ## Platform-Specific Setup Guides
+
+For detailed setup instructions for all platforms, see **[BUILDING.md](BUILDING.md)**.
 
 ### **Linux Setup Guide**
 For detailed Linux setup instructions, see [Linux Setup Guide](docs/LINUX_SETUP_GUIDE.md).
 
-**Quick Linux Setup:**
-```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build qt6-base-dev libgtest-dev
-
-# Fedora/RHEL
-sudo dnf groupinstall -y "Development Tools"
-sudo dnf install -y cmake ninja-build qt6-qtbase-devel gtest-devel
-
-# Build project
-./setup.sh
-```
-
 ### **Windows Setup Guide**
-
-### **Prerequisites Installation**
-
-1. **Install Visual Studio 2022**
-   - Download Visual Studio 2022 Community (free) or Professional
-   - During installation, select "Desktop development with C++" workload
-   - Ensure MSVC v143 toolset and Windows 10/11 SDK are included
-
-2. **Install Qt6**
-   - Download Qt6 from [qt.io](https://www.qt.io/download)
-   - Install Qt 6.9.0 (recommended) or 6.5.3+ to `C:\Qt\`
-   - Select the MSVC 2022 64-bit component during installation
-   - Add Qt bin directory to your system PATH: `C:\Qt\6.9.0\msvc2022_64\bin`
-
-3. **Install vcpkg**
-   ```powershell
-   # Clone vcpkg to C:\dev\vcpkg
-   git clone https://github.com/Microsoft/vcpkg.git C:\dev\vcpkg
-   cd C:\dev\vcpkg
-   .\bootstrap-vcpkg.bat
-
-   # Install required dependencies
-   .\vcpkg install libe57format:x64-windows
-   .\vcpkg install xerces-c:x64-windows
-   .\vcpkg install gtest:x64-windows
-   ```
-
-4. **Install CMake**
-   - Download and install CMake 3.16+ from [cmake.org](https://cmake.org/download/)
-   - Ensure CMake is added to your system PATH
-
-### **Building the Application**
-
-1. **Clone the Repository**
-   ```powershell
-   git clone https://github.com/bramburn/cloud_registration.git
-   cd cloud_registration
-   ```
-
-2. **Configure Environment**
-   ```powershell
-   # Set vcpkg toolchain (if not set globally)
-   $env:CMAKE_TOOLCHAIN_FILE = "C:\dev\vcpkg\scripts\buildsystems\vcpkg.cmake"
-
-   # Verify Qt installation
-   $env:Qt6_DIR = "C:\Qt\6.9.0\msvc2022_64\lib\cmake\Qt6"
-   ```
-
-3. **Build Using Scripts** (Recommended)
-   ```powershell
-   # Clean previous builds
-   .\scripts\build-clean.ps1 -BuildType Clean
-
-   # Build Release version
-   .\scripts\build-clean.ps1 -BuildType Release
-
-   # Or build Debug version for development
-   .\scripts\build-clean.ps1 -BuildType Debug
-   ```
-
-4. **Alternative: Manual CMake Build**
-   ```powershell
-   # Configure Release build
-   cmake --preset msvc-release
-
-   # Build the application
-   cmake --build --preset msvc-release
-
-   # For Debug builds
-   cmake --preset msvc-debug
-   cmake --build --preset msvc-debug
-   ```
-
-### **Running the Application**
-
-```powershell
-# Release build
-.\build-release\bin\Release\CloudRegistration.exe
-
-# Debug build
-.\build-debug\bin\Debug\CloudRegistration.exe
-```
-
-## Application Deployment
-
-### **Standalone Deployment**
-
-For distributing the application to end users:
-
-1. **Using windeployqt** (Recommended)
-   ```powershell
-   # Navigate to build directory
-   cd build-release\bin\Release
-
-   # Deploy Qt dependencies
-   windeployqt.exe CloudRegistration.exe --release --no-translations
-
-   # Copy vcpkg dependencies
-   copy "C:\dev\vcpkg\installed\x64-windows\bin\*.dll" .
-   ```
-
-2. **Manual Deployment**
-   - Copy all required Qt6 DLLs from `C:\Qt\6.9.0\msvc2022_64\bin\`
-   - Copy vcpkg dependencies from `C:\dev\vcpkg\installed\x64-windows\bin\`
-   - Include Visual C++ Redistributable 2022
-
-### **Installer Creation**
-
-For professional deployment, consider using:
-- **NSIS**: Free installer creation tool
-- **WiX Toolset**: Windows Installer XML toolset
-- **Qt Installer Framework**: Cross-platform installer solution
+For detailed Windows setup instructions, see [Windows Setup Guide](docs/WINDOWS_SETUP_GUIDE.md).
 
 ## Getting Started
 
