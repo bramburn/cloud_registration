@@ -27,8 +27,8 @@ public:
     virtual ~TargetManager() = default;
 
     // Target management
-    void addTarget(const QString& scanId, std::unique_ptr<Target> target);
-    void removeTarget(const QString& targetId);
+    bool addTarget(const QString& scanId, std::shared_ptr<Target> target);
+    bool removeTarget(const QString& targetId);
     Target* getTarget(const QString& targetId) const;
     QList<Target*> getTargetsForScan(const QString& scanId) const;
     QList<Target*> getAllTargets() const;
@@ -47,12 +47,14 @@ public:
     QList<Target*> getTargetsWithinRadius(const QVector3D& center, float radius) const;
     
     // Correspondence management
-    void addCorrespondence(const TargetCorrespondence& correspondence);
+    bool addCorrespondence(const TargetCorrespondence& correspondence);
     void removeCorrespondence(const QString& targetId1, const QString& targetId2);
     void removeCorrespondencesForTarget(const QString& targetId);
     void removeCorrespondencesForScan(const QString& scanId);
-    
+
+    QList<TargetCorrespondence> getAllCorrespondences() const;
     QList<TargetCorrespondence> getCorrespondences() const;
+    QList<TargetCorrespondence> getCorrespondencesForTarget(const QString& targetId) const;
     QList<TargetCorrespondence> getCorrespondencesForScan(const QString& scanId) const;
     QList<TargetCorrespondence> getCorrespondencesBetweenScans(const QString& scanId1, const QString& scanId2) const;
     TargetCorrespondence* getCorrespondence(const QString& targetId1, const QString& targetId2);
@@ -70,10 +72,28 @@ public:
     
     // Data management
     void clear();
+    void clearTargetsForScan(const QString& scanId);
     void clearScan(const QString& scanId);
     void clearTargets();
     void clearCorrespondences();
-    
+
+    // Additional methods expected by tests
+    QList<TargetCorrespondence> findPotentialCorrespondences(const QString& scanId1, const QString& scanId2, float threshold) const;
+    struct Statistics {
+        int totalTargets = 0;
+        int sphereTargets = 0;
+        int naturalPointTargets = 0;
+        int checkerboardTargets = 0;
+        int validTargets = 0;
+        int correspondences = 0;
+        float averageQuality = 0.0f;
+    };
+    Statistics getStatistics() const;
+
+    // File I/O
+    bool saveToFile(const QString& filename) const;
+    bool loadFromFile(const QString& filename);
+
     // Serialization
     QVariantMap serialize() const;
     bool deserialize(const QVariantMap& data);
@@ -95,7 +115,7 @@ signals:
 
 private:
     // Target storage
-    QMap<QString, std::unique_ptr<Target>> targets_;
+    QMap<QString, std::shared_ptr<Target>> targets_;
     QMap<QString, QStringList> scanTargets_; // scanId -> list of targetIds
     
     // Correspondence storage
