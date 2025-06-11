@@ -4,6 +4,7 @@
 #include <memory>
 #include "registration/TargetManager.h"
 #include "registration/Target.h"
+#include "registration/TargetCorrespondence.h"
 
 class TargetManagerTest : public ::testing::Test {
 protected:
@@ -42,18 +43,18 @@ TEST_F(TargetManagerTest, AddTargetsToScans) {
     EXPECT_EQ(scan2Targets.size(), 1);
     
     // Check specific targets
-    EXPECT_EQ(scan1Targets[0]->getTargetId(), sphereTarget1->getTargetId());
-    EXPECT_EQ(scan2Targets[0]->getTargetId(), sphereTarget2->getTargetId());
+    EXPECT_EQ(scan1Targets[0]->targetId(), sphereTarget1->targetId());
+    EXPECT_EQ(scan2Targets[0]->targetId(), sphereTarget2->targetId());
 }
 
 // Test retrieving targets by ID
 TEST_F(TargetManagerTest, GetTargetById) {
     targetManager->addTarget(scanId1, sphereTarget1);
     
-    auto retrievedTarget = targetManager->getTarget(sphereTarget1->getTargetId());
+    auto retrievedTarget = targetManager->getTarget(sphereTarget1->targetId());
     EXPECT_NE(retrievedTarget, nullptr);
-    EXPECT_EQ(retrievedTarget->getTargetId(), sphereTarget1->getTargetId());
-    EXPECT_EQ(retrievedTarget->getPosition(), sphereTarget1->getPosition());
+    EXPECT_EQ(retrievedTarget->targetId(), sphereTarget1->targetId());
+    EXPECT_EQ(retrievedTarget->position(), sphereTarget1->position());
     
     // Test non-existent target
     auto nonExistentTarget = targetManager->getTarget("non_existent_id");
@@ -81,11 +82,11 @@ TEST_F(TargetManagerTest, RemoveTargets) {
     targetManager->addTarget(scanId1, naturalTarget1);
     
     // Remove one target
-    EXPECT_TRUE(targetManager->removeTarget(sphereTarget1->getTargetId()));
-    
+    EXPECT_TRUE(targetManager->removeTarget(sphereTarget1->targetId()));
+
     auto remainingTargets = targetManager->getTargetsForScan(scanId1);
     EXPECT_EQ(remainingTargets.size(), 1);
-    EXPECT_EQ(remainingTargets[0]->getTargetId(), naturalTarget1->getTargetId());
+    EXPECT_EQ(remainingTargets[0]->targetId(), naturalTarget1->targetId());
     
     // Try to remove non-existent target
     EXPECT_FALSE(targetManager->removeTarget("non_existent_id"));
@@ -112,21 +113,21 @@ TEST_F(TargetManagerTest, AddCorrespondences) {
     targetManager->addTarget(scanId2, sphereTarget2);
     
     TargetCorrespondence correspondence(
-        sphereTarget1->getTargetId(), 
-        sphereTarget2->getTargetId(),
-        scanId1, 
+        sphereTarget1->targetId(),
+        sphereTarget2->targetId(),
+        scanId1,
         scanId2
     );
-    correspondence.confidence = 0.85f;
-    correspondence.distance = 0.5f;
-    
+    correspondence.setConfidence(0.85f);
+    correspondence.setDistance(0.5f);
+
     EXPECT_TRUE(targetManager->addCorrespondence(correspondence));
-    
+
     auto correspondences = targetManager->getAllCorrespondences();
     EXPECT_EQ(correspondences.size(), 1);
-    EXPECT_EQ(correspondences[0].targetId1, sphereTarget1->getTargetId());
-    EXPECT_EQ(correspondences[0].targetId2, sphereTarget2->getTargetId());
-    EXPECT_FLOAT_EQ(correspondences[0].confidence, 0.85f);
+    EXPECT_EQ(correspondences[0].targetId1(), sphereTarget1->targetId());
+    EXPECT_EQ(correspondences[0].targetId2(), sphereTarget2->targetId());
+    EXPECT_FLOAT_EQ(correspondences[0].confidence(), 0.85f);
 }
 
 // Test correspondence validation
@@ -135,7 +136,7 @@ TEST_F(TargetManagerTest, CorrespondenceValidation) {
     
     // Try to add correspondence with non-existent target
     TargetCorrespondence invalidCorr(
-        sphereTarget1->getTargetId(),
+        sphereTarget1->targetId(),
         "non_existent_target",
         scanId1,
         scanId2
@@ -146,8 +147,8 @@ TEST_F(TargetManagerTest, CorrespondenceValidation) {
     // Try to add correspondence between targets in same scan
     targetManager->addTarget(scanId1, sphereTarget2);
     TargetCorrespondence sameScanCorr(
-        sphereTarget1->getTargetId(),
-        sphereTarget2->getTargetId(),
+        sphereTarget1->targetId(),
+        sphereTarget2->targetId(),
         scanId1,
         scanId1  // Same scan
     );
@@ -162,13 +163,13 @@ TEST_F(TargetManagerTest, GetCorrespondencesForTarget) {
     targetManager->addTarget(scanId2, naturalTarget1);
     
     // Add correspondences
-    TargetCorrespondence corr1(sphereTarget1->getTargetId(), sphereTarget2->getTargetId(), scanId1, scanId2);
-    TargetCorrespondence corr2(sphereTarget1->getTargetId(), naturalTarget1->getTargetId(), scanId1, scanId2);
-    
+    TargetCorrespondence corr1(sphereTarget1->targetId(), sphereTarget2->targetId(), scanId1, scanId2);
+    TargetCorrespondence corr2(sphereTarget1->targetId(), naturalTarget1->targetId(), scanId1, scanId2);
+
     targetManager->addCorrespondence(corr1);
     targetManager->addCorrespondence(corr2);
-    
-    auto correspondences = targetManager->getCorrespondencesForTarget(sphereTarget1->getTargetId());
+
+    auto correspondences = targetManager->getCorrespondencesForTarget(sphereTarget1->targetId());
     EXPECT_EQ(correspondences.size(), 2);
 }
 
@@ -178,8 +179,8 @@ TEST_F(TargetManagerTest, GetCorrespondencesBetweenScans) {
     targetManager->addTarget(scanId2, sphereTarget2);
     
     TargetCorrespondence correspondence(
-        sphereTarget1->getTargetId(),
-        sphereTarget2->getTargetId(),
+        sphereTarget1->targetId(),
+        sphereTarget2->targetId(),
         scanId1,
         scanId2
     );
@@ -200,13 +201,13 @@ TEST_F(TargetManagerTest, CalculateStatistics) {
     targetManager->addTarget(scanId1, sphereTarget2);
     targetManager->addTarget(scanId2, naturalTarget1);
     
-    sphereTarget1->setQuality(0.8f);
-    sphereTarget2->setQuality(0.9f);
-    naturalTarget1->setQuality(0.7f);
-    
+    sphereTarget1->setConfidence(0.8f);
+    sphereTarget2->setConfidence(0.9f);
+    naturalTarget1->setConfidence(0.7f);
+
     TargetCorrespondence correspondence(
-        sphereTarget1->getTargetId(),
-        naturalTarget1->getTargetId(),
+        sphereTarget1->targetId(),
+        naturalTarget1->targetId(),
         scanId1,
         scanId2
     );
@@ -235,9 +236,9 @@ TEST_F(TargetManagerTest, FindPotentialCorrespondences) {
     auto potentialCorrespondences = targetManager->findPotentialCorrespondences(scanId1, scanId2, 0.5f);
     
     EXPECT_EQ(potentialCorrespondences.size(), 1);
-    EXPECT_EQ(potentialCorrespondences[0].targetId1, closeTarget1->getTargetId());
-    EXPECT_EQ(potentialCorrespondences[0].targetId2, closeTarget2->getTargetId());
-    EXPECT_GT(potentialCorrespondences[0].confidence, 0.5f);
+    EXPECT_EQ(potentialCorrespondences[0].targetId1(), closeTarget1->targetId());
+    EXPECT_EQ(potentialCorrespondences[0].targetId2(), closeTarget2->targetId());
+    EXPECT_GT(potentialCorrespondences[0].confidence(), 0.5f);
 }
 
 // Test serialization and deserialization
@@ -247,8 +248,8 @@ TEST_F(TargetManagerTest, SerializationDeserialization) {
     targetManager->addTarget(scanId2, sphereTarget2);
     
     TargetCorrespondence correspondence(
-        sphereTarget1->getTargetId(),
-        sphereTarget2->getTargetId(),
+        sphereTarget1->targetId(),
+        sphereTarget2->targetId(),
         scanId1,
         scanId2
     );

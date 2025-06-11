@@ -191,7 +191,36 @@ target_link_libraries(Rendering PUBLIC
     Qt6::OpenGLWidgets
 )
 
-# Sprint 4: Task 2.4 - Create UI Library
+# Sprint 4: Task 2.4 - Create Registration Library
+set(REGISTRATION_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/Target.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetCorrespondence.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/AlignmentEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/ErrorAnalysis.cpp
+)
+
+set(REGISTRATION_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/Target.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetCorrespondence.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/AlignmentEngine.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/ErrorAnalysis.h
+)
+
+# Create Registration static library
+add_library(Registration STATIC ${REGISTRATION_SOURCES} ${REGISTRATION_HEADERS})
+
+target_include_directories(Registration PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Registration library dependencies: Core, Qt components
+target_link_libraries(Registration PUBLIC
+    Core
+    Qt6::Core
+    Qt6::Gui
+)
+
+# Sprint 4: Task 2.5 - Create UI Library
 set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
@@ -250,6 +279,7 @@ target_link_libraries(CloudRegistration PRIVATE
     Core
     Algorithms
     Registration  # New Registration library for target management
+    Registration
     UI
     Parsers       # Fixed E57 include/implementation issues
     Rendering     # Fixed OpenGL function/buffer type issues
