@@ -181,7 +181,36 @@ target_link_libraries(Rendering PUBLIC
     Qt6::OpenGLWidgets
 )
 
-# Sprint 4: Task 2.4 - Create UI Library
+# Sprint 4: Task 2.4 - Create Registration Library
+set(REGISTRATION_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/Target.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetCorrespondence.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/AlignmentEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/ErrorAnalysis.cpp
+)
+
+set(REGISTRATION_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/Target.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetCorrespondence.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/TargetManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/AlignmentEngine.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/ErrorAnalysis.h
+)
+
+# Create Registration static library
+add_library(Registration STATIC ${REGISTRATION_SOURCES} ${REGISTRATION_HEADERS})
+
+target_include_directories(Registration PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Registration library dependencies: Core, Qt components
+target_link_libraries(Registration PUBLIC
+    Core
+    Qt6::Core
+    Qt6::Gui
+)
+
+# Sprint 4: Task 2.5 - Create UI Library
 set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
@@ -236,6 +265,7 @@ add_executable(CloudRegistration ${APP_SOURCES})
 target_link_libraries(CloudRegistration PRIVATE
     Core
     Algorithms
+    Registration
     UI
     Parsers    # Fixed E57 include/implementation issues
     Rendering  # Fixed OpenGL function/buffer type issues
@@ -301,6 +331,96 @@ target_link_libraries(ProjectManagementTests PRIVATE
 target_include_directories(ProjectManagementTests PRIVATE src)
 add_test(NAME ProjectManagementTests COMMAND ProjectManagementTests)
 
+# Test 5: Target Tests (using Registration library)
+add_executable(TargetTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_target.cpp
+)
+
+target_link_libraries(TargetTests PRIVATE
+    Core
+    Registration
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(TargetTests PRIVATE src)
+add_test(NAME TargetTests COMMAND TargetTests)
+
+# Test 6: Target Manager Tests (using Registration library)
+add_executable(TargetManagerTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_targetmanager.cpp
+)
+
+target_link_libraries(TargetManagerTests PRIVATE
+    Core
+    Registration
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(TargetManagerTests PRIVATE src)
+add_test(NAME TargetManagerTests COMMAND TargetManagerTests)
+
+# Test 7: Least Squares Alignment Tests (using Algorithms library)
+add_executable(LeastSquaresAlignmentTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_least_squares_alignment.cpp
+)
+
+target_link_libraries(LeastSquaresAlignmentTests PRIVATE
+    Core
+    Algorithms
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(LeastSquaresAlignmentTests PRIVATE src)
+add_test(NAME LeastSquaresAlignmentTests COMMAND LeastSquaresAlignmentTests)
+
+# Test 8: Alignment Engine Tests (using Registration library)
+add_executable(AlignmentEngineTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_alignment_engine.cpp
+)
+
+target_link_libraries(AlignmentEngineTests PRIVATE
+    Core
+    Registration
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(AlignmentEngineTests PRIVATE src)
+add_test(NAME AlignmentEngineTests COMMAND AlignmentEngineTests)
+
+# Test 9: Error Analysis Tests (using Registration library)
+add_executable(ErrorAnalysisTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_error_analysis.cpp
+)
+
+target_link_libraries(ErrorAnalysisTests PRIVATE
+    Core
+    Registration
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(ErrorAnalysisTests PRIVATE src)
+add_test(NAME ErrorAnalysisTests COMMAND ErrorAnalysisTests)
+
+# Test 10: Camera Controller Tests (using Rendering library)
+add_executable(CameraControllerTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_camera_controller.cpp
+)
+
+target_link_libraries(CameraControllerTests PRIVATE
+    Core
+    Rendering
+    GTest::gtest_main
+    Qt6::Test
+)
+
+target_include_directories(CameraControllerTests PRIVATE src)
+add_test(NAME CameraControllerTests COMMAND CameraControllerTests)
+
 # Sprint 4: Task 4.1 - Add comments explaining the modular library structure
 #
 # MODULAR LIBRARY ARCHITECTURE:
@@ -355,6 +475,12 @@ set(ALL_TESTS
     VoxelGridFilterTests
     PerformanceProfilerTests
     ProjectManagementTests
+    TargetTests
+    TargetManagerTests
+    LeastSquaresAlignmentTests
+    AlignmentEngineTests
+    ErrorAnalysisTests
+    CameraControllerTests
     E57LinkageTest
     OpenGLInitTest
 )
@@ -367,7 +493,7 @@ add_custom_target(run_all_tests
 )
 
 # Sprint 4: Task 4.4 - Installation rules for deployment
-install(TARGETS CloudRegistration Core Algorithms Parsers Rendering UI
+install(TARGETS CloudRegistration Core Algorithms Registration Parsers Rendering UI
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
