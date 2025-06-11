@@ -28,7 +28,11 @@ void PointCloud::transform(const QMatrix4x4& transformation) {
     if (!normals.empty()) {
         QMatrix3x3 rotationMatrix = transformation.normalMatrix();
         for (auto& normal : normals) {
-            normal = rotationMatrix * normal;
+            // Manual matrix-vector multiplication for QMatrix3x3 * QVector3D
+            float x = rotationMatrix(0, 0) * normal.x() + rotationMatrix(0, 1) * normal.y() + rotationMatrix(0, 2) * normal.z();
+            float y = rotationMatrix(1, 0) * normal.x() + rotationMatrix(1, 1) * normal.y() + rotationMatrix(1, 2) * normal.z();
+            float z = rotationMatrix(2, 0) * normal.x() + rotationMatrix(2, 1) * normal.y() + rotationMatrix(2, 2) * normal.z();
+            normal = QVector3D(x, y, z);
             normal.normalize();
         }
     }

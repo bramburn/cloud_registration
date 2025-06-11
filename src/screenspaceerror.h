@@ -1,19 +1,64 @@
 #ifndef SCREENSPACEERROR_H
 #define SCREENSPACEERROR_H
 
+#include <QMatrix4x4>
+
+// Forward declarations
+struct AxisAlignedBoundingBox;
+struct ViewportInfo;
+
 /**
- * @brief ScreenSpaceError - Utility class for screen space error calculations
- * 
- * This is a stub implementation for Sprint 1 to resolve compilation issues.
- * Full implementation will be added in future sprints.
+ * @brief ViewportInfo - Information about the current viewport
  */
-class ScreenSpaceError {
+struct ViewportInfo {
+    int width = 1920;
+    int height = 1080;
+    float fov = 45.0f;
+    float nearPlane = 0.1f;
+    float farPlane = 1000.0f;
+};
+
+/**
+ * @brief ScreenSpaceErrorCalculator - Utility class for screen space error calculations
+ *
+ * Provides methods for calculating screen space error for octree nodes and determining
+ * when to cull or stop recursion based on error thresholds.
+ */
+class ScreenSpaceErrorCalculator {
 public:
-    static float calculateError(float distance, float pointSize, float screenWidth);
-    static bool shouldCull(float error, float threshold);
+    /**
+     * @brief Calculate screen space error for an AABB
+     * @param bounds The axis-aligned bounding box
+     * @param mvpMatrix Model-view-projection matrix
+     * @param viewport Viewport information
+     * @return Screen space error value
+     */
+    static float calculateAABBScreenSpaceError(
+        const AxisAlignedBoundingBox& bounds,
+        const QMatrix4x4& mvpMatrix,
+        const ViewportInfo& viewport);
+
+    /**
+     * @brief Determine if a node should be culled based on error threshold
+     * @param error Screen space error value
+     * @param threshold Culling threshold
+     * @return True if node should be culled
+     */
+    static bool shouldCullNode(float error, float threshold);
+
+    /**
+     * @brief Determine if recursion should stop based on error threshold
+     * @param error Screen space error value
+     * @param threshold Primary threshold for stopping recursion
+     * @return True if recursion should stop
+     */
+    static bool shouldStopRecursion(float error, float threshold);
 
 private:
-    ScreenSpaceError() = default;
+    ScreenSpaceErrorCalculator() = default;
 };
+
+// Legacy compatibility
+using ScreenSpaceError = ScreenSpaceErrorCalculator;
 
 #endif // SCREENSPACEERROR_H

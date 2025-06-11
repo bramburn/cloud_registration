@@ -180,12 +180,13 @@ protected:
      */
     virtual bool hasConverged(float currentError, float previousError, float threshold);
 
+protected:
+    // Build K-D tree for target point cloud
+    std::unique_ptr<KDTree> buildKDTree(const PointCloud& target);
+
 private:
     std::atomic<bool> m_isCancelled;
     std::atomic<bool> m_isRunning;
-    
-    // Build K-D tree for target point cloud
-    std::unique_ptr<KDTree> buildKDTree(const PointCloud& target);
 };
 
 #endif // ICPREGISTRATION_H
