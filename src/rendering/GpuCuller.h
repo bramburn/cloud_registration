@@ -1,7 +1,7 @@
 #ifndef GPUCULLER_H
 #define GPUCULLER_H
 
-#include <QOpenGLFunctions>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QMatrix4x4>
@@ -26,7 +26,7 @@ struct AxisAlignedBoundingBox;
  * - Interactive frame rates (30+ FPS)
  * - Octree structure optimization
  */
-class GpuCuller : protected QOpenGLFunctions {
+class GpuCuller : protected QOpenGLExtraFunctions {
 public:
     /**
      * @brief Structure representing a culling node for GPU processing

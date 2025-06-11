@@ -13,6 +13,12 @@
 #include "IE57Parser.h"
 #include "E57ParserCore.h"
 
+// Forward declarations for E57Format types
+namespace e57 {
+    class ImageFile;
+    class StructureNode;
+}
+
 /**
  * @brief E57ParserLib - Qt adapter for E57ParserCore
  *
@@ -32,7 +38,7 @@ public:
     ~E57ParserLib();
 
     // Main entry point for MainWindow integration
-    void startParsing(const QString& filePath, const LoadingSettings& settings = LoadingSettings()) override;
+    void startParsing(const QString& filePath, const IE57Parser::LoadingSettings& settings = IE57Parser::LoadingSettings()) override;
 
     // Thread-safe cancellation
     void cancelParsing() override;
@@ -81,7 +87,7 @@ public:
      * @param scanIndex Index of the scan (0-based)
      * @return Scan metadata structure
      */
-    ScanMetadata getScanMetadata(int scanIndex) const override;
+    IE57Parser::ScanMetadata getScanMetadata(int scanIndex) const override;
 
 
 
@@ -111,7 +117,7 @@ public:
      * @param scanIndex Index of the scan to extract (0-based)
      * @return Vector of PointData structures with all available attributes
      */
-    std::vector<PointData> extractEnhancedPointData(int scanIndex = 0) override;
+    std::vector<IE57Parser::PointData> extractEnhancedPointData(int scanIndex = 0) override;
 
     /**
      * @brief Get the number of points in a specific scan
@@ -147,13 +153,13 @@ private:
     QString translateE57Error(const QString& technicalError);
 
     // Data conversion helpers
-    PointData convertCorePointData(const CorePointData& corePoint);
-    CoreLoadingSettings convertLoadingSettings(const LoadingSettings& qtSettings);
+    IE57Parser::PointData convertCorePointData(const CorePointData& corePoint);
+    CoreLoadingSettings convertLoadingSettings(const IE57Parser::LoadingSettings& qtSettings);
 
     // Data members
     std::unique_ptr<E57ParserCore> m_parserCore;
     QString m_currentFilePath;
-    LoadingSettings m_currentSettings;
+    IE57Parser::LoadingSettings m_currentSettings;
     mutable QString m_lastError;
 
     // Threading and cancellation
@@ -162,13 +168,76 @@ private:
     QTimer* m_progressTimer = nullptr;
 
     // Internal data storage
-    std::vector<PointData> m_extractedPoints;
+    std::vector<IE57Parser::PointData> m_extractedPoints;
     QStringList m_scanNames;
     int m_totalScans = 0;
+
+    // E57 file handling (for legacy methods that bypass m_parserCore)
+    std::unique_ptr<e57::ImageFile> m_imageFile;
+    std::vector<float> m_points;  // Legacy point storage
+
+    // Prototype information for parsing
+    struct PrototypeInfo {
+        bool hasCartesianX = false;
+        bool hasCartesianY = false;
+        bool hasCartesianZ = false;
+        bool isDoublePrec = false;
+        bool hasIntensity = false;
+        bool hasColorRed = false;
+        bool hasColorGreen = false;
+        bool hasColorBlue = false;
+        std::string intensityDataType;
+        std::string colorDataType;
+
+        void reset() {
+            hasCartesianX = hasCartesianY = hasCartesianZ = false;
+            isDoublePrec = false;
+            hasIntensity = false;
+            hasColorRed = hasColorGreen = hasColorBlue = false;
+            intensityDataType.clear();
+            colorDataType.clear();
+        }
+    } m_prototypeInfo;
+
+    // Data limits for normalization
+    struct DataLimits {
+        double intensityMin = 0.0;
+        double intensityMax = 1.0;
+        double colorRedMin = 0.0;
+        double colorRedMax = 255.0;
+        double colorGreenMin = 0.0;
+        double colorGreenMax = 255.0;
+        double colorBlueMin = 0.0;
+        double colorBlueMax = 255.0;
+        bool hasIntensityLimits = false;
+        bool hasColorLimits = false;
+
+        void reset() {
+            intensityMin = 0.0;
+            intensityMax = 1.0;
+            colorRedMin = colorGreenMin = colorBlueMin = 0.0;
+            colorRedMax = colorGreenMax = colorBlueMax = 255.0;
+            hasIntensityLimits = hasColorLimits = false;
+        }
+    } m_dataLimits;
 
     // Helper methods
     void clearError() const;
     void setError(const std::string& error) const;
+
+    // Legacy parsing methods (to be refactored)
+    bool inspectPointPrototype(const e57::StructureNode& scanHeaderNode);
+    void validatePrototypeFields(const e57::StructureNode& prototype);
+    bool extractUncompressedXYZData(const e57::StructureNode& scanHeaderNode);
+
+    // Enhanced parsing methods
+    bool inspectEnhancedPrototype(const e57::StructureNode& scanHeaderNode);
+    bool extractDataLimits(const e57::StructureNode& scanHeaderNode);
+    bool extractEnhancedPointData(const e57::StructureNode& scanHeaderNode, std::vector<IE57Parser::PointData>& points);
+
+    // Normalization helpers
+    float normalizeIntensity(float rawValue) const;
+    uint8_t normalizeColorChannel(float rawValue, double minVal, double maxVal) const;
 };
 
 #endif // E57PARSERLIB_H

@@ -140,7 +140,10 @@ set(PARSERS_HEADERS
 # Create Parsers static library
 add_library(Parsers STATIC ${PARSERS_SOURCES} ${PARSERS_HEADERS})
 
-target_include_directories(Parsers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(Parsers PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    $<TARGET_PROPERTY:E57Format,INTERFACE_INCLUDE_DIRECTORIES>
+)
 
 # Parsers library dependencies: Core, E57Format, XercesC
 target_link_libraries(Parsers PUBLIC
@@ -229,15 +232,13 @@ set(APP_SOURCES
 add_executable(CloudRegistration ${APP_SOURCES})
 
 # Sprint 4: Task 1.4 - Link main executable against new modular libraries
-# Note: Temporarily linking only working libraries (Core, Algorithms, UI)
-# Parsers and Rendering libraries have compilation issues that need to be resolved
+# All libraries are now working and can be linked
 target_link_libraries(CloudRegistration PRIVATE
     Core
     Algorithms
     UI
-    # TODO: Fix and re-enable these libraries:
-    # Parsers    # Has E57 include/implementation issues
-    # Rendering  # Has OpenGL function/buffer type issues
+    Parsers    # Fixed E57 include/implementation issues
+    Rendering  # Fixed OpenGL function/buffer type issues
 )
 
 # Sprint 4: Task 3.1-3.3 - Update Test Suite Dependencies to use modular libraries
@@ -325,12 +326,37 @@ add_test(NAME ProjectManagementTests COMMAND ProjectManagementTests)
 #   - Purpose: Application user interface and project management
 #
 
+# Sprint 4: Remediation - Add E57 linkage test
+add_executable(E57LinkageTest tests/test_parsers/test_e57_linkage.cpp)
+target_link_libraries(E57LinkageTest PRIVATE Parsers GTest::gtest_main)
+add_test(NAME E57LinkageTest COMMAND E57LinkageTest)
+
+# Sprint 4: Remediation - Add OpenGL initialization test
+# Find OpenGL package for proper linking
+find_package(OpenGL REQUIRED)
+
+add_executable(OpenGLInitTest tests/test_rendering/test_opengl_init.cpp)
+target_link_libraries(OpenGLInitTest PRIVATE
+    Rendering
+    GTest::gtest_main
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    Qt6::Test
+    OpenGL::GL
+)
+add_test(NAME OpenGLInitTest COMMAND OpenGLInitTest)
+
 # Sprint 4: Task 4.3 - Create custom target to run all tests
 set(ALL_TESTS
     BasicInfrastructureTest
     VoxelGridFilterTests
     PerformanceProfilerTests
     ProjectManagementTests
+    E57LinkageTest
+    OpenGLInitTest
 )
 
 # Sprint 4: Task 4.3 - Enhanced test runner with better output

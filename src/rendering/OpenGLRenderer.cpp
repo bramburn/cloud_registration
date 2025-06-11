@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QOpenGLShader>
+#include <QOpenGLContext>
 
 OpenGLRenderer::OpenGLRenderer()
     : m_vertexBuffer(QOpenGLBuffer::VertexBuffer)
@@ -26,8 +27,12 @@ bool OpenGLRenderer::initialize()
         return true;
     }
 
-    if (!initializeOpenGLFunctions()) {
-        m_lastError = "Failed to initialize OpenGL functions";
+    // Initialize OpenGL functions (Qt6 version returns void)
+    initializeOpenGLFunctions();
+
+    // Check if OpenGL context is valid
+    if (!QOpenGLContext::currentContext()) {
+        m_lastError = "No valid OpenGL context available";
         qCritical() << m_lastError;
         return false;
     }

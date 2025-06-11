@@ -5,12 +5,13 @@
 #include <QDebug>
 #include <QFile>
 #include <QTextStream>
+#include <QOpenGLExtraFunctions>
 
 GpuCuller::GpuCuller()
     : m_computeShader(nullptr)
-    , m_nodeBuffer(QOpenGLBuffer::ShaderStorageBuffer)
-    , m_resultBuffer(QOpenGLBuffer::ShaderStorageBuffer)
-    , m_uniformBuffer(QOpenGLBuffer::UniformBuffer)
+    , m_nodeBuffer(QOpenGLBuffer::VertexBuffer)  // Use VertexBuffer as fallback for Qt6 compatibility
+    , m_resultBuffer(QOpenGLBuffer::VertexBuffer)  // Use VertexBuffer as fallback for Qt6 compatibility
+    , m_uniformBuffer(QOpenGLBuffer::VertexBuffer)  // Use VertexBuffer as fallback for Qt6 compatibility
     , m_initialized(false)
     , m_maxNodes(MAX_NODES_DEFAULT)
     , m_currentNodeCount(0)
@@ -29,11 +30,8 @@ bool GpuCuller::initialize() {
         return true;
     }
 
-    // Initialize OpenGL functions
-    if (!initializeOpenGLFunctions()) {
-        qWarning() << "GpuCuller: Failed to initialize OpenGL functions";
-        return false;
-    }
+    // Initialize OpenGL functions (Qt6 version returns void)
+    initializeOpenGLFunctions();
 
     // Check for compute shader support
     QOpenGLContext* context = QOpenGLContext::currentContext();
