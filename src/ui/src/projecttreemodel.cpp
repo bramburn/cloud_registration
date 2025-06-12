@@ -1,4 +1,4 @@
-#include "projecttreemodel.h"
+#include "ui/projecttreemodel.h"
 
 ProjectTreeModel::ProjectTreeModel(QObject *parent)
     : QAbstractItemModel(parent)

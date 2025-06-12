@@ -1,18 +1,23 @@
-# Sprint 1: Registration Library - Placeholder CMakeLists.txt
-# This file defines the Registration static library containing registration workflow components
+# Sprint 6: Registration Library - Complete Implementation
+# This file defines the Registration static library containing registration workflow and target management
 
 # Define source files for the Registration library
 set(REGISTRATION_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Target.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/TargetCorrespondence.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/TargetManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/AlignmentEngine.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ErrorAnalysis.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/FeatureBasedRegistration.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/PoseGraph.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/PoseGraphBuilder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/RegistrationProject.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/RegistrationWorkflowWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Target.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TargetCorrespondence.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TargetManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AlignmentEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ErrorAnalysis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FeatureBasedRegistration.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PoseGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PoseGraphBuilder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationProject.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationWorkflowWidget.cpp
+
+    # Files moved from detection/ to registration/
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TargetDetectionBase.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/NaturalPointSelector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SphereDetector.cpp
 )
 
 set(REGISTRATION_HEADERS

@@ -1,4 +1,4 @@
-#include "pointcloudloadmanager.h"
+#include "ui/pointcloudloadmanager.h"
 
 PointCloudLoadManager::PointCloudLoadManager(QObject *parent)
     : QObject(parent)

@@ -15,6 +15,7 @@ set(UI_SOURCES
     # Files now located in src/ui/src/ after migration from src/ root
     ${CMAKE_CURRENT_SOURCE_DIR}/src/createprojectdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/loadingsettingsdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.cpp
@@ -24,6 +25,8 @@ set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/IMainView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/IPointCloudViewer.cpp
 )
 
 # Define header files for the UI library (now moved to src/ui/include/ui/)
@@ -40,6 +43,7 @@ set(UI_HEADERS
     # Headers now located in src/ui/include/ui/ after migration from src/ root
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/createprojectdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/loadingsettingsdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mainwindow_simple.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/projecthubwidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/recentprojectsmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportdialog.h

@@ -1,4 +1,4 @@
-#include "scanimportdialog.h"
+#include "ui/scanimportdialog.h"
 #include <QMessageBox>
 #include <QStandardPaths>
 #include <QDir>

@@ -1,4 +1,4 @@
-#include "sidebarwidget.h"
+#include "ui/sidebarwidget.h"
 #include "projecttreemodel.h"
 #include "sqlitemanager.h"
 #include "projectmanager.h"
