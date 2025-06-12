@@ -1,4 +1,4 @@
-#include "E57ParserCore.h"
+#include "parsers/E57ParserCore.h"
 #include <E57Format/E57Format.h>
 #include <fstream>
 #include <sstream>

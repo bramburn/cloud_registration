@@ -9,6 +9,10 @@ set(CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/voxelgridfilter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/performance_profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/screenspaceerror.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ProjectStateService.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/projectmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.cpp
 )
 
 set(CORE_HEADERS
@@ -20,6 +24,10 @@ set(CORE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/voxelgridfilter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/performance_profiler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/screenspaceerror.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/ProjectStateService.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/projectmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/progressmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/sqlitemanager.h
 )
 
 # Create Core static library

@@ -1,8 +1,8 @@
-#include "sidebarwidget.h"
-#include "projecttreemodel.h"
-#include "sqlitemanager.h"
-#include "projectmanager.h"
-#include "confirmationdialog.h"
+#include "ui/sidebarwidget.h"
+#include "ui/projecttreemodel.h"
+#include "core/sqlitemanager.h"
+#include "core/projectmanager.h"
+#include "ui/confirmationdialog.h"
 #include <QStandardItem>
 #include <QHeaderView>
 #include <QContextMenuEvent>

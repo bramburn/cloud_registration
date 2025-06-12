@@ -1,4 +1,4 @@
-#include "pointcloudviewerwidget.h"
+#include "rendering/pointcloudviewerwidget.h"
 #include "core/performance_profiler.h"
 // Sprint 6: Include for Point struct
 #include "export/IFormatWriter.h"

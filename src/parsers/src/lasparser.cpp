@@ -1,4 +1,4 @@
-#include "lasparser.h"
+#include "parsers/lasparser.h"
 #include "core/loadingsettings.h"
 #include "core/lasheadermetadata.h"
 #include "core/performance_profiler.h"

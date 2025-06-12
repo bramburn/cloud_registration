@@ -1,4 +1,4 @@
-#include "sqlitemanager.h"
+#include "core/sqlitemanager.h"
 
 SQLiteManager::SQLiteManager(QObject *parent)
     : QObject(parent)

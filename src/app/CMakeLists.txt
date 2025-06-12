@@ -2,39 +2,36 @@
 # This file defines the main application executable
 
 # Define source files for the main application executable
-# These are files currently at src/ root that are not yet assigned to a modular library.
-# They will be moved to src/app/ or other modules in future sprints.
+# Files have been moved to src/app/src/ as part of restructuring
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../mainwindow.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../mainwindow_simple.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainPresenter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainPresenterExtensions.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainViewAdapter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../pointcloudviewerwidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../ProjectStateService.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../projectmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MainPresenter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MainPresenterExtensions.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MainViewAdapter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
 )
 
 set(APP_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../mainwindow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../mainwindow_simple.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainPresenter.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainPresenter_new.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MainViewAdapter.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../pointcloudviewerwidget.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../ProjectStateService.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../projectmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/mainwindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/mainwindow_simple.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/MainPresenter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/MainPresenter_new.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/MainViewAdapter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/pointcloudloadmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/scanimportmanager.h
 )
 
 # Create the main executable
 add_executable(CloudRegistration ${APP_SOURCES} ${APP_HEADERS})
 
 # Define private include directory for application-specific headers
-# This allows app files to include each other using relative paths within src/ and src/app/
+# This allows app files to include each other using relative paths within src/app/
 target_include_directories(CloudRegistration PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/..  # For includes like "project.h" that are still at src/root
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/..  # For main.cpp at src/root
 )
 
 # Link main executable against all top-level modular libraries and necessary Qt modules

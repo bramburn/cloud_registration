@@ -7,6 +7,7 @@ set(RENDERING_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GpuCuller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LODManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CameraController.cpp  # Moved from src/camera/
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudviewerwidget.cpp
 )
 
 set(RENDERING_HEADERS
@@ -14,6 +15,7 @@ set(RENDERING_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/GpuCuller.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/LODManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/CameraController.h  # Moved from src/camera/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/pointcloudviewerwidget.h
 )
 
 # Create Rendering static library

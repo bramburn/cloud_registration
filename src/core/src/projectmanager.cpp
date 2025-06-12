@@ -1,6 +1,6 @@
-#include "projectmanager.h"
-#include "ProjectStateService.h"
-#include "recentprojectsmanager.h"
+#include "core/projectmanager.h"
+#include "core/ProjectStateService.h"
+#include "ui/recentprojectsmanager.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>

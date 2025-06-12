@@ -1,4 +1,4 @@
-#include "recentprojectsmanager.h"
+#include "ui/recentprojectsmanager.h"
 #include <QSettings>
 #include <QDir>
 #include <QFileInfo>
