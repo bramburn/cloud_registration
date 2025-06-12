@@ -1,4 +1,4 @@
-#include "AlignmentControlPanel.h"
+#include "ui/AlignmentControlPanel.h"
 #include <QMessageBox>
 #include <QApplication>
 #include <QStyle>

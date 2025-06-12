@@ -12,7 +12,7 @@
 #include <QTextEdit>
 #include <QGroupBox>
 #include <QCheckBox>
-#include "../registration/AlignmentEngine.h"
+#include "registration/AlignmentEngine.h"
 
 /**
  * @brief AlignmentControlPanel - UI controls for manual alignment workflow
