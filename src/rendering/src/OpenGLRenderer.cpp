@@ -1,4 +1,4 @@
-#include "OpenGLRenderer.h"
+#include "rendering/OpenGLRenderer.h"
 #include <QDebug>
 #include <QFile>
 #include <QTextStream>

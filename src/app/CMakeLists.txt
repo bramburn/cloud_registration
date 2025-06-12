@@ -44,7 +44,6 @@ target_link_libraries(CloudRegistration PRIVATE
     Core
     Algorithms
     Analysis
-    Camera
     CRS
     Detection
     Export

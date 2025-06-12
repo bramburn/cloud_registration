@@ -3,7 +3,7 @@
 #include <QOpenGLContext>
 #include <QOffscreenSurface>
 #include <QOpenGLFunctions>
-#include "../src/rendering/OpenGLRenderer.h"
+#include "rendering/OpenGLRenderer.h"
 
 class OpenGLRendererTest : public ::testing::Test
 {

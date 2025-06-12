@@ -2,7 +2,7 @@
 #include <QApplication>
 #include <QSignalSpy>
 #include <cmath>
-#include "../src/camera/CameraController.h"
+#include "rendering/CameraController.h"
 
 class CameraControllerTest : public ::testing::Test
 {

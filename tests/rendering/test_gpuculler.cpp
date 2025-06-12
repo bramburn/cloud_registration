@@ -6,8 +6,8 @@
 #include <QGuiApplication>
 #include <memory>
 
-#include "../src/rendering/GpuCuller.h"
-#include "../src/octree.h"
+#include "rendering/GpuCuller.h"
+#include "core/octree.h"
 
 using ::testing::_;
 using ::testing::Return;

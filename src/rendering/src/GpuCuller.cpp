@@ -1,5 +1,5 @@
-#include "GpuCuller.h"
-#include "../octree.h"
+#include "rendering/GpuCuller.h"
+#include "core/octree.h"
 #include <QOpenGLContext>
 #include <QElapsedTimer>
 #include <QDebug>
