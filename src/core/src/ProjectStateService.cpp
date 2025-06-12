@@ -1,7 +1,7 @@
-#include "ProjectStateService.h"
-#include "sqlitemanager.h"
-#include "scanimportmanager.h"
-#include "projecttreemodel.h"
+#include "core/ProjectStateService.h"
+#include "core/sqlitemanager.h"
+#include "app/scanimportmanager.h"
+#include "ui/projecttreemodel.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>

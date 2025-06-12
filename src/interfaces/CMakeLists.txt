@@ -4,10 +4,14 @@
 # Define source files for the Interfaces library
 set(INTERFACES_SOURCES
     # Most interfaces are header-only, but include any implementation files here
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/IE57Parser.cpp
 )
 
 set(INTERFACES_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/IPointCloudProcessor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IE57Parser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IE57Writer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IPointCloudViewer.h
 )
 
 # Create Interfaces static library (might be header-only INTERFACE library later)

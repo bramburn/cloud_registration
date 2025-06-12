@@ -1,6 +1,6 @@
 #include "ui/projecthubwidget.h"
 #include "ui/createprojectdialog.h"
-#include "projectmanager.h"
+#include "core/projectmanager.h"
 #include "ui/recentprojectsmanager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>

@@ -1,4 +1,4 @@
-#include "ui/scanimportmanager.h"
+#include "app/scanimportmanager.h"
 
 ScanImportManager::ScanImportManager(QObject *parent)
     : QObject(parent)

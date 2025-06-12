@@ -2,20 +2,17 @@
 # This file defines the Parsers static library containing file format parsers
 
 # Define source files for the Parsers library
-# Note: These files are currently at src/ root but will be moved to src/parsers/src/ in future sprints
+# Files have been moved to src/parsers/src/ as part of restructuring
 set(PARSERS_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../e57parserlib.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../E57ParserCore.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../IE57Parser.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../lasparser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/e57parserlib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/E57ParserCore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lasparser.cpp
 )
 
 set(PARSERS_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../e57parserlib.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../E57ParserCore.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../IE57Parser.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../IE57Writer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../lasparser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/parsers/e57parserlib.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/parsers/E57ParserCore.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/parsers/lasparser.h
 )
 
 # Create Parsers static library
@@ -23,7 +20,6 @@ add_library(Parsers STATIC ${PARSERS_SOURCES} ${PARSERS_HEADERS})
 
 target_include_directories(Parsers PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>  # Temporary for files at src/ root
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/parsers>
 )
 

@@ -1,4 +1,4 @@
-#include "IE57Parser.h"
+#include "interfaces/IE57Parser.h"
 
 // This file is required for Qt's MOC (Meta-Object Compiler) to generate
 // the necessary meta-object code for the IE57Parser interface.
