@@ -1,4 +1,4 @@
-#include "CameraController.h"
+#include "rendering/CameraController.h"
 #include <QDebug>
 #include <cmath>
 

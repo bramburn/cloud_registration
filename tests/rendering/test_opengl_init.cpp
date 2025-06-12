@@ -5,7 +5,7 @@
 #include <QOpenGLFunctions>
 #include <QSurfaceFormat>
 #include <QTest>
-#include "../../src/rendering/OpenGLRenderer.h"
+#include "rendering/OpenGLRenderer.h"
 
 /**
  * @brief Test widget that creates an OpenGL context for testing

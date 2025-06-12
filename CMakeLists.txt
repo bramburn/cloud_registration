@@ -101,7 +101,6 @@ endif()
 add_subdirectory(src/core)
 add_subdirectory(src/algorithms)
 add_subdirectory(src/analysis)
-add_subdirectory(src/camera)
 add_subdirectory(src/crs)
 add_subdirectory(src/detection)
 add_subdirectory(src/export)
@@ -140,7 +139,7 @@ include(CPack)
 # src/core/include/core/ and src/core/src/
 # src/algorithms/include/algorithms/ and src/algorithms/src/
 # src/analysis/include/analysis/ and src/analysis/src/
-# src/camera/include/camera/ and src/camera/src/
+# src/camera/ - MOVED TO src/rendering/ in Sprint 5
 # src/crs/include/crs/ and src/crs/src/
 # src/detection/include/detection/ and src/detection/src/
 # src/export/include/export/ and src/export/src/

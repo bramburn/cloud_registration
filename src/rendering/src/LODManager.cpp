@@ -1,6 +1,6 @@
-#include "LODManager.h"
-#include "octree.h"
-#include "../camera/CameraController.h"
+#include "rendering/LODManager.h"
+#include "core/octree.h"
+#include "rendering/CameraController.h"
 #include <QDebug>
 #include <algorithm>
 #include <cmath>
