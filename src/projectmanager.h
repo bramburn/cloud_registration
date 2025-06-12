@@ -9,7 +9,7 @@
 #include <QTimer>
 #include <stdexcept>
 #include <memory>
-#include "project.h"
+#include "core/project.h"
 
 // Forward declarations
 class ProjectStateService;

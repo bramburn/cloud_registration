@@ -19,7 +19,7 @@
 #include <chrono>
 #include "octree.h"
 #include "screenspaceerror.h"
-#include "pointdata.h"
+#include "core/pointdata.h"
 #include "IPointCloudViewer.h"
 #include "rendering/GpuCuller.h"
 

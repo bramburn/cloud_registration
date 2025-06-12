@@ -1,5 +1,5 @@
 #include "e57parserlib.h"
-#include "performance_profiler.h"  // Sprint 2.2: Performance profiling
+#include "core/performance_profiler.h"  // Sprint 2.2: Performance profiling
 #include <E57Format/E57Format.h>  // Add proper E57Format include
 #include <sstream>
 #include <QString>

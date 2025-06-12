@@ -9,8 +9,8 @@
 // #include <QVector3D>  // Commented out for testing compatibility
 #include <vector>
 #include <stdexcept>
-#include "voxelgridfilter.h"
-#include "lasheadermetadata.h"
+#include "core/voxelgridfilter.h"
+#include "core/lasheadermetadata.h"
 
 // Forward declarations
 struct LoadingSettings;

@@ -12,7 +12,7 @@
 #include <QSpinBox>
 #include <QGroupBox>
 #include <QCheckBox>
-#include "loadingsettings.h"
+#include "core/loadingsettings.h"
 
 class LoadingSettingsDialog : public QDialog
 {

@@ -1,7 +1,7 @@
 #include "lasparser.h"
-#include "loadingsettings.h"
-#include "lasheadermetadata.h"
-#include "performance_profiler.h"
+#include "core/loadingsettings.h"
+#include "core/lasheadermetadata.h"
+#include "core/performance_profiler.h"
 #include <QDebug>
 #include <QFileInfo>
 #include <QtEndian>

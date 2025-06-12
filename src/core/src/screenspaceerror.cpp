@@ -1,5 +1,5 @@
-#include "screenspaceerror.h"
-#include "octree.h"
+#include "core/screenspaceerror.h"
+#include "core/octree.h"
 #include <QVector3D>
 #include <cmath>
 

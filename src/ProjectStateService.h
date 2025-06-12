@@ -5,7 +5,7 @@
 #include <QString>
 #include <QJsonObject>
 #include <memory>
-#include "project.h"
+#include "core/project.h"
 
 // Forward declarations
 class SQLiteManager;
