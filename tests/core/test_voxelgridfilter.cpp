@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "../src/voxelgridfilter.h"
-#include "../src/loadingsettings.h"
+#include "core/voxelgridfilter.h"
+#include "core/loadingsettings.h"
 #include <chrono>
 
 class VoxelGridFilterTest : public ::testing::Test {

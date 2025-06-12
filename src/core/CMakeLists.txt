@@ -1,25 +1,25 @@
-# Sprint 1: Core Library - Placeholder CMakeLists.txt
+# Sprint 2: Core Library - Updated CMakeLists.txt
 # This file defines the Core static library containing foundational data structures and utilities
 
 # Define source files for the Core library
-# Note: These files are currently at src/ root but will be moved to src/core/src/ in future sprints
+# Files have been moved to src/core/src/ as part of Sprint 2 modularization
 set(CORE_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../project.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../octree.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../voxelgridfilter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../performance_profiler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../screenspaceerror.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/project.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/octree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/voxelgridfilter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/performance_profiler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/screenspaceerror.cpp
 )
 
 set(CORE_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../project.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../octree.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../pointdata.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../loadingsettings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../lasheadermetadata.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../voxelgridfilter.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../performance_profiler.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../screenspaceerror.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/project.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/octree.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/pointdata.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/loadingsettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/lasheadermetadata.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/voxelgridfilter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/performance_profiler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/screenspaceerror.h
 )
 
 # Create Core static library
@@ -29,7 +29,6 @@ add_library(Core STATIC ${CORE_SOURCES} ${CORE_HEADERS})
 # This allows other modules to include Core headers as #include "core/project.h"
 target_include_directories(Core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>  # Temporary for files at src/ root
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/core>
 )
 

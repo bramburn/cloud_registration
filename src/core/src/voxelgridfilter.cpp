@@ -1,5 +1,5 @@
-#include "voxelgridfilter.h"
-#include "loadingsettings.h"
+#include "core/voxelgridfilter.h"
+#include "core/loadingsettings.h"
 #include <QDebug>
 #include <algorithm>
 #include <limits>

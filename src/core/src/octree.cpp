@@ -1,5 +1,5 @@
-#include "octree.h"
-#include "screenspaceerror.h"
+#include "core/octree.h"
+#include "core/screenspaceerror.h"
 #include <QDebug>
 #include <algorithm>
 #include <random>
