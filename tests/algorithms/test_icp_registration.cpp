@@ -4,10 +4,10 @@
 #include <QMatrix4x4>
 #include <QVector3D>
 #include <cmath>
-#include "../src/algorithms/ICPRegistration.h"
-#include "../src/algorithms/PointToPlaneICP.h"
-#include "../src/algorithms/LeastSquaresAlignment.h"
-#include "../src/registration/AlignmentEngine.h"
+#include "../../src/algorithms/ICPRegistration.h"
+#include "../../src/algorithms/PointToPlaneICP.h"
+#include "../../src/algorithms/LeastSquaresAlignment.h"
+#include "../../src/registration/AlignmentEngine.h"
 
 class ICPRegistrationTest : public ::testing::Test {
 protected:

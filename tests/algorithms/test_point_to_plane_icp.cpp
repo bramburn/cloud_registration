@@ -4,7 +4,7 @@
 #include <QMatrix4x4>
 #include <QVector3D>
 #include <cmath>
-#include "../src/algorithms/PointToPlaneICP.h"
+#include "../../src/algorithms/PointToPlaneICP.h"
 
 class PointToPlaneICPTest : public ::testing::Test {
 protected:
