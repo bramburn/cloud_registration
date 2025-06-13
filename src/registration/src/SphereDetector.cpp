@@ -53,6 +53,16 @@ TargetDetectionBase::DetectionResult SphereDetector::detect(const std::vector<Po
     // Detect multiple spheres
     for (int sphereIndex = 0; sphereIndex < MAX_SPHERES_PER_CLOUD; ++sphereIndex)
     {
+        // Check for cancellation
+        if (m_isCancelled)
+        {
+            qDebug() << "SphereDetector: Detection cancelled by user";
+            result.success = false;
+            result.errorMessage = "Detection cancelled by user";
+            emitProgress(100, "Detection cancelled");
+            return result;
+        }
+
         emitProgress(20 + (sphereIndex * 60) / MAX_SPHERES_PER_CLOUD,
                      QString("Detecting sphere %1").arg(sphereIndex + 1));
 
@@ -147,6 +157,9 @@ TargetDetectionBase::DetectionParams SphereDetector::getDefaultParameters() cons
 
 void SphereDetector::detectAsync(const std::vector<PointFullData>& points, const DetectionParams& params)
 {
+    // Reset cancellation flag
+    m_isCancelled = false;
+
     // Run detection in a separate thread to avoid blocking UI
     QThread* workerThread = QThread::create(
         [this, points, params]()
@@ -157,6 +170,12 @@ void SphereDetector::detectAsync(const std::vector<PointFullData>& points, const
 
     connect(workerThread, &QThread::finished, workerThread, &QThread::deleteLater);
     workerThread->start();
+}
+
+void SphereDetector::cancel()
+{
+    qDebug() << "SphereDetector: Cancellation requested";
+    m_isCancelled = true;
 }
 
 SphereDetector::SphereModel SphereDetector::detectSingleSphere(const std::vector<PointFullData>& points,
@@ -182,6 +201,12 @@ SphereDetector::SphereModel SphereDetector::detectSingleSphere(const std::vector
     // RANSAC iterations
     for (int iteration = 0; iteration < params.maxIterations; ++iteration)
     {
+        // Check for cancellation periodically (every 100 iterations)
+        if (iteration % 100 == 0 && m_isCancelled)
+        {
+            return bestSphere;  // Return early if cancelled
+        }
+
         // Generate random sample of 4 points
         std::vector<int> sampleIndices = generateRandomSample(points, usedPoints, m_randomGenerator);
         if (sampleIndices.size() != 4)

@@ -141,6 +141,19 @@ signals:
      */
     void manualSelectionRequested(const QString& scanId);
 
+    /**
+     * @brief Emitted when user requests to cancel detection
+     */
+    void cancelDetectionRequested();
+
+    /**
+     * @brief Emitted when user starts detection
+     * @param scanId ID of the scan
+     * @param mode Detection mode
+     * @param params Detection parameters
+     */
+    void detectionStartRequested(const QString& scanId, int mode, const QVariantMap& params);
+
 private:
     // UI setup methods
     void setupUI();

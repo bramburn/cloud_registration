@@ -101,22 +101,23 @@ void ICPProgressWidget::setupUI()
 
 void ICPProgressWidget::startMonitoring(ICPRegistration* icpAlgorithm, int maxIterations)
 {
-    if (!icpAlgorithm)
-    {
-        qWarning() << "ICPProgressWidget: Cannot monitor null ICP algorithm";
-        return;
-    }
-
     m_icpAlgorithm = icpAlgorithm;
     m_maxIterations = maxIterations;
     m_isMonitoring = true;
 
-    // Connect to ICP signals
-    connect(m_icpAlgorithm, &ICPRegistration::progressUpdated, this, &ICPProgressWidget::updateProgress);
-    connect(m_icpAlgorithm, &ICPRegistration::computationFinished, this, &ICPProgressWidget::onComputationFinished);
-
-    // Connect cancel signal
-    connect(this, &ICPProgressWidget::cancelRequested, m_icpAlgorithm, &ICPRegistration::cancel);
+    // Connect to ICP signals only if icpAlgorithm is provided
+    // If nullptr, external connections are expected (e.g., from AlignmentEngine)
+    if (m_icpAlgorithm)
+    {
+        connect(m_icpAlgorithm, &ICPRegistration::progressUpdated, this, &ICPProgressWidget::updateProgress);
+        connect(m_icpAlgorithm, &ICPRegistration::computationFinished, this, &ICPProgressWidget::onComputationFinished);
+        connect(this, &ICPProgressWidget::cancelRequested, m_icpAlgorithm, &ICPRegistration::cancel);
+        qDebug() << "ICPProgressWidget: Connected directly to ICPRegistration";
+    }
+    else
+    {
+        qDebug() << "ICPProgressWidget: Started with external signal connections (e.g., AlignmentEngine)";
+    }
 
     // Reset display
     resetDisplay();

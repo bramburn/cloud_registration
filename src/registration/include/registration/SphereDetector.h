@@ -3,6 +3,7 @@
 
 #include <QVector3D>
 
+#include <atomic>
 #include <map>
 #include <random>
 #include <vector>
@@ -80,6 +81,11 @@ public slots:
      * @param params Detection parameters
      */
     void detectAsync(const std::vector<PointFullData>& points, const DetectionParams& params);
+
+    /**
+     * @brief Cancel ongoing detection
+     */
+    void cancel();
 
 private:
     /**
@@ -183,6 +189,7 @@ private:
 
 private:
     mutable std::mt19937 m_randomGenerator;  ///< Random number generator for RANSAC
+    std::atomic<bool> m_isCancelled{false};  ///< Cancellation flag for async operations
 
     // Algorithm parameters
     static constexpr int MIN_POINTS_FOR_SPHERE = 4;    ///< Minimum points to fit sphere

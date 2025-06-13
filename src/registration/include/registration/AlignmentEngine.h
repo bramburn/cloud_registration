@@ -12,10 +12,14 @@
 
 #include "ErrorAnalysis.h"
 #include "core/octree.h"
+#include "registration/TargetDetectionBase.h"
 
 // Forward declarations
 class ICPRegistration;
 struct ICPParams;
+class SphereDetector;
+class PointCloudLoadManager;
+class TargetManager;
 
 /**
  * @brief AlignmentEngine - High-level coordination for manual alignment workflow
@@ -74,6 +78,26 @@ public:
 public:
     explicit AlignmentEngine(QObject* parent = nullptr);
     virtual ~AlignmentEngine() = default;
+
+    // --- Dependency Injection ---
+
+    /**
+     * @brief Set point cloud load manager for data access
+     * @param loadManager Pointer to load manager
+     */
+    void setPointCloudLoadManager(PointCloudLoadManager* loadManager)
+    {
+        m_loadManager = loadManager;
+    }
+
+    /**
+     * @brief Set target manager for storing detection results
+     * @param targetManager Pointer to target manager
+     */
+    void setTargetManager(TargetManager* targetManager)
+    {
+        m_targetManager = targetManager;
+    }
 
     // --- Correspondence Management ---
 
@@ -208,6 +232,11 @@ public:
                              int mode,
                              const QVariantMap& params);
 
+    /**
+     * @brief Cancel currently running target detection
+     */
+    void cancelTargetDetection();
+
     // --- Automatic ICP Alignment ---
 
     /**
@@ -267,10 +296,9 @@ signals:
 
     /**
      * @brief Emitted when target detection completes successfully
-     * @param scanId ID of the processed scan
-     * @param targets List of detected targets
+     * @param result Complete detection result with targets and metadata
      */
-    void targetDetectionCompleted(const QString& scanId, const QVariantList& targets);
+    void targetDetectionCompleted(const TargetDetectionBase::DetectionResult& result);
 
     /**
      * @brief Emitted when target detection encounters an error
@@ -278,11 +306,48 @@ signals:
      */
     void targetDetectionError(const QString& error);
 
+    // ICP Progress signals
+    /**
+     * @brief Emitted during ICP iterations to report progress
+     * @param iteration Current iteration number
+     * @param rmsError Current RMS error
+     * @param transformation Current transformation estimate
+     */
+    void progressUpdated(int iteration, float rmsError, const QMatrix4x4& transformation);
+
+    /**
+     * @brief Emitted when ICP computation completes
+     * @param success True if converged successfully
+     * @param finalTransformation Final transformation matrix
+     * @param finalRMSError Final RMS error
+     * @param iterations Number of iterations performed
+     */
+    void computationFinished(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
+
 private slots:
     /**
      * @brief Perform actual alignment computation (called by timer for async execution)
      */
     void performAlignment();
+
+    /**
+     * @brief Handle detection progress from SphereDetector
+     * @param percentage Progress percentage (0-100)
+     * @param stage Current processing stage
+     */
+    void onDetectionProgress(int percentage, const QString& stage);
+
+    /**
+     * @brief Handle detection completion from SphereDetector
+     * @param result Detection result
+     */
+    void onDetectionCompleted(const TargetDetectionBase::DetectionResult& result);
+
+    /**
+     * @brief Handle detection error from SphereDetector
+     * @param error Error message
+     */
+    void onDetectionError(const QString& error);
 
 private:
     /**
@@ -321,6 +386,11 @@ private:
     std::unique_ptr<ICPRegistration> m_icpAlgorithm;  ///< Current ICP algorithm instance
     QString m_currentSourceScanId;                    ///< Current source scan ID for ICP
     QString m_currentTargetScanId;                    ///< Current target scan ID for ICP
+
+    // Target detection members
+    std::unique_ptr<SphereDetector> m_sphereDetector;  ///< Current sphere detector instance
+    PointCloudLoadManager* m_loadManager;              ///< Point cloud load manager for data access
+    TargetManager* m_targetManager;                    ///< Target manager for storing results
 
     // Sprint 6.1: Deviation analysis
     float m_lastDeviationMaxDistance = 0.05f;  ///< Last max deviation distance used

@@ -13,6 +13,7 @@
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
 #include "ui/ICPParameterDialog.h"
+#include "ui/ICPProgressWidget.h"
 #include "algorithms/ICPRegistration.h"
 #include "registration/RegistrationWorkflowWidget.h"
 #include "registration/RegistrationProject.h"
@@ -68,7 +69,8 @@ MainPresenter::MainPresenter(IMainView* view,
       m_currentPoseGraph(nullptr),
       m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>()),
       m_qualityAssessment(nullptr),
-      m_reportGenerator(nullptr)
+      m_reportGenerator(nullptr),
+      m_icpProgressWidget(nullptr)
 {
     if (m_view)
     {
@@ -1036,19 +1038,39 @@ void MainPresenter::handleTargetDetectionClicked()
     std::vector<PointFullData> pointCloudData;
     if (m_loadManager)
     {
-        // For now, we'll create a placeholder - in a real implementation,
-        // this would get the actual point cloud data from the load manager
-        // pointCloudData = m_loadManager->getLoadedPointFullData(currentScanId);
+        pointCloudData = m_loadManager->getLoadedPointFullData(currentScanId);
     }
 
-    // Create target manager if not available
-    static TargetManager* targetManager = new TargetManager(this);
+    // Ensure we have target manager and alignment engine
+    if (!m_targetManager)
+    {
+        m_targetManager = new TargetManager(this);
+    }
+
+    if (!m_alignmentEngine)
+    {
+        m_alignmentEngine = new AlignmentEngine(this);
+        m_alignmentEngine->setPointCloudLoadManager(m_loadManager);
+        m_alignmentEngine->setTargetManager(m_targetManager);
+    }
 
     // Create and show the target detection dialog
-    TargetDetectionDialog dialog(targetManager, static_cast<QWidget*>(m_view));
+    TargetDetectionDialog dialog(m_targetManager, static_cast<QWidget*>(m_view));
     dialog.setPointCloudData(currentScanId, pointCloudData);
 
-    // Connect dialog signals
+    // Connect AlignmentEngine signals to dialog
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionProgress,
+            &dialog, &TargetDetectionDialog::onDetectionProgress);
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionCompleted,
+            &dialog, &TargetDetectionDialog::onDetectionCompleted);
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionError,
+            &dialog, &TargetDetectionDialog::onDetectionError);
+
+    // Connect dialog cancel signal to MainPresenter
+    connect(&dialog, &TargetDetectionDialog::cancelDetectionRequested,
+            this, &MainPresenter::cancelTargetDetection);
+
+    // Connect dialog completion signals
     connect(&dialog, &TargetDetectionDialog::detectionCompleted,
             this, [this](const QString& scanId, const TargetDetectionBase::DetectionResult& result) {
                 // Handle detection completion
@@ -1067,6 +1089,10 @@ void MainPresenter::handleTargetDetectionClicked()
                         .arg(scanId));
             });
 
+    // Connect dialog start detection to AlignmentEngine
+    connect(&dialog, &TargetDetectionDialog::detectionStartRequested,
+            m_alignmentEngine, &AlignmentEngine::startTargetDetection);
+
     // Show dialog modally
     if (dialog.exec() == QDialog::Accepted)
     {
@@ -1075,6 +1101,16 @@ void MainPresenter::handleTargetDetectionClicked()
     else
     {
         m_view->updateStatusBar("Target detection cancelled");
+    }
+}
+
+void MainPresenter::cancelTargetDetection()
+{
+    qDebug() << "MainPresenter::cancelTargetDetection() called";
+
+    if (m_alignmentEngine)
+    {
+        m_alignmentEngine->cancelTargetDetection();
     }
 }
 
@@ -1122,11 +1158,60 @@ void MainPresenter::handleAutomaticAlignmentClicked()
                      << "Convergence:" << params.convergenceThreshold
                      << "Max distance:" << params.maxCorrespondenceDistance;
 
-            // TODO: Get AlignmentEngine instance and start automatic alignment
-            // For now, just show a message
-            showInfo("ICP Started",
-                    QString("Starting ICP alignment between %1 and %2")
-                    .arg(sourceScanId, targetScanId));
+            // Store scan IDs for reference
+            m_currentSourceScanId = sourceScanId;
+            m_currentTargetScanId = targetScanId;
+
+            if (!m_alignmentEngine) {
+                showError("ICP Error", "Alignment engine is not available.");
+                return;
+            }
+
+            // Create and show ICP progress widget
+            if (m_icpProgressWidget) {
+                delete m_icpProgressWidget;
+            }
+            m_icpProgressWidget = new ICPProgressWidget(static_cast<QWidget*>(m_view));
+
+            // Connect cancel signal
+            connect(m_icpProgressWidget, &ICPProgressWidget::cancelRequested,
+                    this, &MainPresenter::cancelAutomaticAlignment);
+
+            // Connect progress signals from AlignmentEngine to ICPProgressWidget
+            connect(m_alignmentEngine, &AlignmentEngine::progressUpdated,
+                    m_icpProgressWidget, &ICPProgressWidget::updateProgress);
+            connect(m_alignmentEngine, &AlignmentEngine::computationFinished,
+                    m_icpProgressWidget, &ICPProgressWidget::onComputationFinished);
+
+            // Connect completion signal to clean up the progress widget
+            connect(m_icpProgressWidget, &ICPProgressWidget::computationCompleted,
+                    this, [this](bool success, const QString& message) {
+                Q_UNUSED(success)
+                Q_UNUSED(message)
+                // Clean up the progress widget
+                if (m_icpProgressWidget) {
+                    m_icpProgressWidget->deleteLater();
+                    m_icpProgressWidget = nullptr;
+                }
+            });
+
+            // Connect progress signals for live viewer updates
+            connect(m_alignmentEngine, &AlignmentEngine::progressUpdated,
+                    this, [this](int iteration, float rmsError, const QMatrix4x4& transformation) {
+                // Update viewer with intermediate transformation
+                if (m_viewer) {
+                    auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+                    if (viewerWidget) {
+                        viewerWidget->setDynamicTransform(transformation);
+                    }
+                }
+            });
+
+            // Start monitoring - pass nullptr for ICPRegistration since we connect to AlignmentEngine
+            m_icpProgressWidget->startMonitoring(nullptr, params.maxIterations);
+
+            // Start automatic alignment
+            m_alignmentEngine->startAutomaticAlignment(sourceScanId, targetScanId, params);
         });
 
         // Show the dialog
@@ -1147,6 +1232,24 @@ void MainPresenter::handleAutomaticAlignmentClicked()
     catch (...)
     {
         showError("Automatic Alignment", "Unknown error occurred while initializing ICP dialog.");
+    }
+}
+
+void MainPresenter::cancelAutomaticAlignment()
+{
+    qDebug() << "MainPresenter: Cancel automatic alignment requested";
+
+    if (!m_alignmentEngine) {
+        qWarning() << "MainPresenter: Cannot cancel alignment - AlignmentEngine not available";
+        return;
+    }
+
+    // Cancel the alignment computation
+    m_alignmentEngine->cancelAutomaticAlignment();
+
+    // Update status
+    if (m_view) {
+        m_view->updateStatusBar("ICP alignment cancelled");
     }
 }
 
