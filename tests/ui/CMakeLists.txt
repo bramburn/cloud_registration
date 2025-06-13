@@ -77,4 +77,26 @@ target_include_directories(AlignmentControlPanelTests PRIVATE
 )
 add_test(NAME AlignmentControlPanelTests COMMAND AlignmentControlPanelTests)
 
+# Sprint 7.1: Pose Graph Viewer Widget Tests
+add_executable(PoseGraphViewerWidgetTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_posegraphviewerwidget.cpp
+)
+target_link_libraries(PoseGraphViewerWidgetTests PRIVATE
+    UI                  # Link against the UI library
+    Registration        # For PoseGraph classes
+    Core                # Indirect dependency
+    GTest::gtest_main   # Google Test framework
+    GMock::gmock        # Google Mock framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(PoseGraphViewerWidgetTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui           # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration # Registration headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core       # Core headers
+)
+add_test(NAME PoseGraphViewerWidgetTests COMMAND PoseGraphViewerWidgetTests)
+
 message(STATUS "Configuring UI tests...")

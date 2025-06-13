@@ -14,6 +14,17 @@
 #include "interfaces/IPointCloudViewer.h"
 #include "registration/RegistrationProject.h"
 #include "ui/ExportDialog.h"
+#include "export/IFormatWriter.h"
+#include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
+#include "ui/AlignmentControlPanel.h"
+#include "ui/PoseGraphViewerWidget.h"
+#include "registration/PoseGraph.h"
+#include "registration/PoseGraphBuilder.h"
+#include "registration/RegistrationProject.h"
+
+// Sprint 6.1: Additional includes for deviation map functionality
+#include "rendering/pointcloudviewerwidget.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -29,12 +40,20 @@ MainPresenter::MainPresenter(IMainView* view,
       m_projectManager(projectManager),
       m_loadManager(loadManager),
       m_currentProject(nullptr),
+      m_targetManager(nullptr),
+      m_alignmentEngine(nullptr),
       m_isFileOpen(false),
       m_isProjectOpen(false),
       m_isParsingInProgress(false),
       m_currentMemoryUsage(0),
       m_currentFPS(0.0f),
-      m_currentVisiblePoints(0)
+      m_currentVisiblePoints(0),
+      m_currentSourceScanId(""),
+      m_currentTargetScanId(""),
+      m_registrationProject(nullptr),
+      m_poseGraphViewer(nullptr),
+      m_currentPoseGraph(nullptr),
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
 {
     if (m_view)
     {
@@ -57,6 +76,16 @@ void MainPresenter::setProjectManager(ProjectManager* projectManager)
 void MainPresenter::setPointCloudLoadManager(PointCloudLoadManager* loadManager)
 {
     m_loadManager = loadManager;
+}
+
+void MainPresenter::setTargetManager(TargetManager* targetManager)
+{
+    m_targetManager = targetManager;
+}
+
+void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
+{
+    m_alignmentEngine = alignmentEngine;
 }
 
 void MainPresenter::setupConnections()
@@ -119,6 +148,15 @@ void MainPresenter::setupConnections()
     // Sprint 3.2: Export functionality connections
     // Note: Currently ExportDialog is self-contained, so no connections needed
     // This will be updated when we implement the full MVP pattern as per s3.2.md
+    // Connect alignment control panel signals if available
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            connect(alignmentPanel, &AlignmentControlPanel::alignmentRequested, this, &MainPresenter::triggerAlignmentPreview);
+        }
+    }
 }
 
 void MainPresenter::handleNewProject()
@@ -892,6 +930,7 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     }
 }
 
+// Alignment Management Implementation
 void MainPresenter::handleAcceptAlignment()
 {
     qDebug() << "MainPresenter::handleAcceptAlignment() called";
@@ -1001,6 +1040,7 @@ void MainPresenter::handleCancelAlignment()
     showInfo("Cancel Alignment", "Alignment cancellation functionality will be fully implemented when AlignmentEngine is integrated.");
 }
 
+<<<<<<< HEAD
 
 
 // Sprint 3.2: Export functionality implementation
@@ -1039,6 +1079,226 @@ void MainPresenter::handleExportPointCloud()
 
     // Set available formats from the exporter
     dialog.setAvailableFormats(m_exporter->getSupportedFormats());
+
+    // Load default settings
+    dialog.loadSettings();
+
+    // Note: The current ExportDialog is self-contained and handles export internally
+    // We don't need to connect to our own exporter since the dialog has its own
+
+    // Show dialog and handle result
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // The ExportDialog handles the export internally and shows its own progress
+        // We just need to update our status bar
+        m_view->updateStatusBar("Export completed");
+        showInfo("Export Successful", "Point cloud has been exported successfully.");
+    }
+}
+
+void MainPresenter::onExportCompleted(const ExportResult& result)
+{
+    // This method is currently not used since ExportDialog is self-contained
+    // But keeping it for future integration when we move to the MVP pattern
+    // as specified in s3.2.md
+
+    if (result.success)
+    {
+        showInfo("Export Successful",
+                QString("Point cloud exported successfully to:\n%1").arg(result.outputPath));
+        m_view->updateStatusBar("Export completed successfully");
+    }
+    else
+    {
+        showError("Export Failed",
+                QString("Export failed: %1").arg(result.errorMessage));
+        m_view->updateStatusBar("Export failed");
+=======
+void MainPresenter::setRegistrationProject(Registration::RegistrationProject* project)
+{
+    m_registrationProject = project;
+
+    if (m_registrationProject) {
+        // Connect to registration project signals
+        connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
+                this, &MainPresenter::rebuildPoseGraph);
+
+        qDebug() << "MainPresenter: Registration project set";
+    }
+}
+
+void MainPresenter::setPoseGraphViewer(PoseGraphViewerWidget* viewer)
+{
+    m_poseGraphViewer = viewer;
+
+    if (m_poseGraphViewer) {
+        // Connect pose graph viewer signals
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::nodeSelected,
+                this, [this](const QString& scanId) {
+                    qDebug() << "Pose graph node selected:" << scanId;
+                    // Handle node selection (e.g., highlight in main viewer)
+                });
+
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::edgeSelected,
+                this, [this](const QString& sourceScanId, const QString& targetScanId) {
+                    qDebug() << "Pose graph edge selected:" << sourceScanId << "to" << targetScanId;
+                    // Handle edge selection (e.g., show registration details)
+                });
+
+        qDebug() << "MainPresenter: Pose graph viewer set";
+    }
+}
+
+void MainPresenter::handleLoadProjectCompleted()
+{
+    qDebug() << "MainPresenter: Project load completed, rebuilding pose graph";
+    rebuildPoseGraph();
+}
+
+void MainPresenter::rebuildPoseGraph()
+{
+    if (!m_registrationProject || !m_poseGraphBuilder) {
+        qWarning() << "MainPresenter: Cannot rebuild pose graph - missing registration project or builder";
+        return;
+    }
+
+    try {
+        qDebug() << "MainPresenter: Starting pose graph rebuild";
+
+        // Build the pose graph from the registration project
+        m_currentPoseGraph = m_poseGraphBuilder->build(*m_registrationProject);
+
+        if (m_currentPoseGraph && m_poseGraphViewer) {
+            // Display the graph in the viewer
+            m_poseGraphViewer->displayGraph(*m_currentPoseGraph);
+
+            qDebug() << "MainPresenter: Pose graph rebuilt and displayed with"
+                     << m_currentPoseGraph->nodeCount() << "nodes and"
+                     << m_currentPoseGraph->edgeCount() << "edges";
+
+            if (m_view) {
+                m_view->updateStatusBar(QString("Pose graph updated: %1 nodes, %2 edges")
+                                       .arg(m_currentPoseGraph->nodeCount())
+                                       .arg(m_currentPoseGraph->edgeCount()));
+            }
+        } else {
+            qWarning() << "MainPresenter: Failed to build pose graph or viewer not available";
+        }
+    } catch (const std::exception& e) {
+        qCritical() << "MainPresenter: Error rebuilding pose graph:" << e.what();
+        showError("Pose Graph Error", QString("Failed to rebuild pose graph: %1").arg(e.what()));
+    }
+}
+
+
+
+void MainPresenter::triggerAlignmentPreview()
+{
+    if (!m_targetManager)
+    {
+        showError("Alignment Preview", "Target manager is not available.");
+        return;
+    }
+
+    if (!m_alignmentEngine)
+    {
+        showError("Alignment Preview", "Alignment engine is not available.");
+        return;
+    }
+
+    // Retrieve correspondences from TargetManager
+    QList<TargetCorrespondence> correspondences = m_targetManager->getAllCorrespondences();
+
+    if (correspondences.size() < 3)
+    {
+        showError("Alignment Preview", "At least 3 point correspondences are required for alignment computation.");
+        return;
+    }
+
+    // Trigger alignment computation through AlignmentEngine
+    m_alignmentEngine->recomputeAlignment();
+
+    // Update status
+    if (m_view)
+    {
+        m_view->updateStatusBar("Alignment computation started...");
+    }
+}
+
+// Sprint 6.1: Deviation map toggle implementation
+void MainPresenter::handleShowDeviationMapToggled(bool enabled)
+{
+    qDebug() << "MainPresenter::handleShowDeviationMapToggled called with enabled:" << enabled;
+
+    // This is a stub implementation for now
+    // In a full implementation, we would need:
+    // 1. Access to RegistrationProject to get the latest registration result
+    // 2. Access to AlignmentEngine to perform deviation analysis
+    // 3. Access to PointCloudViewerWidget to load colorized points and show legend
+
+    if (enabled)
+    {
+        showInfo("Deviation Map", "Deviation map functionality is implemented but requires registration data. "
+                                  "Please ensure you have performed a registration between scans first.");
+
+        // TODO: Implement the full logic as described in the S6.1 document:
+        // - Get latest registration result from RegistrationProject
+        // - Get source and target point data from PointCloudLoadManager
+        // - Call AlignmentEngine::analyzeDeviation()
+        // - Call PointCloudViewerWidget::loadColorizedPointCloud()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible()
+    }
+    else
+    {
+        showInfo("Deviation Map", "Deviation map disabled.");
+
+        // TODO: Implement the disable logic:
+        // - Call PointCloudViewerWidget::revertToOriginalColors()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible(false, 0.0f)
+    }
+
+    if (m_view)
+    {
+        m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
+    }
+}
+
+// Sprint 3.2: Export functionality implementation
+void MainPresenter::handleExportPointCloud()
+{
+    // Pre-check: Verify that viewer has point cloud data
+    if (!m_viewer || !m_viewer->hasPointCloudData())
+    {
+        showError("Export Error", "No point cloud data loaded for export.");
+        return;
+    }
+
+    // Retrieve current point cloud data (with applied transformations)
+    std::vector<Point> dataToExport = m_viewer->getCurrentPointCloudData();
+    if (dataToExport.empty())
+    {
+        showError("Export Error", "No point cloud data available for export.");
+        return;
+    }
+
+    // Create and configure ExportDialog
+    ExportDialog dialog(static_cast<QWidget*>(m_view));
+    dialog.setPointCloudData(dataToExport);
+
+    // Set project information if available
+    if (m_currentProject)
+    {
+        dialog.setProjectInfo(m_currentProject->projectName(), m_currentProject->description());
+    }
+    else
+    {
+        // Fallback to basic project info
+        QString projectName = m_isProjectOpen ? QFileInfo(m_currentProjectPath).baseName() : "Untitled";
+        dialog.setProjectInfo(projectName, "Point cloud export from Cloud Registration application");
+    }
+
+    // Note: ExportDialog will set its own supported formats internally
+    // No need to set them explicitly since it has its own PointCloudExporter
 
     // Load default settings
     dialog.loadSettings();
