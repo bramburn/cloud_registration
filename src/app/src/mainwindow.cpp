@@ -48,6 +48,7 @@
 #include "quality/PDFReportGenerator.h"
 #include "quality/QualityAssessment.h"
 #include "ui/ExportDialog.h"
+#include "ui/UserPreferences.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -133,6 +134,11 @@ MainWindow::MainWindow(QWidget* parent)
         m_presenter->setProjectManager(m_projectManager);
         m_presenter->setTargetManager(m_targetManager);
         m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
 
@@ -354,12 +360,51 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
         setupUI();
         qDebug() << "UI setup completed";
 
+        // Sprint 6: Initialize export and quality assessment components
+        qDebug() << "Initializing Sprint 6 components...";
+        m_exporter = std::make_unique<PointCloudExporter>(this);
+        m_qualityAssessment = std::make_unique<QualityAssessment>(this);
+        m_reportGenerator = std::make_unique<PDFReportGenerator>(this);
+        m_crsManager = std::make_unique<CoordinateSystemManager>(this);
+
+        // Connect Sprint 6 signals
+        connect(m_exporter.get(),
+                &PointCloudExporter::exportCompleted,
+                this,
+                [this](const ExportResult& result)
+                {
+                    if (result.success)
+                    {
+                        onExportCompleted(result.outputPath);
+                    }
+                    else
+                    {
+                        QMessageBox::critical(this, "Export Failed", result.errorMessage);
+                    }
+                });
+
+        connect(m_qualityAssessment.get(),
+                &QualityAssessment::assessmentCompleted,
+                this,
+                [this](const QualityReport& report)
+                {
+                    m_lastQualityReport = new QualityReport(report);
+                    onQualityAssessmentCompleted();
+                });
+
+        qDebug() << "Sprint 6 components initialized";
+
         // Sprint 4: Initialize presenter after UI setup
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, m_e57Parser, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
         m_presenter->setTargetManager(m_targetManager);
         m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
 
@@ -648,6 +693,13 @@ void MainWindow::setupMenuBar()
     m_generateReportAction->setStatusTip("Generate PDF quality assessment report");
     connect(m_generateReportAction, &QAction::triggered, this, &MainWindow::onGenerateQualityReport);
 
+    // Sprint 7.3: Add performance report action
+    m_generatePerformanceReportAction = qualityMenu->addAction("Generate &Performance Report...");
+    m_generatePerformanceReportAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
+    m_generatePerformanceReportAction->setEnabled(false);
+    m_generatePerformanceReportAction->setStatusTip("Generate performance profiling report");
+    connect(m_generatePerformanceReportAction, &QAction::triggered, this, &MainWindow::onGeneratePerformanceReport);
+
     qualityMenu->addSeparator();
 
     // Sprint 6.1: Add deviation map toggle
@@ -680,6 +732,9 @@ void MainWindow::setupMenuBar()
                                    "Built with Qt6 and OpenGL");
             });
     helpMenu->addAction(aboutAction);
+
+    // Sprint 7.3: Update performance report action state based on preferences
+    updatePerformanceReportActionState();
 }
 
 void MainWindow::setupStatusBar()
@@ -2881,45 +2936,14 @@ void MainWindow::onQualityAssessment()
 
 void MainWindow::onGenerateQualityReport()
 {
-    if (!m_reportGenerator || !m_lastQualityReport)
+    // Sprint 6.2: Delegate to MainPresenter instead of handling directly
+    if (m_presenter)
     {
-        QMessageBox::warning(this, "Report Error", "No quality assessment data available for report generation");
-        return;
-    }
-
-    QString outputPath = QFileDialog::getSaveFileName(this,
-                                                      "Save Quality Report",
-                                                      QString("%1_quality_report.pdf").arg(m_currentFileName),
-                                                      "PDF Files (*.pdf);;All Files (*)");
-
-    if (outputPath.isEmpty())
-    {
-        return;
-    }
-
-    ReportOptions options;
-    options.outputPath = outputPath;
-    options.projectName = m_currentFileName.isEmpty() ? "Untitled Project" : m_currentFileName;
-    options.companyName = "FARO Technologies";
-    options.operatorName = QApplication::applicationName();
-    options.includeCharts = true;
-    options.includeRecommendations = true;
-    options.includeDetailedMetrics = true;
-
-    setStatusMessage("Generating quality report...");
-
-    bool success = m_reportGenerator->generateReport(*m_lastQualityReport, options);
-
-    if (success)
-    {
-        QMessageBox::information(this, "Report Generated", QString("Quality report saved to:\n%1").arg(outputPath));
-        setStatusMessage("Quality report generated successfully");
+        m_presenter->handleGenerateReportClicked();
     }
     else
     {
-        QMessageBox::critical(
-            this, "Report Error", QString("Failed to generate report: %1").arg(m_reportGenerator->getLastError()));
-        setStatusMessage("Report generation failed");
+        QMessageBox::warning(this, "Report Error", "Presenter not available for report generation");
     }
 }
 
@@ -2969,7 +2993,33 @@ void MainWindow::onShowDeviationMapToggled(bool enabled)
     }
 }
 
+// Sprint 7.3: Performance report generation implementation
+void MainWindow::onGeneratePerformanceReport()
+{
+    qDebug() << "Generate performance report requested";
+
+    if (m_presenter)
+    {
+        m_presenter->handleGeneratePerformanceReportClicked();
+    }
+    else
+    {
+        QMessageBox::warning(this, "Performance Report Error", "Presenter not available for performance report generation");
+    }
+}
+
 AlignmentControlPanel* MainWindow::getAlignmentControlPanel()
 {
     return m_alignmentControlPanel;
+}
+
+// Sprint 7.3: Update performance report action state based on preferences
+void MainWindow::updatePerformanceReportActionState()
+{
+    if (m_generatePerformanceReportAction)
+    {
+        bool profilingEnabled = UserPreferences::instance().getValue("advanced/profilingEnabled", false).toBool();
+        m_generatePerformanceReportAction->setEnabled(profilingEnabled);
+        qDebug() << "Performance report action enabled:" << profilingEnabled;
+    }
 }

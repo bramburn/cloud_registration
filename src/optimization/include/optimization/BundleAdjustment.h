@@ -5,10 +5,11 @@
 #include <QObject>
 #include <QVector3D>
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
-#include "../registration/PoseGraph.h"
+#include "registration/PoseGraph.h"
 
 namespace Optimization
 {
@@ -72,6 +73,11 @@ public:
      * @return Recommended optimization parameters
      */
     Parameters getRecommendedParameters(const Registration::PoseGraph& graph) const;
+
+    /**
+     * @brief Cancel the current optimization
+     */
+    void cancel();
 
 signals:
     void optimizationProgress(int iteration, double currentError, double lambda);
@@ -157,6 +163,9 @@ private:
      */
     std::unique_ptr<Registration::PoseGraph> createOptimizedGraph(const Registration::PoseGraph& originalGraph,
                                                                   const StateVector& optimizedState) const;
+
+    // Cancellation support
+    std::atomic<bool> m_isCancelled;
 
     // Numerical differentiation step size
     static constexpr double NUMERICAL_EPSILON = 1e-8;

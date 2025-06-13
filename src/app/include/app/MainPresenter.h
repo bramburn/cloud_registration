@@ -19,11 +19,21 @@ struct ExportResult;
 class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
+class BundleAdjustmentProgressDialog;
+class QualityAssessment;
+class PDFReportGenerator;
+struct QualityReport;
+class ICPProgressWidget;
+class ReportOptionsDialog;
 
 namespace Registration {
     class PoseGraph;
     class PoseGraphBuilder;
     class RegistrationProject;
+}
+
+namespace Optimization {
+    class BundleAdjustment;
 }
 
 /**
@@ -90,6 +100,18 @@ class MainPresenter : public QObject
      * @param alignmentEngine Pointer to alignment engine.
      */
     void setAlignmentEngine(AlignmentEngine* alignmentEngine);
+
+    /**
+     * @brief Set the quality assessment instance (Sprint 6.2)
+     * @param qualityAssessment Pointer to the quality assessment
+     */
+    void setQualityAssessment(QualityAssessment* qualityAssessment);
+
+    /**
+     * @brief Set the PDF report generator instance (Sprint 6.2)
+     * @param reportGenerator Pointer to the PDF report generator
+     */
+    void setPDFReportGenerator(PDFReportGenerator* reportGenerator);
 
 public slots:
         /**
@@ -225,8 +247,47 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    /**
+     * @brief Handle automatic alignment (ICP) button click
+     *
+     * This slot is triggered when the user clicks the "Automatic Alignment (ICP)"
+     * button in the RegistrationWorkflowWidget. It launches the ICPParameterDialog
+     * and initiates the ICP computation if parameters are accepted.
+     */
+    void handleAutomaticAlignmentClicked();
+
+    /**
+     * @brief Cancel currently running automatic alignment
+     *
+     * This slot is connected to ICPProgressWidget::cancelRequested signal
+     * and cancels the ongoing ICP computation.
+     */
+    void cancelAutomaticAlignment();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
+
     // Sprint 3.2: Export functionality
     void handleExportPointCloud();
+
+    /**
+     * @brief Handle target detection request from workflow widget.
+     */
+    void handleTargetDetectionClicked();
+
+    /**
+     * @brief Cancel currently running target detection
+     */
+    void cancelTargetDetection();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget for target detection integration.
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
 
     // Pose Graph Management
     /**
@@ -250,6 +311,16 @@ public slots:
      * @brief Rebuild the pose graph from current registration project
      */
     void rebuildPoseGraph();
+
+    /**
+     * @brief Handle Bundle Adjustment request
+     */
+    void handleRunBundleAdjustment();
+
+    /**
+     * @brief Handle Bundle Adjustment cancellation request
+     */
+    void cancelBundleAdjustment();
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -304,14 +375,73 @@ private slots:
          * @param totalBytes Total memory usage in bytes.
          */
     void onMemoryUsageChanged(size_t totalBytes);
+
     // Sprint 3.2: Export functionality slots
     void onExportCompleted(const ExportResult& result);
+
+    /**
+     * @brief Handle Bundle Adjustment progress updates
+     * @param iteration Current iteration number
+     * @param currentError Current optimization error
+     * @param lambda Current lambda value
+     */
+    void onBundleAdjustmentProgress(int iteration, double currentError, double lambda);
+
+    /**
+     * @brief Handle Bundle Adjustment completion
+     * @param result Bundle adjustment result
+     */
+    void onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result);
 
     /**
      * @brief Handle deviation map toggle (Sprint 6.1)
      * @param enabled Whether to show or hide the deviation map
      */
     void handleShowDeviationMapToggled(bool enabled);
+
+    /**
+     * @brief Handle registration result added signal (Sprint 3.3)
+     * @param sourceScanId ID of the source scan
+     * @param targetScanId ID of the target scan
+     */
+    void onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId);
+
+    /**
+     * @brief Handle generate quality report request (Sprint 6.2)
+     */
+    void handleGenerateReportClicked();
+
+    /**
+     * @brief Start report generation with specified options (Sprint 6.3)
+     * @param options Report generation options from ReportOptionsDialog
+     * @param dialog Pointer to the dialog for progress updates
+     */
+    void startReportGeneration(const PDFReportGenerator::ReportOptions& options, ReportOptionsDialog* dialog);
+
+    /**
+     * @brief Handle generate performance report request (Sprint 7.3)
+     */
+    void handleGeneratePerformanceReportClicked();
+
+private slots:
+    /**
+     * @brief Handle quality assessment completion (Sprint 6.2)
+     * @param report The completed quality report
+     */
+    void onQualityAssessmentCompleted(const QualityReport& report);
+
+    /**
+     * @brief Handle successful report generation (Sprint 6.2)
+     * @param filePath Path to the generated report
+     */
+    void onReportGenerated(const QString& filePath);
+
+    /**
+     * @brief Handle report generation error (Sprint 6.2)
+     * @param error Error message
+     */
+    void onReportError(const QString& error);
+
 private:
         /**
          * @brief Set up signal-slot connections between components.
@@ -374,6 +504,36 @@ private:
      */
     void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
 
+    /**
+     * @brief Handle ICP computation completion
+     * @param success True if ICP converged successfully
+     * @param finalTransformation Final transformation matrix
+     * @param finalRMSError Final RMS error
+     * @param iterations Number of iterations performed
+     */
+    void handleICPCompletion(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
+
+    /**
+     * @brief Handle user acceptance of ICP result
+     */
+    void handleAcceptICPResult();
+
+    /**
+     * @brief Handle user discard of ICP result
+     */
+    void handleDiscardICPResult();
+
+    /**
+     * @brief Handle alignment state changes from AlignmentEngine (Sprint 2.3)
+     *
+     * This slot receives alignment state changes and forwards them to the
+     * AlignmentControlPanel for UI updates.
+     *
+     * @param state New alignment state
+     * @param message Status message
+     */
+    void handleAlignmentStateChanged(AlignmentEngine::AlignmentState state, const QString& message);
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -405,6 +565,8 @@ private:
          // Sidebar state management
     QStringList m_loadedScans;
         QStringList m_lockedClusters;
+        // Workflow widget integration
+        class RegistrationWorkflowWidget* m_connectedWorkflowWidget;
 
     // Alignment state management
     QString m_currentSourceScanId;
@@ -415,6 +577,24 @@ private:
     PoseGraphViewerWidget* m_poseGraphViewer;
     std::unique_ptr<Registration::PoseGraph> m_currentPoseGraph;
     std::unique_ptr<Registration::PoseGraphBuilder> m_poseGraphBuilder;
+
+    // Bundle Adjustment Management
+    std::unique_ptr<Optimization::BundleAdjustment> m_bundleAdjustment;
+    std::unique_ptr<BundleAdjustmentProgressDialog> m_baProgressDialog;
+
+    // Sprint 6.2: Quality assessment and reporting
+    QualityAssessment* m_qualityAssessment;
+    PDFReportGenerator* m_reportGenerator;
+    QualityReport m_lastQualityReport;
+
+    // Sprint 4.2: ICP Progress monitoring
+    ICPProgressWidget* m_icpProgressWidget;
+
+    // Sprint 4.3: ICP Result Management
+    QMatrix4x4 m_lastICPTransformation;
+    float m_lastICPRMSError;
+    int m_lastICPIterations;
+    bool m_hasValidICPResult;
 };
 
 #endif  // MAINPRESENTER_H

@@ -12,6 +12,14 @@
 
 #include "ErrorAnalysis.h"
 #include "core/octree.h"
+#include "registration/TargetDetectionBase.h"
+
+// Forward declarations
+class ICPRegistration;
+struct ICPParams;
+class SphereDetector;
+class PointCloudLoadManager;
+class TargetManager;
 
 /**
  * @brief AlignmentEngine - High-level coordination for manual alignment workflow
@@ -42,7 +50,8 @@ public:
         Insufficient,  ///< Less than 3 correspondences
         Computing,     ///< Transformation computation in progress
         Valid,         ///< Valid transformation computed
-        Error          ///< Error in computation
+        Error,         ///< Error in computation
+        Cancelled      ///< Computation cancelled by user
     };
 
     /**
@@ -69,6 +78,26 @@ public:
 public:
     explicit AlignmentEngine(QObject* parent = nullptr);
     virtual ~AlignmentEngine() = default;
+
+    // --- Dependency Injection ---
+
+    /**
+     * @brief Set point cloud load manager for data access
+     * @param loadManager Pointer to load manager
+     */
+    void setPointCloudLoadManager(PointCloudLoadManager* loadManager)
+    {
+        m_loadManager = loadManager;
+    }
+
+    /**
+     * @brief Set target manager for storing detection results
+     * @param targetManager Pointer to target manager
+     */
+    void setTargetManager(TargetManager* targetManager)
+    {
+        m_targetManager = targetManager;
+    }
 
     // --- Correspondence Management ---
 
@@ -191,6 +220,60 @@ public:
      */
     void setQualityThresholds(float rmsThreshold, float maxErrorThreshold);
 
+    // --- Target Detection Integration ---
+
+    /**
+     * @brief Start target detection process
+     * @param scanId ID of the scan to process
+     * @param mode Detection mode (automatic, manual, or both)
+     * @param params Detection parameters
+     */
+    void startTargetDetection(const QString& scanId,
+                             int mode,
+                             const QVariantMap& params);
+
+    /**
+     * @brief Cancel currently running target detection
+     */
+    void cancelTargetDetection();
+
+    // --- Automatic ICP Alignment ---
+
+    /**
+     * @brief Start automatic ICP alignment between two scans
+     * @param sourceScanId Identifier of the source scan to be transformed
+     * @param targetScanId Identifier of the target/reference scan
+     * @param params ICP algorithm parameters
+     */
+    void startAutomaticAlignment(const QString& sourceScanId,
+                                const QString& targetScanId,
+                                const ICPParams& params);
+
+    /**
+     * @brief Cancel currently running automatic alignment
+     */
+    void cancelAutomaticAlignment();
+
+    // --- Sprint 4.3: ICP Result Management ---
+
+    /**
+     * @brief Get the last ICP transformation matrix
+     * @return Last computed ICP transformation
+     */
+    QMatrix4x4 getLastICPTransform() const;
+
+    /**
+     * @brief Get the last ICP RMS error
+     * @return Last computed ICP RMS error
+     */
+    float getLastICPRMSError() const;
+
+    /**
+     * @brief Check if current result is from ICP computation
+     * @return true if current result is from ICP
+     */
+    bool isCurrentResultFromICP() const;
+
 signals:
     /**
      * @brief Emitted when transformation is updated
@@ -223,11 +306,68 @@ signals:
      */
     void correspondencesChanged(int count);
 
+    // Target detection signals
+    /**
+     * @brief Emitted when target detection progress updates
+     * @param percentage Progress percentage (0-100)
+     * @param stage Current processing stage
+     */
+    void targetDetectionProgress(int percentage, const QString& stage);
+
+    /**
+     * @brief Emitted when target detection completes successfully
+     * @param result Complete detection result with targets and metadata
+     */
+    void targetDetectionCompleted(const TargetDetectionBase::DetectionResult& result);
+
+    /**
+     * @brief Emitted when target detection encounters an error
+     * @param error Error message
+     */
+    void targetDetectionError(const QString& error);
+
+    // ICP Progress signals
+    /**
+     * @brief Emitted during ICP iterations to report progress
+     * @param iteration Current iteration number
+     * @param rmsError Current RMS error
+     * @param transformation Current transformation estimate
+     */
+    void progressUpdated(int iteration, float rmsError, const QMatrix4x4& transformation);
+
+    /**
+     * @brief Emitted when ICP computation completes
+     * @param success True if converged successfully
+     * @param finalTransformation Final transformation matrix
+     * @param finalRMSError Final RMS error
+     * @param iterations Number of iterations performed
+     */
+    void computationFinished(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
+
 private slots:
     /**
      * @brief Perform actual alignment computation (called by timer for async execution)
      */
     void performAlignment();
+
+    /**
+     * @brief Handle detection progress from SphereDetector
+     * @param percentage Progress percentage (0-100)
+     * @param stage Current processing stage
+     */
+    void onDetectionProgress(int percentage, const QString& stage);
+
+    /**
+     * @brief Handle detection completion from SphereDetector
+     * @param result Detection result
+     */
+    void onDetectionCompleted(const TargetDetectionBase::DetectionResult& result);
+
+    /**
+     * @brief Handle detection error from SphereDetector
+     * @param error Error message
+     */
+    void onDetectionError(const QString& error);
 
 private:
     /**
@@ -261,6 +401,16 @@ private:
     // Async computation
     QTimer* m_computationTimer;         ///< Timer for async computation
     bool m_computationPending = false;  ///< Computation request pending
+
+    // ICP-specific members
+    std::unique_ptr<ICPRegistration> m_icpAlgorithm;  ///< Current ICP algorithm instance
+    QString m_currentSourceScanId;                    ///< Current source scan ID for ICP
+    QString m_currentTargetScanId;                    ///< Current target scan ID for ICP
+
+    // Target detection members
+    std::unique_ptr<SphereDetector> m_sphereDetector;  ///< Current sphere detector instance
+    PointCloudLoadManager* m_loadManager;              ///< Point cloud load manager for data access
+    TargetManager* m_targetManager;                    ///< Target manager for storing results
 
     // Sprint 6.1: Deviation analysis
     float m_lastDeviationMaxDistance = 0.05f;  ///< Last max deviation distance used
