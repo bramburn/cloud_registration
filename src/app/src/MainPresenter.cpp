@@ -1138,7 +1138,33 @@ void MainPresenter::setRegistrationProject(Registration::RegistrationProject* pr
         connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
                 this, &MainPresenter::rebuildPoseGraph);
 
+        // Connect to update sidebar when registration results are added
+        connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
+                this, &MainPresenter::onRegistrationResultAdded);
+
+        // Set the registration project on the sidebar for scan grouping
+        if (m_view) {
+            auto* sidebar = m_view->getSidebar();
+            if (sidebar) {
+                sidebar->setRegistrationProject(m_registrationProject);
+                qDebug() << "MainPresenter: Registration project set on sidebar";
+            }
+        }
+
         qDebug() << "MainPresenter: Registration project set";
+    }
+}
+void MainPresenter::onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId)
+{
+    qDebug() << "MainPresenter: Registration result added for" << sourceScanId << "to" << targetScanId;
+
+    // Update the sidebar to show the new grouping
+    if (m_view) {
+        auto* sidebar = m_view->getSidebar();
+        if (sidebar) {
+            sidebar->refreshFromDatabase();
+            qDebug() << "MainPresenter: Sidebar refreshed after registration result added";
+        }
     }
 }
 

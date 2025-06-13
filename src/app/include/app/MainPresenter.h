@@ -312,6 +312,14 @@ private slots:
      * @param enabled Whether to show or hide the deviation map
      */
     void handleShowDeviationMapToggled(bool enabled);
+
+    /**
+     * @brief Handle registration result added signal (Sprint 3.3)
+     * @param sourceScanId ID of the source scan
+     * @param targetScanId ID of the target scan
+     */
+    void onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId);
+
 private:
         /**
          * @brief Set up signal-slot connections between components.
