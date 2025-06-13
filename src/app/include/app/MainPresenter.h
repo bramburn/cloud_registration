@@ -35,14 +35,14 @@ class MainPresenter : public QObject
 
         public :
     /**
-       * @brief Constructor with dependency injection.
-       * @param view Pointer to the main view interface.
-       * @param e57Parser Pointer to the E57 parser interface.
-       * @param e57Writer Pointer to the E57 writer interface.
-       * @param projectManager Pointer to the project manager.
-       * @param loadManager Pointer to the point cloud load manager.
-       * @param parent Parent QObject.
-       */
+         * @brief Constructor with dependency injection.
+         * @param view Pointer to the main view interface.
+         * @param e57Parser Pointer to the E57 parser interface.
+         * @param e57Writer Pointer to the E57 writer interface.
+         * @param projectManager Pointer to the project manager.
+         * @param loadManager Pointer to the point cloud load manager.
+         * @param parent Parent QObject.
+         */
     explicit MainPresenter(IMainView* view,
                           IE57Parser* e57Parser,
                           IE57Writer* e57Writer = nullptr,
@@ -120,10 +120,10 @@ public slots:
 
          // Sidebar-related handlers
     /**
-       * @brief Handle cluster creation request from sidebar.
-       * @param clusterName Name of the new cluster.
-       * @param parentClusterId ID of parent cluster (empty for root level).
-       */
+         * @brief Handle cluster creation request from sidebar.
+         * @param clusterName Name of the new cluster.
+         * @param parentClusterId ID of parent cluster (empty for root level).
+         */
     void handleClusterCreation(const QString& clusterName, const QString& parentClusterId = QString());
 
         /**
