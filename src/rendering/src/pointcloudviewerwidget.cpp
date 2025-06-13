@@ -81,7 +81,12 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
       m_visiblePointCount(0),
       m_gpuCuller(nullptr),
       m_gpuCullingEnabled(false),
-      m_gpuCullingThreshold(1.0f)
+      m_gpuCullingThreshold(1.0f),
+      // Sprint 1.1: Initialize selection mode
+      m_selectionMode(SelectionMode::Navigation),
+      m_pointSelector(nullptr),
+      m_showCrosshairs(false),
+      m_crosshairPosition(0, 0)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -116,6 +121,9 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
 
     // Initialize in idle state
     setState(ViewerState::Idle, "Ready to load point cloud files");
+
+    // Sprint 1.1: Initialize point selector
+    initializePointSelector();
 
     qDebug() << "PointCloudViewerWidget constructor completed";
 }
@@ -3042,4 +3050,78 @@ void PointCloudViewerWidget::clearDynamicTransform()
 
     // Trigger repaint to show original position
     update();
+}
+
+// Sprint 1.1: Selection mode implementation
+void PointCloudViewerWidget::setSelectionMode(SelectionMode mode)
+{
+    if (m_selectionMode != mode)
+    {
+        SelectionMode oldMode = m_selectionMode;
+        m_selectionMode = mode;
+
+        qDebug() << "Selection mode changed from" << static_cast<int>(oldMode)
+                 << "to" << static_cast<int>(mode);
+
+        updateSelectionMode();
+        emit selectionModeChanged(mode);
+
+        // Update visual feedback
+        update();
+    }
+}
+
+void PointCloudViewerWidget::updateSelectionMode()
+{
+    switch (m_selectionMode)
+    {
+        case SelectionMode::None:
+        case SelectionMode::Navigation:
+            m_showCrosshairs = false;
+            setCursor(Qt::ArrowCursor);
+            break;
+
+        case SelectionMode::ManualAlignment:
+            m_showCrosshairs = true;
+            setCursor(Qt::CrossCursor);
+            qDebug() << "Manual alignment mode activated - point selection enabled";
+            break;
+
+        case SelectionMode::Measurement:
+            m_showCrosshairs = true;
+            setCursor(Qt::CrossCursor);
+            break;
+
+        case SelectionMode::Annotation:
+            m_showCrosshairs = true;
+            setCursor(Qt::PointingHandCursor);
+            break;
+    }
+}
+
+void PointCloudViewerWidget::initializePointSelector()
+{
+    if (!m_pointSelector)
+    {
+        m_pointSelector = std::make_unique<NaturalPointSelector>(this);
+
+        // Connect point selector signals
+        connect(m_pointSelector.get(), &NaturalPointSelector::pointSelected,
+                this, [this](const NaturalPointSelector::SelectionResult& result) {
+                    if (result.isValid())
+                    {
+                        emit pointSelected(result.selectedPoint, result.pointIndex);
+                        qDebug() << "Point selected at" << result.selectedPoint
+                                 << "with confidence" << result.confidence;
+                    }
+                });
+
+        connect(m_pointSelector.get(), &NaturalPointSelector::selectionFailed,
+                this, [this](const QString& reason) {
+                    emit selectionFailed(reason);
+                    qDebug() << "Point selection failed:" << reason;
+                });
+
+        qDebug() << "Point selector initialized";
+    }
 }
