@@ -24,6 +24,7 @@ class QualityAssessment;
 class PDFReportGenerator;
 struct QualityReport;
 class ICPProgressWidget;
+class ReportOptionsDialog;
 
 namespace Registration {
     class PoseGraph;
@@ -437,6 +438,13 @@ private slots:
     void handleGenerateReportClicked();
 
     /**
+     * @brief Start report generation with specified options (Sprint 6.3)
+     * @param options Report generation options from ReportOptionsDialog
+     * @param dialog Pointer to the dialog for progress updates
+     */
+    void startReportGeneration(const PDFReportGenerator::ReportOptions& options, ReportOptionsDialog* dialog);
+
+    /**
      * @brief Handle generate performance report request (Sprint 7.3)
      */
     void handleGeneratePerformanceReportClicked();
@@ -523,6 +531,25 @@ private:
     void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
 
     /**
+     * @brief Handle ICP computation completion
+     * @param success True if ICP converged successfully
+     * @param finalTransformation Final transformation matrix
+     * @param finalRMSError Final RMS error
+     * @param iterations Number of iterations performed
+     */
+    void handleICPCompletion(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
+
+    /**
+     * @brief Handle user acceptance of ICP result
+     */
+    void handleAcceptICPResult();
+
+    /**
+     * @brief Handle user discard of ICP result
+     */
+    void handleDiscardICPResult();
+
+    /**
      * @brief Handle alignment state changes from AlignmentEngine (Sprint 2.3)
      *
      * This slot receives alignment state changes and forwards them to the
@@ -588,6 +615,12 @@ private:
 
     // Sprint 4.2: ICP Progress monitoring
     ICPProgressWidget* m_icpProgressWidget;
+
+    // Sprint 4.3: ICP Result Management
+    QMatrix4x4 m_lastICPTransformation;
+    float m_lastICPRMSError;
+    int m_lastICPIterations;
+    bool m_hasValidICPResult;
 };
 
 #endif  // MAINPRESENTER_H

@@ -34,6 +34,13 @@ public:
         QString logoPath;
         QString companyName = "CloudRegistration";
         QString reportTitle = "Point Cloud Registration Quality Report";
+
+        /**
+         * @brief Create default report options with project-specific values
+         * @param projectName Name of the current project
+         * @return ReportOptions with sensible defaults
+         */
+        static ReportOptions createDefault(const QString& projectName = QString());
     };
 
     explicit PDFReportGenerator(QObject* parent = nullptr);

@@ -28,6 +28,9 @@ set(UI_SOURCES
 
     # Sprint 7.2: Bundle Adjustment Progress Dialog
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BundleAdjustmentProgressDialog.cpp
+
+    # Sprint 6.3: Enhanced Report Options Dialog
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ReportOptionsDialog.cpp
 )
 
 # Define header files for the UI library (now includes migrated headers from src/ root)
@@ -57,6 +60,9 @@ set(UI_HEADERS
 
     # Sprint 7.2: Bundle Adjustment Progress Dialog
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BundleAdjustmentProgressDialog.h
+
+    # Sprint 6.3: Enhanced Report Options Dialog
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ReportOptionsDialog.h
 )
 
 # Create UI static library
@@ -67,7 +73,7 @@ target_include_directories(UI PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/ui>
 )
 
-# UI library dependencies: Core, Algorithms, Parsers, Rendering, Registration, Optimization, Qt UI components
+# UI library dependencies: Core, Algorithms, Parsers, Rendering, Registration, Optimization, Quality, Qt UI components
 target_link_libraries(UI PUBLIC
     Core
     Algorithms  # UI components like AlignmentControlPanel might use algorithms directly
@@ -75,6 +81,7 @@ target_link_libraries(UI PUBLIC
     Rendering   # UI components interact with viewer/rendering settings
     Registration  # UI components for pose graph visualization
     Optimization  # UI components for Bundle Adjustment progress dialog
+    Quality     # UI components for report options dialog
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

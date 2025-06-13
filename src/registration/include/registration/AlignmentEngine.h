@@ -254,6 +254,26 @@ public:
      */
     void cancelAutomaticAlignment();
 
+    // --- Sprint 4.3: ICP Result Management ---
+
+    /**
+     * @brief Get the last ICP transformation matrix
+     * @return Last computed ICP transformation
+     */
+    QMatrix4x4 getLastICPTransform() const;
+
+    /**
+     * @brief Get the last ICP RMS error
+     * @return Last computed ICP RMS error
+     */
+    float getLastICPRMSError() const;
+
+    /**
+     * @brief Check if current result is from ICP computation
+     * @return true if current result is from ICP
+     */
+    bool isCurrentResultFromICP() const;
+
 signals:
     /**
      * @brief Emitted when transformation is updated

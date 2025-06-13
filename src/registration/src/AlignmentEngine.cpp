@@ -468,6 +468,22 @@ void AlignmentEngine::cancelAutomaticAlignment()
         emit alignmentStateChanged(AlignmentState::Cancelled, m_currentResult.message);
     }
 }
+
+// Sprint 4.3: ICP Result Management
+QMatrix4x4 AlignmentEngine::getLastICPTransform() const
+{
+    return m_currentResult.transformation;
+}
+
+float AlignmentEngine::getLastICPRMSError() const
+{
+    return m_currentResult.errorStats.rmsError;
+}
+
+bool AlignmentEngine::isCurrentResultFromICP() const
+{
+    // Check if the current result message contains ICP-related keywords
+    return m_currentResult.message.contains("ICP", Qt::CaseInsensitive);
 }
 
 // Sprint 6.1: Deviation analysis implementation
