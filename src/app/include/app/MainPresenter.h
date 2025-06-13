@@ -17,12 +17,12 @@ class PointCloudLoadManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -117,6 +117,15 @@ public slots:
          * @brief Handle application exit request.
          */
     void handleExit();
+        /**
+         * @brief Handle alignment acceptance request.
+         */
+    void handleAcceptAlignment();
+
+        /**
+         * @brief Handle alignment cancellation request.
+         */
+    void handleCancelAlignment();
 
          // Sidebar-related handlers
     /**
@@ -319,6 +328,9 @@ private:
          // Sidebar state management
     QStringList m_loadedScans;
         QStringList m_lockedClusters;
+         // Alignment state management
+    QString m_currentSourceScanId;
+        QString m_currentTargetScanId;
 };
 
 #endif  // MAINPRESENTER_H

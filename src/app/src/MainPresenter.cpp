@@ -884,3 +884,112 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
         showError("Drag and Drop", "This drag and drop operation is not supported.");
     }
 }
+
+void MainPresenter::handleAcceptAlignment()
+{
+    qDebug() << "MainPresenter::handleAcceptAlignment() called";
+
+    // TODO: This implementation requires AlignmentEngine and RegistrationProject instances
+    // These would typically be injected via constructor or setter methods
+
+    /*
+    // Intended implementation when components are available:
+
+    if (!m_alignmentEngine || !m_registrationProject) {
+        showError("Accept Alignment", "Required components not available.");
+        return;
+    }
+
+    // 1. Retrieve final transformation from AlignmentEngine
+    AlignmentEngine::AlignmentResult currentResult = m_alignmentEngine->getCurrentResult();
+    if (currentResult.state != AlignmentEngine::AlignmentState::Valid) {
+        showError("Accept Alignment", "No valid alignment to accept.");
+        return;
+    }
+
+    // 2. Identify scans involved in alignment
+    if (m_currentSourceScanId.isEmpty() || m_currentTargetScanId.isEmpty()) {
+        showError("Accept Alignment", "Scan IDs not properly set for alignment.");
+        return;
+    }
+
+    // 3. Apply permanent transformation to target scan
+    m_registrationProject->setScanTransform(m_currentTargetScanId, currentResult.transformation);
+
+    // 4. Create and store registration result
+    RegistrationProject::RegistrationResult result;
+    result.sourceScanId = m_currentSourceScanId;
+    result.targetScanId = m_currentTargetScanId;
+    result.transformation = currentResult.transformation;
+    result.rmsError = currentResult.errorStats.rmsError;
+    result.correspondenceCount = currentResult.errorStats.numCorrespondences;
+    result.isValid = true;
+    result.algorithm = "Manual";
+    result.timestamp = QDateTime::currentDateTime();
+
+    m_registrationProject->addRegistrationResult(result);
+
+    // 5. Clear alignment engine state
+    m_alignmentEngine->clearCorrespondences();
+
+    // 6. Clear dynamic transform in viewer
+    if (m_viewer) {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget) {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // 7. Update UI state and transition to QualityReview
+    if (m_workflowWidget) {
+        m_workflowWidget->goToStep(RegistrationStep::QualityReview);
+    }
+
+    // 8. Update status
+    m_view->updateStatusBar("Alignment accepted successfully");
+    showInfo("Accept Alignment", "Alignment has been accepted and applied to the target scan.");
+    */
+
+    // Placeholder implementation for now
+    showInfo("Accept Alignment", "Alignment acceptance functionality will be fully implemented when AlignmentEngine and RegistrationProject are integrated.");
+}
+
+void MainPresenter::handleCancelAlignment()
+{
+    qDebug() << "MainPresenter::handleCancelAlignment() called";
+
+    // TODO: This implementation requires AlignmentEngine and RegistrationWorkflowWidget instances
+    // These would typically be injected via constructor or setter methods
+
+    /*
+    // Intended implementation when components are available:
+
+    if (!m_alignmentEngine) {
+        showError("Cancel Alignment", "AlignmentEngine not available.");
+        return;
+    }
+
+    // 1. Clear alignment engine correspondences and state
+    m_alignmentEngine->clearCorrespondences();
+
+    // 2. Clear dynamic transform in viewer
+    if (m_viewer) {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget) {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // 3. Transition back to ManualAlignment step
+    if (m_workflowWidget) {
+        m_workflowWidget->goToStep(RegistrationStep::ManualAlignment);
+    }
+
+    // 4. Update status
+    m_view->updateStatusBar("Alignment cancelled");
+    showInfo("Cancel Alignment", "Alignment has been cancelled. No changes were applied.");
+    */
+
+    // Placeholder implementation for now
+    showInfo("Cancel Alignment", "Alignment cancellation functionality will be fully implemented when AlignmentEngine is integrated.");
+}
