@@ -14,15 +14,22 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class PoseGraphViewerWidget;
+
+namespace Registration {
+    class PoseGraph;
+    class PoseGraphBuilder;
+    class RegistrationProject;
+}
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -195,6 +202,28 @@ public slots:
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
 
+    // Pose Graph Management
+    /**
+     * @brief Set the registration project for pose graph operations
+     * @param project Pointer to the registration project
+     */
+    void setRegistrationProject(Registration::RegistrationProject* project);
+
+    /**
+     * @brief Set the pose graph viewer widget
+     * @param viewer Pointer to the pose graph viewer widget
+     */
+    void setPoseGraphViewer(PoseGraphViewerWidget* viewer);
+
+    /**
+     * @brief Handle project load completion and rebuild pose graph
+     */
+    void handleLoadProjectCompleted();
+
+    /**
+     * @brief Rebuild the pose graph from current registration project
+     */
+    void rebuildPoseGraph();
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -319,6 +348,11 @@ private:
          // Sidebar state management
     QStringList m_loadedScans;
         QStringList m_lockedClusters;
+    // Pose Graph Management
+    Registration::RegistrationProject* m_registrationProject;
+    PoseGraphViewerWidget* m_poseGraphViewer;
+    std::unique_ptr<Registration::PoseGraph> m_currentPoseGraph;
+    std::unique_ptr<Registration::PoseGraphBuilder> m_poseGraphBuilder;
 };
 
 #endif  // MAINPRESENTER_H

@@ -20,6 +20,10 @@ set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sidebarwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projecttreemodel.cpp
+
+    # Sprint 7.1: Pose Graph Visualization
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PoseGraphViewerWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationTabWidget.cpp
 )
 
 # Define header files for the UI library (now includes migrated headers from src/ root)
@@ -41,6 +45,10 @@ set(UI_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/sidebarwidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/projecttreemodel.h
+
+    # Sprint 7.1: Pose Graph Visualization
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PoseGraphViewerWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RegistrationTabWidget.h
 )
 
 # Create UI static library
@@ -51,12 +59,13 @@ target_include_directories(UI PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/ui>
 )
 
-# UI library dependencies: Core, Algorithms, Parsers, Rendering, Qt UI components
+# UI library dependencies: Core, Algorithms, Parsers, Rendering, Registration, Qt UI components
 target_link_libraries(UI PUBLIC
     Core
     Algorithms  # UI components like AlignmentControlPanel might use algorithms directly
     Parsers     # UI components for import/export might use parsers
     Rendering   # UI components interact with viewer/rendering settings
+    Registration  # UI components for pose graph visualization
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

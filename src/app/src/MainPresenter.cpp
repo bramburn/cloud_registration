@@ -12,6 +12,10 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
+#include "ui/PoseGraphViewerWidget.h"
+#include "registration/PoseGraph.h"
+#include "registration/PoseGraphBuilder.h"
+#include "registration/RegistrationProject.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -31,7 +35,11 @@ MainPresenter::MainPresenter(IMainView* view,
       m_isParsingInProgress(false),
       m_currentMemoryUsage(0),
       m_currentFPS(0.0f),
-      m_currentVisiblePoints(0)
+      m_currentVisiblePoints(0),
+      m_registrationProject(nullptr),
+      m_poseGraphViewer(nullptr),
+      m_currentPoseGraph(nullptr),
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
 {
     if (m_view)
     {
@@ -882,5 +890,82 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     else
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
+    }
+}
+
+// Pose Graph Management Implementation
+void MainPresenter::setRegistrationProject(Registration::RegistrationProject* project)
+{
+    m_registrationProject = project;
+
+    if (m_registrationProject) {
+        // Connect to registration project signals
+        connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
+                this, &MainPresenter::rebuildPoseGraph);
+
+        qDebug() << "MainPresenter: Registration project set";
+    }
+}
+
+void MainPresenter::setPoseGraphViewer(PoseGraphViewerWidget* viewer)
+{
+    m_poseGraphViewer = viewer;
+
+    if (m_poseGraphViewer) {
+        // Connect pose graph viewer signals
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::nodeSelected,
+                this, [this](const QString& scanId) {
+                    qDebug() << "Pose graph node selected:" << scanId;
+                    // Handle node selection (e.g., highlight in main viewer)
+                });
+
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::edgeSelected,
+                this, [this](const QString& sourceScanId, const QString& targetScanId) {
+                    qDebug() << "Pose graph edge selected:" << sourceScanId << "to" << targetScanId;
+                    // Handle edge selection (e.g., show registration details)
+                });
+
+        qDebug() << "MainPresenter: Pose graph viewer set";
+    }
+}
+
+void MainPresenter::handleLoadProjectCompleted()
+{
+    qDebug() << "MainPresenter: Project load completed, rebuilding pose graph";
+    rebuildPoseGraph();
+}
+
+void MainPresenter::rebuildPoseGraph()
+{
+    if (!m_registrationProject || !m_poseGraphBuilder) {
+        qWarning() << "MainPresenter: Cannot rebuild pose graph - missing registration project or builder";
+        return;
+    }
+
+    try {
+        qDebug() << "MainPresenter: Starting pose graph rebuild";
+
+        // Build the pose graph from the registration project
+        m_currentPoseGraph = m_poseGraphBuilder->build(*m_registrationProject);
+
+        if (m_currentPoseGraph && m_poseGraphViewer) {
+            // Display the graph in the viewer
+            m_poseGraphViewer->displayGraph(*m_currentPoseGraph);
+
+            qDebug() << "MainPresenter: Pose graph rebuilt and displayed with"
+                     << m_currentPoseGraph->nodeCount() << "nodes and"
+                     << m_currentPoseGraph->edgeCount() << "edges";
+
+            if (m_view) {
+                m_view->updateStatusBar(QString("Pose graph updated: %1 nodes, %2 edges")
+                                       .arg(m_currentPoseGraph->nodeCount())
+                                       .arg(m_currentPoseGraph->edgeCount()));
+            }
+        } else {
+            qWarning() << "MainPresenter: Failed to build pose graph or viewer not available";
+        }
+    } catch (const std::exception& e) {
+        qCritical() << "MainPresenter: Error rebuilding pose graph:" << e.what();
+        showError("Pose Graph Error", QString("Failed to rebuild pose graph: %1").arg(e.what()));
     }
 }
