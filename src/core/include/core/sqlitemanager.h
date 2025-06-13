@@ -4,6 +4,11 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QList>
+
+// Forward declarations
+struct ScanInfo;
+struct ClusterInfo;
 
 /**
  * @brief SQLiteManager - Manages SQLite database operations
@@ -31,6 +36,10 @@ public:
     bool createProject(const QString& projectName, const QString& projectPath);
     bool loadProject(const QString& projectPath);
     QStringList getRecentProjects();
+
+    // Data retrieval operations (Sprint 3.3)
+    QList<ScanInfo> getAllScans() const;
+    QList<ClusterInfo> getAllClusters() const;
 
 signals:
     void databaseOpened(const QString& path);

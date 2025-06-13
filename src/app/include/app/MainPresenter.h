@@ -374,6 +374,13 @@ private slots:
     void handleShowDeviationMapToggled(bool enabled);
 
     /**
+     * @brief Handle registration result added signal (Sprint 3.3)
+     * @param sourceScanId ID of the source scan
+     * @param targetScanId ID of the target scan
+     */
+    void onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId);
+
+    /**
      * @brief Handle generate quality report request (Sprint 6.2)
      */
     void handleGenerateReportClicked();

@@ -17,6 +17,10 @@ class SQLiteManager;
 struct ScanInfo;
 struct ClusterInfo;
 
+namespace Registration {
+    class RegistrationProject;
+}
+
 class SidebarWidget : public QTreeView
 {
     Q_OBJECT
@@ -26,6 +30,7 @@ public:
     void setProject(const QString& projectName, const QString& projectPath);
     void clearProject();
     void setSQLiteManager(SQLiteManager* manager);
+    void setRegistrationProject(Registration::RegistrationProject* project);
 
     // Sprint 4: Remove direct manager dependencies - use signals instead
     // void setProjectManager(ProjectManager *manager);
