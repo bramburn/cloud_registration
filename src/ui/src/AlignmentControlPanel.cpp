@@ -263,6 +263,9 @@ void AlignmentControlPanel::updateAlignmentResult(const AlignmentEngine::Alignme
 
     // Enable/disable report button
     m_reportButton->setEnabled(result.state == AlignmentEngine::AlignmentState::Valid);
+
+    // Sprint 4.3: Handle ICP-specific button states
+    updateICPButtonStates(result);
 }
 
 void AlignmentControlPanel::updateAlignmentState(AlignmentEngine::AlignmentState state, const QString& message)
@@ -412,4 +415,45 @@ QString AlignmentControlPanel::getQualityLevel(float rmsError) const
     if (rmsError <= 5.0f)
         return "Acceptable";
     return "Poor";
+}
+
+// Sprint 4.3: ICP-specific button state management
+void AlignmentControlPanel::updateICPButtonStates(const AlignmentEngine::AlignmentResult& result)
+{
+    // Check if this result is from ICP computation
+    bool isICPResult = result.message.contains("ICP", Qt::CaseInsensitive);
+
+    if (isICPResult && result.state == AlignmentEngine::AlignmentState::Valid)
+    {
+        // Enable Accept/Discard buttons for successful ICP results
+        m_acceptButton->setEnabled(true);
+        m_cancelButton->setEnabled(true);
+
+        // Update button text to be more specific for ICP
+        m_acceptButton->setText("Accept ICP Result");
+        m_cancelButton->setText("Discard ICP Result");
+
+        qDebug() << "AlignmentControlPanel: Enabled ICP Accept/Discard buttons";
+    }
+    else if (isICPResult && result.state != AlignmentEngine::AlignmentState::Valid)
+    {
+        // Disable buttons for failed ICP results
+        m_acceptButton->setEnabled(false);
+        m_cancelButton->setEnabled(false);
+
+        // Reset button text
+        m_acceptButton->setText("Accept Alignment");
+        m_cancelButton->setText("Cancel");
+
+        qDebug() << "AlignmentControlPanel: Disabled ICP buttons due to invalid result";
+    }
+    else
+    {
+        // For non-ICP results, use standard manual alignment button behavior
+        m_acceptButton->setText("Accept Alignment");
+        m_cancelButton->setText("Cancel");
+
+        // Standard button enablement logic is handled by updateUIState()
+        qDebug() << "AlignmentControlPanel: Using standard button behavior for non-ICP result";
+    }
 }

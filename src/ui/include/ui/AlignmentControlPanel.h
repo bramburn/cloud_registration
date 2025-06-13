@@ -186,6 +186,12 @@ private:
     void updateUIState(AlignmentEngine::AlignmentState state);
 
     /**
+     * @brief Update ICP-specific button states
+     * @param result Alignment result to check for ICP origin
+     */
+    void updateICPButtonStates(const AlignmentEngine::AlignmentResult& result);
+
+    /**
      * @brief Format error value for display
      * @param error Error value in mm
      * @return Formatted string with appropriate precision and units

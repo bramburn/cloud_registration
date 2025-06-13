@@ -70,7 +70,10 @@ MainPresenter::MainPresenter(IMainView* view,
       m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>()),
       m_qualityAssessment(nullptr),
       m_reportGenerator(nullptr),
-      m_icpProgressWidget(nullptr)
+      m_icpProgressWidget(nullptr),
+      m_lastICPRMSError(0.0f),
+      m_lastICPIterations(0),
+      m_hasValidICPResult(false)
 {
     if (m_view)
     {
@@ -225,6 +228,12 @@ void MainPresenter::setupConnections()
                 connect(alignmentPanel, &AlignmentControlPanel::qualityThresholdsChanged,
                         m_alignmentEngine, &AlignmentEngine::setQualityThresholds);
             }
+
+            // Sprint 4.3: Connect ICP-specific accept/discard signals
+            connect(alignmentPanel, &AlignmentControlPanel::acceptAlignmentRequested,
+                    this, &MainPresenter::handleAcceptICPResult);
+            connect(alignmentPanel, &AlignmentControlPanel::cancelAlignmentRequested,
+                    this, &MainPresenter::handleDiscardICPResult);
         }
     }
 
@@ -235,6 +244,10 @@ void MainPresenter::setupConnections()
                 this, &MainPresenter::handleAlignmentResultUpdated);
         connect(m_alignmentEngine, &AlignmentEngine::alignmentStateChanged,
                 this, &MainPresenter::handleAlignmentStateChanged);
+
+        // Sprint 4.3: Connect ICP completion signal
+        connect(m_alignmentEngine, &AlignmentEngine::computationFinished,
+                this, &MainPresenter::handleICPCompletion);
     }
 }
 }
@@ -2092,5 +2105,213 @@ void MainPresenter::handleGeneratePerformanceReportClicked()
         if (m_view) {
             m_view->updateStatusBar("Performance report generation failed");
         }
+    }
+}
+
+// Sprint 4.3: ICP Result Application & Workflow Progression
+void MainPresenter::handleICPCompletion(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations)
+{
+    qDebug() << "MainPresenter::handleICPCompletion() called - Success:" << success
+             << "RMS:" << finalRMSError << "Iterations:" << iterations;
+
+    // Store ICP results for later use
+    m_lastICPTransformation = finalTransformation;
+    m_lastICPRMSError = finalRMSError;
+    m_lastICPIterations = iterations;
+    m_hasValidICPResult = success;
+
+    if (success)
+    {
+        // Update AlignmentControlPanel with final metrics
+        if (m_view)
+        {
+            auto* alignmentPanel = m_view->getAlignmentControlPanel();
+            if (alignmentPanel && m_alignmentEngine)
+            {
+                // Get the current result from AlignmentEngine and update the panel
+                const auto& result = m_alignmentEngine->getCurrentResult();
+                alignmentPanel->updateAlignmentResult(result);
+                qDebug() << "Updated AlignmentControlPanel with final ICP metrics";
+            }
+        }
+
+        // Update status bar
+        if (m_view)
+        {
+            m_view->updateStatusBar(QString("ICP completed successfully - RMS: %1 mm, Iterations: %2")
+                                   .arg(finalRMSError, 0, 'f', 3)
+                                   .arg(iterations));
+        }
+    }
+    else
+    {
+        // Handle failure case
+        if (m_view)
+        {
+            auto* alignmentPanel = m_view->getAlignmentControlPanel();
+            if (alignmentPanel)
+            {
+                // Update with failure state - buttons should be disabled
+                alignmentPanel->updateAlignmentState(AlignmentEngine::AlignmentState::Error,
+                                                   "ICP computation failed or was cancelled");
+            }
+
+            // Clear dynamic transform on failure
+            if (m_viewer)
+            {
+                auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+                if (viewerWidget)
+                {
+                    viewerWidget->clearDynamicTransform();
+                }
+            }
+
+            m_view->updateStatusBar("ICP computation failed or was cancelled");
+        }
+    }
+}
+
+void MainPresenter::handleAcceptICPResult()
+{
+    qDebug() << "MainPresenter::handleAcceptICPResult() called";
+
+    if (!m_hasValidICPResult)
+    {
+        showError("Accept ICP Result", "No valid ICP result available to accept.");
+        return;
+    }
+
+    if (!m_registrationProject)
+    {
+        showError("Accept ICP Result", "No registration project is available.");
+        return;
+    }
+
+    try
+    {
+        // Apply permanent transformation to the target scan
+        if (!m_currentTargetScanId.isEmpty())
+        {
+            m_registrationProject->setScanTransform(m_currentTargetScanId, m_lastICPTransformation);
+            qDebug() << "Applied transformation to scan:" << m_currentTargetScanId;
+        }
+
+        // Create and add registration result
+        RegistrationProject::RegistrationResult result;
+        result.sourceScanId = m_currentSourceScanId;
+        result.targetScanId = m_currentTargetScanId;
+        result.transformation = m_lastICPTransformation;
+        result.rmsError = m_lastICPRMSError;
+        result.algorithm = "ICP";
+        result.timestamp = QDateTime::currentDateTime();
+        result.iterations = m_lastICPIterations;
+
+        m_registrationProject->addRegistrationResult(result);
+        qDebug() << "Added registration result to project";
+
+        // Clear dynamic transform in viewer
+        if (m_viewer)
+        {
+            auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+            if (viewerWidget)
+            {
+                viewerWidget->clearDynamicTransform();
+                qDebug() << "Cleared dynamic transform from viewer";
+            }
+        }
+
+        // Reset alignment engine state
+        if (m_alignmentEngine)
+        {
+            m_alignmentEngine->clearCorrespondences();
+            qDebug() << "Cleared alignment engine correspondences";
+        }
+
+        // Transition workflow to Quality Review
+        if (m_workflowWidget)
+        {
+            m_workflowWidget->goToStep(RegistrationStep::QualityReview);
+            qDebug() << "Transitioned workflow to QualityReview step";
+        }
+
+        // Update UI state
+        if (m_view)
+        {
+            m_view->updateStatusBar("ICP alignment accepted and applied successfully");
+        }
+
+        // Reset ICP result state
+        m_hasValidICPResult = false;
+
+        showInfo("Accept ICP Result", "ICP alignment has been accepted and applied to the target scan.");
+    }
+    catch (const std::exception& e)
+    {
+        showError("Accept ICP Result", QString("Failed to accept ICP result: %1").arg(e.what()));
+    }
+    catch (...)
+    {
+        showError("Accept ICP Result", "Unknown error occurred while accepting ICP result.");
+    }
+}
+
+void MainPresenter::handleDiscardICPResult()
+{
+    qDebug() << "MainPresenter::handleDiscardICPResult() called";
+
+    try
+    {
+        // Clear dynamic transform in viewer
+        if (m_viewer)
+        {
+            auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+            if (viewerWidget)
+            {
+                viewerWidget->clearDynamicTransform();
+                qDebug() << "Cleared dynamic transform from viewer";
+            }
+        }
+
+        // Reset alignment engine state
+        if (m_alignmentEngine)
+        {
+            m_alignmentEngine->clearCorrespondences();
+            qDebug() << "Cleared alignment engine correspondences";
+        }
+
+        // Keep workflow at ICPRegistration step or return to ManualAlignment for retry
+        if (m_workflowWidget)
+        {
+            // For now, keep at ICPRegistration step to allow retry
+            // In future, we might want to transition to ManualAlignment
+            qDebug() << "Keeping workflow at current step for retry";
+        }
+
+        // Update UI state
+        if (m_view)
+        {
+            auto* alignmentPanel = m_view->getAlignmentControlPanel();
+            if (alignmentPanel)
+            {
+                // Reset alignment panel to idle state
+                alignmentPanel->updateAlignmentState(AlignmentEngine::AlignmentState::Idle,
+                                                   "ICP result discarded");
+            }
+
+            m_view->updateStatusBar("ICP alignment discarded");
+        }
+
+        // Reset ICP result state
+        m_hasValidICPResult = false;
+
+        showInfo("Discard ICP Result", "ICP alignment has been discarded. You can retry the alignment if needed.");
+    }
+    catch (const std::exception& e)
+    {
+        showError("Discard ICP Result", QString("Error while discarding ICP result: %1").arg(e.what()));
+    }
+    catch (...)
+    {
+        showError("Discard ICP Result", "Unknown error occurred while discarding ICP result.");
     }
 }
