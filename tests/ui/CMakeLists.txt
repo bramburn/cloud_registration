@@ -165,4 +165,28 @@ target_include_directories(BundleAdjustmentProgressDialogTests PRIVATE
 )
 add_test(NAME BundleAdjustmentProgressDialogTests COMMAND BundleAdjustmentProgressDialogTests)
 
+# Sprint 6.3: Report Options Dialog Tests
+add_executable(ReportOptionsDialogTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_reportoptionsdialog.cpp
+)
+target_link_libraries(ReportOptionsDialogTests PRIVATE
+    UI                  # Link against the UI library
+    Quality             # For PDFReportGenerator classes
+    Core                # Indirect dependency
+    GTest::gtest_main   # Google Test framework
+    GMock::gmock        # Google Mock framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(ReportOptionsDialogTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui           # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/quality/include/quality # Quality headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core       # Core headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/interfaces/include/interfaces # Interface headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../mocks                         # Mock headers
+)
+add_test(NAME ReportOptionsDialogTests COMMAND ReportOptionsDialogTests)
+
 message(STATUS "Configuring UI tests...")

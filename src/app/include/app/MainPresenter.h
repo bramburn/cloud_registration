@@ -24,6 +24,7 @@ class QualityAssessment;
 class PDFReportGenerator;
 struct QualityReport;
 class ICPProgressWidget;
+class ReportOptionsDialog;
 
 namespace Registration {
     class PoseGraph;
@@ -409,6 +410,13 @@ private slots:
      * @brief Handle generate quality report request (Sprint 6.2)
      */
     void handleGenerateReportClicked();
+
+    /**
+     * @brief Start report generation with specified options (Sprint 6.3)
+     * @param options Report generation options from ReportOptionsDialog
+     * @param dialog Pointer to the dialog for progress updates
+     */
+    void startReportGeneration(const PDFReportGenerator::ReportOptions& options, ReportOptionsDialog* dialog);
 
     /**
      * @brief Handle generate performance report request (Sprint 7.3)

@@ -33,6 +33,7 @@
 // Sprint 6.2: Quality assessment and reporting includes
 #include "quality/QualityAssessment.h"
 #include "quality/PDFReportGenerator.h"
+#include "ui/ReportOptionsDialog.h"
 
 // Sprint 7.3: Performance profiling includes
 #include "core/performance_profiler.h"
@@ -1642,7 +1643,7 @@ void MainPresenter::handleShowDeviationMapToggled(bool enabled)
     }
 }
 
-// Sprint 6.2: PDF Report Generation Implementation
+// Sprint 6.3: Enhanced PDF Report Generation with Options Dialog
 void MainPresenter::handleGenerateReportClicked()
 {
     qDebug() << "MainPresenter::handleGenerateReportClicked() called";
@@ -1654,40 +1655,72 @@ void MainPresenter::handleGenerateReportClicked()
         return;
     }
 
-    // Prompt for save path
-    QString defaultName = QString("%1_QualityReport.pdf")
-                         .arg(m_lastQualityReport.projectName.isEmpty() ? "Project" : m_lastQualityReport.projectName);
-
-    QString filePath = m_view->askForSaveFilePath("Save Quality Report",
-                                                  "PDF files (*.pdf)",
-                                                  defaultName);
-
-    if (filePath.isEmpty()) {
-        return; // User cancelled
-    }
-
     if (!m_reportGenerator) {
         showError("Generate Quality Report", "PDF report generator is not available.");
         return;
     }
 
-    // Prepare report options
-    PDFReportGenerator::ReportOptions options;
-    options.outputPath = filePath;
-    options.projectName = m_lastQualityReport.projectName;
-    options.operatorName = "Default User"; // Hardcoded for now as per document
-    options.includeCharts = false;
-    options.includeScreenshots = false;
-    options.includeRecommendations = false;
-    options.includeDetailedMetrics = true;
+    // Create and configure ReportOptionsDialog
+    auto* dialog = new ReportOptionsDialog(m_view, static_cast<QWidget*>(m_view));
 
-    // Trigger report generation
-    m_reportGenerator->generatePdfReport(m_lastQualityReport, options);
+    // Set default options based on current project
+    QString projectName = m_lastQualityReport.projectName.isEmpty() ?
+                         "Untitled Project" : m_lastQualityReport.projectName;
+    auto defaultOptions = PDFReportGenerator::ReportOptions::createDefault(projectName);
+    dialog->setReportOptions(defaultOptions);
+
+    // Connect dialog signal to our new slot
+    connect(dialog, &ReportOptionsDialog::generateReportRequested,
+            this, [this, dialog](const PDFReportGenerator::ReportOptions& options) {
+                startReportGeneration(options, dialog);
+            });
+
+    // Show dialog modally
+    dialog->exec();
+
+    // Clean up
+    dialog->deleteLater();
+}
+
+// Sprint 6.3: Start report generation with user-configured options
+void MainPresenter::startReportGeneration(const PDFReportGenerator::ReportOptions& options, ReportOptionsDialog* dialog)
+{
+    qDebug() << "MainPresenter::startReportGeneration() called";
+
+    if (!m_reportGenerator) {
+        if (dialog) {
+            dialog->onReportFinished(false, "PDF report generator is not available.");
+        } else {
+            showError("Generate Quality Report", "PDF report generator is not available.");
+        }
+        return;
+    }
+
+    // Connect progress signals to dialog if provided
+    if (dialog) {
+        // Connect progress updates
+        connect(m_reportGenerator, &PDFReportGenerator::reportProgress,
+                dialog, &ReportOptionsDialog::onReportProgress);
+
+        // Connect completion signals
+        connect(m_reportGenerator, &PDFReportGenerator::reportGenerated,
+                dialog, [dialog](const QString& filePath) {
+                    dialog->onReportFinished(true, QString("Report generated successfully at:\n%1").arg(filePath));
+                });
+
+        connect(m_reportGenerator, &PDFReportGenerator::reportError,
+                dialog, [dialog](const QString& error) {
+                    dialog->onReportFinished(false, error);
+                });
+    }
 
     // Update status
     if (m_view) {
         m_view->updateStatusBar("Generating quality report...");
     }
+
+    // Trigger report generation with user options
+    m_reportGenerator->generatePdfReport(m_lastQualityReport, options);
 }
 
 void MainPresenter::onQualityAssessmentCompleted(const QualityReport& report)
