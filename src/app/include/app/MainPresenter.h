@@ -477,6 +477,17 @@ private:
      */
     void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
 
+    /**
+     * @brief Handle alignment state changes from AlignmentEngine (Sprint 2.3)
+     *
+     * This slot receives alignment state changes and forwards them to the
+     * AlignmentControlPanel for UI updates.
+     *
+     * @param state New alignment state
+     * @param message Status message
+     */
+    void handleAlignmentStateChanged(AlignmentEngine::AlignmentState state, const QString& message);
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
