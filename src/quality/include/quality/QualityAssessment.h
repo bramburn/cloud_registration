@@ -93,6 +93,12 @@ struct QualityReport
 
     QString generateSummary() const;
     QString generateDetailedReport() const;
+
+    // Sprint 6.2: Add validation method
+    bool isValid() const
+    {
+        return !projectName.isEmpty() && !timestamp.isEmpty() && metrics.totalPoints > 0;
+    }
 };
 
 /**
