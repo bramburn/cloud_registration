@@ -1,4 +1,7 @@
 #include "app/pointcloudloadmanager.h"
+#include "algorithms/ICPRegistration.h"
+
+#include <QDebug>
 
 PointCloudLoadManager::PointCloudLoadManager(QObject* parent) : QObject(parent) {}
 
@@ -60,4 +63,34 @@ bool PointCloudLoadManager::unloadScan(const QString& scanId)
 bool PointCloudLoadManager::isScanLoaded(const QString& scanId) const
 {
     return m_loadedScans.contains(scanId);
+}
+
+PointCloud PointCloudLoadManager::getLoadedPointCloud(const QString& scanId) const
+{
+    if (!isScanLoaded(scanId))
+    {
+        qWarning() << "Scan" << scanId << "is not loaded";
+        return PointCloud(); // Return empty point cloud
+    }
+
+    // TODO: Implement actual point cloud retrieval from memory/disk
+    // For now, return a placeholder point cloud with some test data
+    PointCloud cloud;
+
+    // Generate some test points for demonstration
+    std::vector<float> testPoints = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 0.0f,
+        1.0f, 0.0f, 1.0f,
+        0.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f
+    };
+
+    cloud = PointCloud(testPoints);
+
+    qDebug() << "Retrieved point cloud for scan" << scanId << "with" << cloud.size() << "points";
+    return cloud;
 }

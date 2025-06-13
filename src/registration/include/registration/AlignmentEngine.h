@@ -7,7 +7,13 @@
 #include <QTimer>
 #include <QVector3D>
 
+#include <memory>
+
 #include "ErrorAnalysis.h"
+
+// Forward declarations
+class ICPRegistration;
+struct ICPParams;
 
 /**
  * @brief AlignmentEngine - High-level coordination for manual alignment workflow
@@ -38,7 +44,8 @@ public:
         Insufficient,  ///< Less than 3 correspondences
         Computing,     ///< Transformation computation in progress
         Valid,         ///< Valid transformation computed
-        Error          ///< Error in computation
+        Error,         ///< Error in computation
+        Cancelled      ///< Computation cancelled by user
     };
 
     /**
@@ -165,6 +172,23 @@ public:
      */
     void setQualityThresholds(float rmsThreshold, float maxErrorThreshold);
 
+    // --- Automatic ICP Alignment ---
+
+    /**
+     * @brief Start automatic ICP alignment between two scans
+     * @param sourceScanId Identifier of the source scan to be transformed
+     * @param targetScanId Identifier of the target/reference scan
+     * @param params ICP algorithm parameters
+     */
+    void startAutomaticAlignment(const QString& sourceScanId,
+                                const QString& targetScanId,
+                                const ICPParams& params);
+
+    /**
+     * @brief Cancel currently running automatic alignment
+     */
+    void cancelAutomaticAlignment();
+
 signals:
     /**
      * @brief Emitted when transformation is updated
@@ -235,6 +259,11 @@ private:
     // Async computation
     QTimer* m_computationTimer;         ///< Timer for async computation
     bool m_computationPending = false;  ///< Computation request pending
+
+    // ICP-specific members
+    std::unique_ptr<ICPRegistration> m_icpAlgorithm;  ///< Current ICP algorithm instance
+    QString m_currentSourceScanId;                    ///< Current source scan ID for ICP
+    QString m_currentTargetScanId;                    ///< Current target scan ID for ICP
 
     // Constants
     static constexpr int COMPUTATION_DELAY_MS = 100;  ///< Delay before computation (ms)

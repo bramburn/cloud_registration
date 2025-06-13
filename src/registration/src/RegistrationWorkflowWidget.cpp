@@ -251,17 +251,57 @@ QWidget* RegistrationWorkflowWidget::createICPRegistrationWidget()
     instructions->setWordWrap(true);
     layout->addWidget(instructions);
 
-    // Placeholder for ICP registration UI
-    QTextEdit* placeholder = new QTextEdit();
-    placeholder->setPlainText("ICP registration interface will be implemented here.\n\n"
-                              "This will include:\n"
-                              "- ICP algorithm configuration\n"
-                              "- Progress monitoring\n"
-                              "- Convergence visualization\n"
-                              "- Result validation");
-    placeholder->setMaximumHeight(200);
-    placeholder->setReadOnly(true);
-    layout->addWidget(placeholder);
+    // Automatic Alignment section
+    QGroupBox* automaticGroup = new QGroupBox("Automatic Alignment");
+    QVBoxLayout* automaticLayout = new QVBoxLayout(automaticGroup);
+
+    QLabel* automaticDescription = new QLabel(
+        "Use the Iterative Closest Point (ICP) algorithm to automatically align your scans. "
+        "This method refines the alignment by iteratively finding the best transformation "
+        "between corresponding points in the source and target scans.");
+    automaticDescription->setWordWrap(true);
+    automaticDescription->setStyleSheet("QLabel { color: #666; font-style: italic; margin-bottom: 10px; }");
+    automaticLayout->addWidget(automaticDescription);
+
+    // Create the "Automatic Alignment (ICP)" button
+    QPushButton* automaticAlignmentButton = new QPushButton("Automatic Alignment (ICP)");
+    automaticAlignmentButton->setObjectName("automaticAlignmentButton");
+    automaticAlignmentButton->setMinimumHeight(40);
+    automaticAlignmentButton->setStyleSheet(
+        "QPushButton {"
+        "  background-color: #4CAF50;"
+        "  color: white;"
+        "  border: none;"
+        "  border-radius: 5px;"
+        "  font-weight: bold;"
+        "  font-size: 14px;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: #45a049;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: #3d8b40;"
+        "}"
+        "QPushButton:disabled {"
+        "  background-color: #cccccc;"
+        "  color: #666666;"
+        "}");
+
+    // Connect the button to emit a signal that MainPresenter can handle
+    connect(automaticAlignmentButton, &QPushButton::clicked, this, &RegistrationWorkflowWidget::automaticAlignmentRequested);
+
+    automaticLayout->addWidget(automaticAlignmentButton);
+    layout->addWidget(automaticGroup);
+
+    // Status and progress section (placeholder for future implementation)
+    QGroupBox* statusGroup = new QGroupBox("Status");
+    QVBoxLayout* statusLayout = new QVBoxLayout(statusGroup);
+
+    QLabel* statusLabel = new QLabel("Ready to start automatic alignment");
+    statusLabel->setObjectName("icpStatusLabel");
+    statusLayout->addWidget(statusLabel);
+
+    layout->addWidget(statusGroup);
 
     layout->addStretch();
     return groupBox;

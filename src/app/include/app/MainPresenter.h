@@ -17,12 +17,12 @@ class PointCloudLoadManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -194,6 +194,20 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    /**
+     * @brief Handle automatic alignment (ICP) button click
+     *
+     * This slot is triggered when the user clicks the "Automatic Alignment (ICP)"
+     * button in the RegistrationWorkflowWidget. It launches the ICPParameterDialog
+     * and initiates the ICP computation if parameters are accepted.
+     */
+    void handleAutomaticAlignmentClicked();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
 
 private slots:
         /**

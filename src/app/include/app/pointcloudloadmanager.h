@@ -6,6 +6,9 @@
 
 #include <vector>
 
+// Forward declaration
+class PointCloud;
+
 /**
  * @brief PointCloudLoadManager - Manages point cloud loading operations
  *
@@ -32,6 +35,10 @@ public:
     bool loadScan(const QString& scanId);
     bool unloadScan(const QString& scanId);
     bool isScanLoaded(const QString& scanId) const;
+
+    // Sprint 4.1: ICP integration methods
+    PointCloud getLoadedPointCloud(const QString& scanId) const;
+    QStringList getLoadedScans() const { return m_loadedScans; }
 
 signals:
     void loadingStarted(const QString& filePath);
