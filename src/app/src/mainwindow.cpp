@@ -615,6 +615,16 @@ void MainWindow::setupMenuBar()
 
     qualityMenu->addSeparator();
 
+    // Sprint 6.1: Add deviation map toggle
+    m_showDeviationMapAction = qualityMenu->addAction("Show &Deviation Map");
+    m_showDeviationMapAction->setCheckable(true);
+    m_showDeviationMapAction->setShortcut(QKeySequence("Ctrl+D"));
+    m_showDeviationMapAction->setEnabled(false);
+    m_showDeviationMapAction->setStatusTip("Show colorized deviation map between registered scans");
+    connect(m_showDeviationMapAction, &QAction::toggled, this, &MainWindow::onShowDeviationMapToggled);
+
+    qualityMenu->addSeparator();
+
     m_coordinateSystemAction = qualityMenu->addAction("&Coordinate System Settings...");
     m_coordinateSystemAction->setStatusTip("Configure coordinate reference systems");
     connect(m_coordinateSystemAction, &QAction::triggered, this, &MainWindow::onCoordinateSystemSettings);
@@ -2901,4 +2911,19 @@ void MainWindow::onQualityAssessmentCompleted()
 {
     setStatusMessage("Quality assessment completed");
     m_generateReportAction->setEnabled(true);
+}
+
+// Sprint 6.1: Deviation map toggle implementation
+void MainWindow::onShowDeviationMapToggled(bool enabled)
+{
+    qDebug() << "Show deviation map toggled:" << enabled;
+
+    if (m_presenter)
+    {
+        m_presenter->handleShowDeviationMapToggled(enabled);
+    }
+    else
+    {
+        qWarning() << "No presenter available for deviation map toggle";
+    }
 }

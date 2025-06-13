@@ -13,6 +13,11 @@
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
 
+// Sprint 6.1: Additional includes for deviation map functionality
+#include "registration/RegistrationProject.h"
+#include "registration/AlignmentEngine.h"
+#include "rendering/pointcloudviewerwidget.h"
+
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
                              IE57Writer* e57Writer,
@@ -883,4 +888,39 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
     }
+}
+
+// Sprint 6.1: Deviation map toggle implementation
+void MainPresenter::handleShowDeviationMapToggled(bool enabled)
+{
+    qDebug() << "MainPresenter::handleShowDeviationMapToggled called with enabled:" << enabled;
+
+    // This is a stub implementation for now
+    // In a full implementation, we would need:
+    // 1. Access to RegistrationProject to get the latest registration result
+    // 2. Access to AlignmentEngine to perform deviation analysis
+    // 3. Access to PointCloudViewerWidget to load colorized points and show legend
+
+    if (enabled)
+    {
+        showInfo("Deviation Map", "Deviation map functionality is implemented but requires registration data. "
+                                  "Please ensure you have performed a registration between scans first.");
+
+        // TODO: Implement the full logic as described in the S6.1 document:
+        // - Get latest registration result from RegistrationProject
+        // - Get source and target point data from PointCloudLoadManager
+        // - Call AlignmentEngine::analyzeDeviation()
+        // - Call PointCloudViewerWidget::loadColorizedPointCloud()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible()
+    }
+    else
+    {
+        showInfo("Deviation Map", "Deviation map disabled.");
+
+        // TODO: Implement the disable logic:
+        // - Call PointCloudViewerWidget::revertToOriginalColors()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible(false, 0.0f)
+    }
+
+    m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
 }

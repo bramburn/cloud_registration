@@ -146,6 +146,11 @@ public slots:
     }
     void clearDynamicTransform();
 
+    // Sprint 6.1: Deviation map support
+    void loadColorizedPointCloud(const std::vector<PointFullData>& colorizedPoints);
+    void revertToOriginalColors();
+    void setDeviationMapLegendVisible(bool visible, float maxDistance);
+
     // Sprint 6: GPU culling support
     void setGpuCullingEnabled(bool enabled);
     bool isGpuCullingEnabled() const;
@@ -227,6 +232,9 @@ private:
     void renderMultipleScans();
     void updateScanOctrees();
     QColor generateScanColor(int scanIndex);
+
+    // Sprint 6.1: Deviation map rendering methods
+    void renderDeviationMapLegend(float maxDistance);
 
 private slots:
     void updateLoadingAnimation();
@@ -382,6 +390,13 @@ private:
 
     // Sprint 4: Dynamic transformation for real-time alignment preview
     QMatrix4x4 m_dynamicTransform;  ///< Additional transformation applied during rendering
+
+    // Sprint 6.1: Deviation map support
+    std::vector<PointFullData> m_originalSourcePoints;  ///< Original source points for reversion
+    std::vector<PointFullData> m_colorizedPoints;       ///< Colorized points for deviation map
+    bool m_renderDeviationMap = false;                   ///< Flag to render deviation map
+    bool m_legendVisible = false;                        ///< Flag to show deviation legend
+    float m_legendMaxDistance = 0.0f;                    ///< Max distance for legend
 };
 
 #endif  // POINTCLOUDVIEWERWIDGET_H

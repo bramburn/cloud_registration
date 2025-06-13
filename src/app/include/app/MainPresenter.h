@@ -17,12 +17,12 @@ class PointCloudLoadManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -250,6 +250,11 @@ private slots:
          */
     void onMemoryUsageChanged(size_t totalBytes);
 
+    /**
+     * @brief Handle deviation map toggle (Sprint 6.1)
+     * @param enabled Whether to show or hide the deviation map
+     */
+    void handleShowDeviationMapToggled(bool enabled);
 private:
         /**
          * @brief Set up signal-slot connections between components.

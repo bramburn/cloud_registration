@@ -239,6 +239,9 @@ private slots:
     void onExportCompleted(const QString& filePath);
     void onQualityAssessmentCompleted();
 
+    // Sprint 6.1: Deviation map slot
+    void onShowDeviationMapToggled(bool enabled);
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -322,6 +325,9 @@ private:
     QAction* m_qualityAssessmentAction;
     QAction* m_generateReportAction;
     QAction* m_coordinateSystemAction;
+
+    // Sprint 6.1: Deviation map action
+    QAction* m_showDeviationMapAction;
 
     // Sprint 1.2: Import guidance widgets
     QWidget* m_importGuidanceWidget;
