@@ -19,6 +19,7 @@
 #include "registration/PoseGraph.h"
 #include "registration/PoseGraphBuilder.h"
 #include "registration/RegistrationProject.h"
+#include "rendering/pointcloudviewerwidget.h"
 
 // Sprint 6.1: Additional includes for deviation map functionality
 #include "rendering/pointcloudviewerwidget.h"
@@ -82,6 +83,15 @@ void MainPresenter::setTargetManager(TargetManager* targetManager)
 void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
 {
     m_alignmentEngine = alignmentEngine;
+
+    // Connect alignment engine signals
+    if (m_alignmentEngine)
+    {
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
+                this, &MainPresenter::handleAlignmentResultUpdated);
+
+        qDebug() << "MainPresenter: AlignmentEngine set and signals connected";
+    }
 }
 
 void MainPresenter::setupConnections()
@@ -149,6 +159,13 @@ void MainPresenter::setupConnections()
         {
             connect(alignmentPanel, &AlignmentControlPanel::alignmentRequested, this, &MainPresenter::triggerAlignmentPreview);
         }
+    }
+
+    // Connect alignment engine signals if available
+    if (m_alignmentEngine)
+    {
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
+                this, &MainPresenter::handleAlignmentResultUpdated);
     }
 }
 
@@ -1179,5 +1196,73 @@ void MainPresenter::handleShowDeviationMapToggled(bool enabled)
     if (m_view)
     {
         m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
+    }
+}
+
+// Sprint 2.2: Alignment computation and live preview implementation
+void MainPresenter::handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result)
+{
+    qDebug() << "MainPresenter::handleAlignmentResultUpdated() called with state:" << static_cast<int>(result.state);
+
+    // Update PointCloudViewerWidget with dynamic transformation for live preview
+    if (m_viewer && result.isValid())
+    {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget)
+        {
+            // Apply the transformation to the "moving" scan for live preview
+            // Note: In a full implementation, we would need to determine which scan is the "moving" one
+            // For now, we apply the transformation assuming the second scan is the moving one
+            viewerWidget->setDynamicTransform(result.transformation);
+
+            qDebug() << "Dynamic transformation applied to viewer for live preview";
+        }
+    }
+    else if (m_viewer && !result.isValid())
+    {
+        // Clear dynamic transform if result is invalid
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget)
+        {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // Update AlignmentControlPanel with quality metrics
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            alignmentPanel->updateAlignmentResult(result);
+            qDebug() << "Alignment control panel updated with result metrics";
+        }
+    }
+
+    // Update status bar based on result state
+    if (m_view)
+    {
+        QString statusMessage;
+        switch (result.state)
+        {
+            case AlignmentEngine::AlignmentState::Valid:
+                statusMessage = QString("Alignment computed successfully - RMS: %1 mm")
+                                .arg(result.errorStats.rmsError, 0, 'f', 3);
+                break;
+            case AlignmentEngine::AlignmentState::Computing:
+                statusMessage = "Computing alignment...";
+                break;
+            case AlignmentEngine::AlignmentState::Error:
+                statusMessage = QString("Alignment error: %1").arg(result.message);
+                break;
+            case AlignmentEngine::AlignmentState::Insufficient:
+                statusMessage = "Insufficient correspondences for alignment";
+                break;
+            default:
+                statusMessage = "Alignment idle";
+                break;
+        }
+
+        m_view->updateStatusBar(statusMessage);
     }
 }
