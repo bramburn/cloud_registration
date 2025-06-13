@@ -24,9 +24,12 @@ class PDFReportGenerator : public QObject
 public:
     struct ReportOptions
     {
-        bool includeCharts = true;
-        bool includeScreenshots = true;
-        bool includeRecommendations = true;
+        QString outputPath;
+        QString projectName;
+        QString operatorName = "Default User";
+        bool includeCharts = false;
+        bool includeScreenshots = false;
+        bool includeRecommendations = false;
         bool includeDetailedMetrics = true;
         QString logoPath;
         QString companyName = "CloudRegistration";
@@ -36,7 +39,10 @@ public:
     explicit PDFReportGenerator(QObject* parent = nullptr);
     ~PDFReportGenerator() override;
 
-    // Main report generation
+    // Main report generation - Sprint 6.2 signature
+    void generatePdfReport(const QualityReport& report, const ReportOptions& options);
+
+    // Legacy method for backward compatibility
     bool generatePdfReport(const QualityReport& report,
                            const QString& outputPath,
                            const ReportOptions& options = ReportOptions());

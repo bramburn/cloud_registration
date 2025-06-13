@@ -23,6 +23,10 @@
 // Sprint 6.1: Additional includes for deviation map functionality
 #include "rendering/pointcloudviewerwidget.h"
 
+// Sprint 6.2: Quality assessment and reporting includes
+#include "quality/QualityAssessment.h"
+#include "quality/PDFReportGenerator.h"
+
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
                              IE57Writer* e57Writer,
@@ -49,7 +53,9 @@ MainPresenter::MainPresenter(IMainView* view,
       m_registrationProject(nullptr),
       m_poseGraphViewer(nullptr),
       m_currentPoseGraph(nullptr),
-      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>()),
+      m_qualityAssessment(nullptr),
+      m_reportGenerator(nullptr)
 {
     if (m_view)
     {
@@ -82,6 +88,34 @@ void MainPresenter::setTargetManager(TargetManager* targetManager)
 void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
 {
     m_alignmentEngine = alignmentEngine;
+}
+
+void MainPresenter::setQualityAssessment(QualityAssessment* qualityAssessment)
+{
+    m_qualityAssessment = qualityAssessment;
+
+    if (m_qualityAssessment) {
+        // Connect quality assessment signals
+        connect(m_qualityAssessment, &QualityAssessment::assessmentCompleted,
+                this, &MainPresenter::onQualityAssessmentCompleted);
+        connect(m_qualityAssessment, &QualityAssessment::assessmentError,
+                this, [this](const QString& error) {
+                    showError("Quality Assessment Error", error);
+                });
+    }
+}
+
+void MainPresenter::setPDFReportGenerator(PDFReportGenerator* reportGenerator)
+{
+    m_reportGenerator = reportGenerator;
+
+    if (m_reportGenerator) {
+        // Connect report generator signals
+        connect(m_reportGenerator, &PDFReportGenerator::reportGenerated,
+                this, &MainPresenter::onReportGenerated);
+        connect(m_reportGenerator, &PDFReportGenerator::reportError,
+                this, &MainPresenter::onReportError);
+    }
 }
 
 void MainPresenter::setupConnections()
@@ -1180,4 +1214,94 @@ void MainPresenter::handleShowDeviationMapToggled(bool enabled)
     {
         m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
     }
+}
+
+// Sprint 6.2: PDF Report Generation Implementation
+void MainPresenter::handleGenerateReportClicked()
+{
+    qDebug() << "MainPresenter::handleGenerateReportClicked() called";
+
+    // Pre-check: Verify that we have a valid quality report
+    if (!m_lastQualityReport.isValid()) {
+        showError("Generate Quality Report",
+                  "No quality assessment data available. Please perform a quality assessment first.");
+        return;
+    }
+
+    // Prompt for save path
+    QString defaultName = QString("%1_QualityReport.pdf")
+                         .arg(m_lastQualityReport.projectName.isEmpty() ? "Project" : m_lastQualityReport.projectName);
+
+    QString filePath = m_view->askForSaveFilePath("Save Quality Report",
+                                                  "PDF files (*.pdf)",
+                                                  defaultName);
+
+    if (filePath.isEmpty()) {
+        return; // User cancelled
+    }
+
+    if (!m_reportGenerator) {
+        showError("Generate Quality Report", "PDF report generator is not available.");
+        return;
+    }
+
+    // Prepare report options
+    PDFReportGenerator::ReportOptions options;
+    options.outputPath = filePath;
+    options.projectName = m_lastQualityReport.projectName;
+    options.operatorName = "Default User"; // Hardcoded for now as per document
+    options.includeCharts = false;
+    options.includeScreenshots = false;
+    options.includeRecommendations = false;
+    options.includeDetailedMetrics = true;
+
+    // Trigger report generation
+    m_reportGenerator->generatePdfReport(m_lastQualityReport, options);
+
+    // Update status
+    if (m_view) {
+        m_view->updateStatusBar("Generating quality report...");
+    }
+}
+
+void MainPresenter::onQualityAssessmentCompleted(const QualityReport& report)
+{
+    qDebug() << "MainPresenter::onQualityAssessmentCompleted() called";
+
+    // Store the quality report
+    m_lastQualityReport = report;
+
+    // Enable the generate report action through the view
+    // Note: This assumes the view has a method to enable specific actions
+    // In the actual implementation, this would be handled through IMainView interface
+
+    if (m_view) {
+        m_view->updateStatusBar("Quality assessment completed. Report generation is now available.");
+    }
+
+    showInfo("Quality Assessment", "Quality assessment completed successfully. You can now generate a PDF report.");
+}
+
+void MainPresenter::onReportGenerated(const QString& filePath)
+{
+    qDebug() << "MainPresenter::onReportGenerated() called with path:" << filePath;
+
+    if (m_view) {
+        m_view->updateStatusBar("Quality report generated successfully");
+    }
+
+    showInfo("Report Generated",
+             QString("Quality report has been successfully generated and saved to:\n%1").arg(filePath));
+}
+
+void MainPresenter::onReportError(const QString& error)
+{
+    qDebug() << "MainPresenter::onReportError() called with error:" << error;
+
+    if (m_view) {
+        m_view->updateStatusBar("Report generation failed");
+    }
+
+    showError("Report Generation Failed",
+              QString("Failed to generate quality report:\n%1").arg(error));
 }
