@@ -1,7 +1,7 @@
 #pragma once
 
 #include "PoseGraph.h"
-#include "../project.h"
+#include "core/project.h"
 #include <QObject>
 #include <memory>
 

@@ -1,7 +1,7 @@
 #ifndef VOXELGRIDPROCESSOR_H
 #define VOXELGRIDPROCESSOR_H
 
-#include "../interfaces/IPointCloudProcessor.h"
+#include "interfaces/IPointCloudProcessor.h"
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <unordered_map>

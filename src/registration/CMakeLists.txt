@@ -13,6 +13,7 @@ set(REGISTRATION_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PoseGraphBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationProject.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationWorkflowWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorkflowStateMachine.cpp
 
     # Files moved from detection/ to registration/
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TargetDetectionBase.cpp
@@ -31,6 +32,7 @@ set(REGISTRATION_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/PoseGraphBuilder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/RegistrationProject.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/RegistrationWorkflowWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/WorkflowStateMachine.h
 
     # Headers moved from detection/ to registration/ (Sprint 6)
     ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/TargetDetectionBase.h
@@ -42,8 +44,8 @@ set(REGISTRATION_HEADERS
 add_library(Registration STATIC ${REGISTRATION_SOURCES} ${REGISTRATION_HEADERS})
 
 target_include_directories(Registration PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/registration>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/registration>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
 # Registration library dependencies: Core, Algorithms, Qt components

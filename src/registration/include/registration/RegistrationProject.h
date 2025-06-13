@@ -1,7 +1,7 @@
 #ifndef REGISTRATIONPROJECT_H
 #define REGISTRATIONPROJECT_H
 
-#include "../project.h"
+#include "core/project.h"
 #include "Target.h"
 #include "TargetCorrespondence.h"
 #include "TargetManager.h"

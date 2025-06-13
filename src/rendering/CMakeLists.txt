@@ -20,8 +20,8 @@ set(RENDERING_HEADERS
 add_library(Rendering STATIC ${RENDERING_SOURCES} ${RENDERING_HEADERS})
 
 target_include_directories(Rendering PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/rendering>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/rendering>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
 # Rendering library dependencies: Core, Qt OpenGL components

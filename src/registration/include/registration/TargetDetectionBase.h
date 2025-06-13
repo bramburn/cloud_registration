@@ -5,8 +5,8 @@
 #include <QVariantMap>
 #include <QList>
 #include <memory>
-#include "../registration/Target.h"
-#include "../pointdata.h"
+#include "registration/Target.h"
+#include "core/pointdata.h"
 
 /**
  * @brief Abstract base class for all target detection algorithms

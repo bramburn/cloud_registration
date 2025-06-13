@@ -1,4 +1,4 @@
-#include "PointCloudExporter.h"
+#include "export/PointCloudExporter.h"
 #include "FormatWriters/E57Writer.h"
 #include "FormatWriters/LASWriter.h"
 #include "FormatWriters/PLYWriter.h"

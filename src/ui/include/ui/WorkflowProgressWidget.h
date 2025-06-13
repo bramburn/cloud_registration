@@ -8,7 +8,7 @@
 #include <QPushButton>
 #include <QFrame>
 #include <QMap>
-#include "../registration/WorkflowStateMachine.h"
+#include "registration/WorkflowStateMachine.h"
 
 /**
  * @brief Visual progress indicator for registration workflow

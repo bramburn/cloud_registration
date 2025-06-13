@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../features/FeatureExtractor.h"
+#include "features/FeatureExtractor.h"
 #include <QObject>
 #include <QMatrix4x4>
 #include <QList>

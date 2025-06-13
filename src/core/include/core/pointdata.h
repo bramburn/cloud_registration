@@ -5,6 +5,20 @@
 #include <QMatrix4x4>
 #include "octree.h"
 
+// Simple 3D point structure for algorithms and analysis
+struct Point3D {
+    float x, y, z;
+
+    Point3D() : x(0), y(0), z(0) {}
+    Point3D(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
+
+    // Conversion from PointFullData
+    explicit Point3D(const PointFullData& point) : x(point.x), y(point.y), z(point.z) {}
+
+    // Conversion to QVector3D
+    QVector3D toQVector3D() const { return QVector3D(x, y, z); }
+};
+
 // Vertex data structure for OpenGL (interleaved X,Y,Z,R,G,B,I as per Sprint R3 backlog)
 struct VertexData {
     float position[3];    // X, Y, Z

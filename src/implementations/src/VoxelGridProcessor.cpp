@@ -1,4 +1,4 @@
-#include "VoxelGridProcessor.h"
+#include "implementations/VoxelGridProcessor.h"
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QJsonParseError>

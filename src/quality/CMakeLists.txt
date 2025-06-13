@@ -16,8 +16,8 @@ set(QUALITY_HEADERS
 add_library(Quality STATIC ${QUALITY_SOURCES} ${QUALITY_HEADERS})
 
 target_include_directories(Quality PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/quality>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/quality>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
 # Quality library dependencies: Core, Qt components, Qt PrintSupport

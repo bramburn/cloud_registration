@@ -10,7 +10,7 @@
 #include <QSplitter>
 #include <memory>
 #include "WorkflowStateMachine.h"
-#include "../ui/WorkflowProgressWidget.h"
+#include "ui/WorkflowProgressWidget.h"
 
 // Forward declarations
 class TargetManager;

@@ -8,7 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include <queue>
-#include "../pointdata.h"
+#include "core/pointdata.h"
 
 /**
  * @brief Advanced memory management system for large point cloud datasets

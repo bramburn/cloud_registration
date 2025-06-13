@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../pointdata.h"
+#include "core/pointdata.h"
 #include <QObject>
 #include <QVector3D>
 #include <QList>

@@ -20,7 +20,7 @@ add_library(Parsers STATIC ${PARSERS_SOURCES} ${PARSERS_HEADERS})
 
 target_include_directories(Parsers PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/parsers>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
 # Parsers library dependencies: Core, Qt components, and optionally E57Format, XercesC

@@ -10,7 +10,7 @@
 #include <QMutex>
 #include <QTimer>
 #include <QThread>
-#include "IE57Parser.h"
+#include "interfaces/IE57Parser.h"
 #include "E57ParserCore.h"
 
 // Forward declarations for E57Format types
