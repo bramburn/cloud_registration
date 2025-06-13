@@ -14,6 +14,8 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class RegistrationProject;
+struct ExportResult;
 class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
@@ -238,6 +240,8 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    // Sprint 3.2: Export functionality
+    void handleExportPointCloud();
 
     // Pose Graph Management
     /**
@@ -315,6 +319,8 @@ private slots:
          * @param totalBytes Total memory usage in bytes.
          */
     void onMemoryUsageChanged(size_t totalBytes);
+    // Sprint 3.2: Export functionality slots
+    void onExportCompleted(const ExportResult& result);
 
     /**
      * @brief Handle deviation map toggle (Sprint 6.1)
@@ -397,6 +403,17 @@ private:
      */
     void triggerAlignmentPreview();
 
+    /**
+     * @brief Handle alignment result updates from AlignmentEngine
+     *
+     * This slot receives the complete alignment result and updates both the
+     * PointCloudViewerWidget with the dynamic transformation and the
+     * AlignmentControlPanel with quality metrics.
+     *
+     * @param result Complete alignment result with transformation and error statistics
+     */
+    void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -407,8 +424,10 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
-        TargetManager* m_targetManager;
-        AlignmentEngine* m_alignmentEngine;
+    // Sprint 3.2: Export functionality
+    RegistrationProject* m_currentProject;
+    TargetManager* m_targetManager;
+    AlignmentEngine* m_alignmentEngine;
 
          // Application state
     QString m_currentProjectPath;
