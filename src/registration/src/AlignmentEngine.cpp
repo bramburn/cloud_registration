@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 
 #include "../algorithms/LeastSquaresAlignment.h"
+#include "../algorithms/ICPRegistration.h"
 #include "analysis/DifferenceAnalysis.h"
 #include "core/pointdata.h"
 
@@ -277,6 +278,105 @@ void AlignmentEngine::startTargetDetection(const QString& scanId, int mode, cons
         QVariantList emptyTargets;
         emit targetDetectionCompleted(scanId, emptyTargets);
     });
+}
+
+void AlignmentEngine::startAutomaticAlignment(const QString& sourceScanId,
+                                            const QString& targetScanId,
+                                            const ICPParams& params)
+{
+    qDebug() << "Starting automatic alignment between" << sourceScanId << "and" << targetScanId;
+
+    // Store scan IDs for reference
+    m_currentSourceScanId = sourceScanId;
+    m_currentTargetScanId = targetScanId;
+
+    // Create a new ICP algorithm instance
+    m_icpAlgorithm = std::make_unique<ICPRegistration>();
+
+    // Connect signals for progress updates
+    connect(m_icpAlgorithm.get(), &ICPRegistration::progressUpdated,
+            this, [this](int iteration, float rmsError, const QMatrix4x4& transformation) {
+        // Update current result with intermediate transformation
+        m_currentResult.transformation = transformation;
+        m_currentResult.errorStats.rmsError = rmsError;
+        m_currentResult.state = AlignmentState::Computing;
+        m_currentResult.message = QString("ICP iteration %1, RMS error: %2 mm")
+                                    .arg(iteration)
+                                    .arg(rmsError, 0, 'f', 3);
+
+        // Emit signals for real-time update
+        emit transformationUpdated(transformation);
+        emit qualityMetricsUpdated(rmsError);
+        emit alignmentResultUpdated(m_currentResult);
+        emit alignmentStateChanged(AlignmentState::Computing, m_currentResult.message);
+
+        qDebug() << "ICP progress:" << iteration << "iterations, RMS:" << rmsError;
+    });
+
+    // Connect signal for completion
+    connect(m_icpAlgorithm.get(), &ICPRegistration::computationFinished,
+            this, [this](bool success, const QMatrix4x4& finalTransform, float finalError, int iterations) {
+        // Update final result
+        m_currentResult.transformation = finalTransform;
+        m_currentResult.errorStats.rmsError = finalError;
+
+        if (success)
+        {
+            m_currentResult.state = AlignmentState::Valid;
+            m_currentResult.message = QString("ICP completed successfully after %1 iterations (RMS: %2 mm)")
+                                        .arg(iterations)
+                                        .arg(finalError, 0, 'f', 3);
+        }
+        else
+        {
+            m_currentResult.state = AlignmentState::Error;
+            m_currentResult.message = "ICP computation failed or was cancelled";
+        }
+
+        // Emit signals for final update
+        emit transformationUpdated(finalTransform);
+        emit qualityMetricsUpdated(finalError);
+        emit alignmentResultUpdated(m_currentResult);
+        emit alignmentStateChanged(m_currentResult.state, m_currentResult.message);
+
+        qDebug() << "ICP computation finished. Success:" << success
+                 << "Iterations:" << iterations
+                 << "Final RMS:" << finalError;
+    });
+
+    // TODO: Retrieve point clouds from PointCloudLoadManager
+    // For now, we'll use empty point clouds as placeholders
+    PointCloud sourceCloud;
+    PointCloud targetCloud;
+
+    // Set initial transformation to identity
+    QMatrix4x4 initialGuess;
+    initialGuess.setToIdentity();
+
+    // Start the computation asynchronously
+    QMetaObject::invokeMethod(m_icpAlgorithm.get(), [this, sourceCloud, targetCloud, initialGuess, params]() {
+        m_icpAlgorithm->compute(sourceCloud, targetCloud, initialGuess, params);
+    }, Qt::QueuedConnection);
+
+    // Update current state
+    m_currentResult.state = AlignmentState::Computing;
+    m_currentResult.message = "Starting ICP computation...";
+    emit alignmentStateChanged(AlignmentState::Computing, m_currentResult.message);
+}
+
+void AlignmentEngine::cancelAutomaticAlignment()
+{
+    if (m_icpAlgorithm && m_icpAlgorithm->isRunning())
+    {
+        qDebug() << "Cancelling automatic alignment";
+        m_icpAlgorithm->cancel();
+
+        // Update state
+        m_currentResult.state = AlignmentState::Cancelled;
+        m_currentResult.message = "ICP computation cancelled by user";
+        emit alignmentStateChanged(AlignmentState::Cancelled, m_currentResult.message);
+    }
+}
 }
 
 // Sprint 6.1: Deviation analysis implementation

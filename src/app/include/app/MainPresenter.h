@@ -14,14 +14,24 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class RegistrationProject;
+struct ExportResult;
 class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
+class BundleAdjustmentProgressDialog;
+class QualityAssessment;
+class PDFReportGenerator;
+struct QualityReport;
 
 namespace Registration {
     class PoseGraph;
     class PoseGraphBuilder;
     class RegistrationProject;
+}
+
+namespace Optimization {
+    class BundleAdjustment;
 }
 
 /**
@@ -88,6 +98,18 @@ class MainPresenter : public QObject
      * @param alignmentEngine Pointer to alignment engine.
      */
     void setAlignmentEngine(AlignmentEngine* alignmentEngine);
+
+    /**
+     * @brief Set the quality assessment instance (Sprint 6.2)
+     * @param qualityAssessment Pointer to the quality assessment
+     */
+    void setQualityAssessment(QualityAssessment* qualityAssessment);
+
+    /**
+     * @brief Set the PDF report generator instance (Sprint 6.2)
+     * @param reportGenerator Pointer to the PDF report generator
+     */
+    void setPDFReportGenerator(PDFReportGenerator* reportGenerator);
 
 public slots:
         /**
@@ -223,6 +245,23 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    /**
+     * @brief Handle automatic alignment (ICP) button click
+     *
+     * This slot is triggered when the user clicks the "Automatic Alignment (ICP)"
+     * button in the RegistrationWorkflowWidget. It launches the ICPParameterDialog
+     * and initiates the ICP computation if parameters are accepted.
+     */
+    void handleAutomaticAlignmentClicked();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
+
+    // Sprint 3.2: Export functionality
+    void handleExportPointCloud();
 
     /**
      * @brief Handle target detection request from workflow widget.
@@ -257,6 +296,16 @@ public slots:
      * @brief Rebuild the pose graph from current registration project
      */
     void rebuildPoseGraph();
+
+    /**
+     * @brief Handle Bundle Adjustment request
+     */
+    void handleRunBundleAdjustment();
+
+    /**
+     * @brief Handle Bundle Adjustment cancellation request
+     */
+    void cancelBundleAdjustment();
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -312,11 +361,60 @@ private slots:
          */
     void onMemoryUsageChanged(size_t totalBytes);
 
+    // Sprint 3.2: Export functionality slots
+    void onExportCompleted(const ExportResult& result);
+
+    /**
+     * @brief Handle Bundle Adjustment progress updates
+     * @param iteration Current iteration number
+     * @param currentError Current optimization error
+     * @param lambda Current lambda value
+     */
+    void onBundleAdjustmentProgress(int iteration, double currentError, double lambda);
+
+    /**
+     * @brief Handle Bundle Adjustment completion
+     * @param result Bundle adjustment result
+     */
+    void onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result);
+
     /**
      * @brief Handle deviation map toggle (Sprint 6.1)
      * @param enabled Whether to show or hide the deviation map
      */
     void handleShowDeviationMapToggled(bool enabled);
+
+    /**
+     * @brief Handle registration result added signal (Sprint 3.3)
+     * @param sourceScanId ID of the source scan
+     * @param targetScanId ID of the target scan
+     */
+    void onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId);
+
+    /**
+     * @brief Handle generate quality report request (Sprint 6.2)
+     */
+    void handleGenerateReportClicked();
+
+private slots:
+    /**
+     * @brief Handle quality assessment completion (Sprint 6.2)
+     * @param report The completed quality report
+     */
+    void onQualityAssessmentCompleted(const QualityReport& report);
+
+    /**
+     * @brief Handle successful report generation (Sprint 6.2)
+     * @param filePath Path to the generated report
+     */
+    void onReportGenerated(const QString& filePath);
+
+    /**
+     * @brief Handle report generation error (Sprint 6.2)
+     * @param error Error message
+     */
+    void onReportError(const QString& error);
+
 private:
         /**
          * @brief Set up signal-slot connections between components.
@@ -389,8 +487,10 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
-        TargetManager* m_targetManager;
-        AlignmentEngine* m_alignmentEngine;
+    // Sprint 3.2: Export functionality
+    RegistrationProject* m_currentProject;
+    TargetManager* m_targetManager;
+    AlignmentEngine* m_alignmentEngine;
 
          // Application state
     QString m_currentProjectPath;
@@ -420,6 +520,15 @@ private:
     PoseGraphViewerWidget* m_poseGraphViewer;
     std::unique_ptr<Registration::PoseGraph> m_currentPoseGraph;
     std::unique_ptr<Registration::PoseGraphBuilder> m_poseGraphBuilder;
+
+    // Bundle Adjustment Management
+    std::unique_ptr<Optimization::BundleAdjustment> m_bundleAdjustment;
+    std::unique_ptr<BundleAdjustmentProgressDialog> m_baProgressDialog;
+
+    // Sprint 6.2: Quality assessment and reporting
+    QualityAssessment* m_qualityAssessment;
+    PDFReportGenerator* m_reportGenerator;
+    QualityReport m_lastQualityReport;
 };
 
 #endif  // MAINPRESENTER_H

@@ -97,6 +97,9 @@ public:
     // Clear all data
     void clear();
 
+    // Update node transforms (for Bundle Adjustment)
+    void updateNodeTransforms(const QMap<QString, QMatrix4x4>& newTransforms);
+
 private:
     QList<PoseNode> m_nodes;
     QList<PoseEdge> m_edges;

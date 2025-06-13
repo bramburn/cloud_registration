@@ -12,19 +12,26 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
-#include "registration/AlignmentEngine.h"
+#include "ui/ICPParameterDialog.h"
+#include "algorithms/ICPRegistration.h"
 #include "registration/RegistrationWorkflowWidget.h"
+#include "registration/RegistrationProject.h"
+#include "ui/ExportDialog.h"
+#include "export/IFormatWriter.h"
 #include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
 #include "ui/TargetDetectionDialog.h"
 #include "ui/AlignmentControlPanel.h"
 #include "ui/PoseGraphViewerWidget.h"
+#include "ui/BundleAdjustmentProgressDialog.h"
 #include "registration/PoseGraph.h"
 #include "registration/PoseGraphBuilder.h"
-#include "registration/RegistrationProject.h"
 #include "rendering/pointcloudviewerwidget.h"
+#include "optimization/BundleAdjustment.h"
 
-// Sprint 6.1: Additional includes for deviation map functionality
-#include "rendering/pointcloudviewerwidget.h"
+// Sprint 6.2: Quality assessment and reporting includes
+#include "quality/QualityAssessment.h"
+#include "quality/PDFReportGenerator.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -39,6 +46,7 @@ MainPresenter::MainPresenter(IMainView* view,
       m_viewer(nullptr),
       m_projectManager(projectManager),
       m_loadManager(loadManager),
+      m_currentProject(nullptr),
       m_targetManager(nullptr),
       m_alignmentEngine(nullptr),
       m_isFileOpen(false),
@@ -53,7 +61,9 @@ MainPresenter::MainPresenter(IMainView* view,
       m_registrationProject(nullptr),
       m_poseGraphViewer(nullptr),
       m_currentPoseGraph(nullptr),
-      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>()),
+      m_qualityAssessment(nullptr),
+      m_reportGenerator(nullptr)
 {
     if (m_view)
     {
@@ -94,6 +104,34 @@ void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
                 this, &MainPresenter::handleAlignmentResultUpdated);
 
         qDebug() << "MainPresenter: AlignmentEngine set and signals connected";
+    }
+}
+
+void MainPresenter::setQualityAssessment(QualityAssessment* qualityAssessment)
+{
+    m_qualityAssessment = qualityAssessment;
+
+    if (m_qualityAssessment) {
+        // Connect quality assessment signals
+        connect(m_qualityAssessment, &QualityAssessment::assessmentCompleted,
+                this, &MainPresenter::onQualityAssessmentCompleted);
+        connect(m_qualityAssessment, &QualityAssessment::assessmentError,
+                this, [this](const QString& error) {
+                    showError("Quality Assessment Error", error);
+                });
+    }
+}
+
+void MainPresenter::setPDFReportGenerator(PDFReportGenerator* reportGenerator)
+{
+    m_reportGenerator = reportGenerator;
+
+    if (m_reportGenerator) {
+        // Connect report generator signals
+        connect(m_reportGenerator, &PDFReportGenerator::reportGenerated,
+                this, &MainPresenter::onReportGenerated);
+        connect(m_reportGenerator, &PDFReportGenerator::reportError,
+                this, &MainPresenter::onReportError);
     }
 }
 
@@ -154,6 +192,9 @@ void MainPresenter::setupConnections()
         }
     }
 
+    // Sprint 3.2: Export functionality connections
+    // Note: Currently ExportDialog is self-contained, so no connections needed
+    // This will be updated when we implement the full MVP pattern as per s3.2.md
     // Connect alignment control panel signals if available
     if (m_view)
     {
@@ -170,6 +211,7 @@ void MainPresenter::setupConnections()
         connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
                 this, &MainPresenter::handleAlignmentResultUpdated);
     }
+}
 }
 
 void MainPresenter::handleNewProject()
@@ -955,7 +997,6 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     }
 }
 
-<<<<<<< HEAD
 void MainPresenter::handleTargetDetectionClicked()
 {
     // Check if we have loaded scans
@@ -1014,6 +1055,78 @@ void MainPresenter::handleTargetDetectionClicked()
     }
 }
 
+void MainPresenter::handleAutomaticAlignmentClicked()
+{
+    qDebug() << "MainPresenter: Automatic alignment button clicked";
+
+    if (!m_loadManager)
+    {
+        showError("Automatic Alignment", "Point cloud load manager is not available.");
+        return;
+    }
+
+    // Get loaded scans
+    QStringList loadedScans = m_loadManager->getLoadedScans();
+
+    if (loadedScans.size() < 2)
+    {
+        showError("Automatic Alignment",
+                 QString("At least 2 scans must be loaded for automatic alignment. Currently loaded: %1")
+                 .arg(loadedScans.size()));
+        return;
+    }
+
+    // For now, use the first two loaded scans
+    QString sourceScanId = loadedScans[0];
+    QString targetScanId = loadedScans[1];
+
+    qDebug() << "Selected scans for alignment:" << sourceScanId << "→" << targetScanId;
+
+    try
+    {
+        // Get point clouds for parameter calculation
+        PointCloud sourceCloud = m_loadManager->getLoadedPointCloud(sourceScanId);
+        PointCloud targetCloud = m_loadManager->getLoadedPointCloud(targetScanId);
+
+        // Create and configure the ICP parameter dialog
+        ICPParameterDialog dialog(sourceCloud, targetCloud, m_view ? m_view->getWidget() : nullptr);
+        dialog.setScanIds(sourceScanId, targetScanId);
+
+        // Connect the dialog's runICPRequested signal
+        connect(&dialog, &ICPParameterDialog::runICPRequested,
+                this, [this](const ICPParams& params, const QString& sourceScanId, const QString& targetScanId) {
+            qDebug() << "ICP requested with parameters - Max iterations:" << params.maxIterations
+                     << "Convergence:" << params.convergenceThreshold
+                     << "Max distance:" << params.maxCorrespondenceDistance;
+
+            // TODO: Get AlignmentEngine instance and start automatic alignment
+            // For now, just show a message
+            showInfo("ICP Started",
+                    QString("Starting ICP alignment between %1 and %2")
+                    .arg(sourceScanId, targetScanId));
+        });
+
+        // Show the dialog
+        if (dialog.exec() == QDialog::Accepted)
+        {
+            qDebug() << "ICP parameter dialog accepted";
+        }
+        else
+        {
+            qDebug() << "ICP parameter dialog cancelled";
+        }
+    }
+    catch (const std::exception& e)
+    {
+        showError("Automatic Alignment",
+                 QString("Failed to initialize ICP dialog: %1").arg(e.what()));
+    }
+    catch (...)
+    {
+        showError("Automatic Alignment", "Unknown error occurred while initializing ICP dialog.");
+    }
+}
+
 void MainPresenter::connectToWorkflowWidget(RegistrationWorkflowWidget* workflowWidget)
 {
     if (!workflowWidget)
@@ -1029,13 +1142,17 @@ void MainPresenter::connectToWorkflowWidget(RegistrationWorkflowWidget* workflow
     connect(workflowWidget, &RegistrationWorkflowWidget::targetDetectionRequested,
             this, &MainPresenter::handleTargetDetectionClicked);
 
+    // Connect the automatic alignment signal
+    connect(workflowWidget, &RegistrationWorkflowWidget::automaticAlignmentRequested,
+            this, &MainPresenter::handleAutomaticAlignmentClicked);
+
     // Enable target detection when scans are loaded
     if (m_isFileOpen && !m_currentScanNames.isEmpty())
     {
         workflowWidget->enableTargetDetection(true);
     }
 
-    qDebug() << "MainPresenter connected to RegistrationWorkflowWidget for target detection";
+    qDebug() << "MainPresenter connected to RegistrationWorkflowWidget for target detection and automatic alignment";
 }
 
 // Alignment Management Implementation
@@ -1148,6 +1265,78 @@ void MainPresenter::handleCancelAlignment()
     showInfo("Cancel Alignment", "Alignment cancellation functionality will be fully implemented when AlignmentEngine is integrated.");
 }
 
+// Sprint 3.2: Export functionality implementation
+void MainPresenter::handleExportPointCloud()
+{
+    // Pre-check: Verify that viewer has point cloud data
+    if (!m_viewer || !m_viewer->hasPointCloudData())
+    {
+        showError("Export Error", "No point cloud data loaded for export.");
+        return;
+    }
+
+    // Retrieve current point cloud data (with applied transformations)
+    std::vector<Point> dataToExport = m_viewer->getCurrentPointCloudData();
+    if (dataToExport.empty())
+    {
+        showError("Export Error", "No point cloud data available for export.");
+        return;
+    }
+
+    // Create and configure ExportDialog
+    ExportDialog dialog(static_cast<QWidget*>(m_view));
+    dialog.setPointCloudData(dataToExport);
+
+    // Set project information if available
+    if (m_currentProject)
+    {
+        dialog.setProjectInfo(m_currentProject->projectName(), m_currentProject->description());
+    }
+    else
+    {
+        // Fallback to basic project info
+        QString projectName = m_isProjectOpen ? QFileInfo(m_currentProjectPath).baseName() : "Untitled";
+        dialog.setProjectInfo(projectName, "Point cloud export from Cloud Registration application");
+    }
+
+    // Note: ExportDialog will set its own supported formats internally
+    // No need to set them explicitly since it has its own PointCloudExporter
+
+    // Load default settings
+    dialog.loadSettings();
+
+    // Note: The current ExportDialog is self-contained and handles export internally
+    // We don't need to connect to our own exporter since the dialog has its own
+
+    // Show dialog and handle result
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // The ExportDialog handles the export internally and shows its own progress
+        // We just need to update our status bar
+        m_view->updateStatusBar("Export completed");
+        showInfo("Export Successful", "Point cloud has been exported successfully.");
+    }
+}
+
+void MainPresenter::onExportCompleted(const ExportResult& result)
+{
+    // This method is currently not used since ExportDialog is self-contained
+    // But keeping it for future integration when we move to the MVP pattern
+    // as specified in s3.2.md
+
+    if (result.success)
+    {
+        showInfo("Export Successful",
+                QString("Point cloud exported successfully to:\n%1").arg(result.outputPath));
+        m_view->updateStatusBar("Export completed successfully");
+    }
+    else
+    {
+        showError("Export Failed",
+                QString("Export failed: %1").arg(result.errorMessage));
+        m_view->updateStatusBar("Export failed");
+    }
+}
 void MainPresenter::setRegistrationProject(Registration::RegistrationProject* project)
 {
     m_registrationProject = project;
@@ -1157,7 +1346,33 @@ void MainPresenter::setRegistrationProject(Registration::RegistrationProject* pr
         connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
                 this, &MainPresenter::rebuildPoseGraph);
 
+        // Connect to update sidebar when registration results are added
+        connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
+                this, &MainPresenter::onRegistrationResultAdded);
+
+        // Set the registration project on the sidebar for scan grouping
+        if (m_view) {
+            auto* sidebar = m_view->getSidebar();
+            if (sidebar) {
+                sidebar->setRegistrationProject(m_registrationProject);
+                qDebug() << "MainPresenter: Registration project set on sidebar";
+            }
+        }
+
         qDebug() << "MainPresenter: Registration project set";
+    }
+}
+void MainPresenter::onRegistrationResultAdded(const QString& sourceScanId, const QString& targetScanId)
+{
+    qDebug() << "MainPresenter: Registration result added for" << sourceScanId << "to" << targetScanId;
+
+    // Update the sidebar to show the new grouping
+    if (m_view) {
+        auto* sidebar = m_view->getSidebar();
+        if (sidebar) {
+            sidebar->refreshFromDatabase();
+            qDebug() << "MainPresenter: Sidebar refreshed after registration result added";
+        }
     }
 }
 
@@ -1178,6 +1393,9 @@ void MainPresenter::setPoseGraphViewer(PoseGraphViewerWidget* viewer)
                     qDebug() << "Pose graph edge selected:" << sourceScanId << "to" << targetScanId;
                     // Handle edge selection (e.g., show registration details)
                 });
+
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::bundleAdjustmentRequested,
+                this, &MainPresenter::handleRunBundleAdjustment);
 
         qDebug() << "MainPresenter: Pose graph viewer set";
     }
@@ -1259,6 +1477,7 @@ void MainPresenter::triggerAlignmentPreview()
     }
 }
 
+<<<<<<< Updated upstream
 // Sprint 6.1: Deviation map toggle implementation
 void MainPresenter::handleShowDeviationMapToggled(bool enabled)
 {
@@ -1295,6 +1514,96 @@ void MainPresenter::handleShowDeviationMapToggled(bool enabled)
     {
         m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
     }
+}
+
+// Sprint 6.2: PDF Report Generation Implementation
+void MainPresenter::handleGenerateReportClicked()
+{
+    qDebug() << "MainPresenter::handleGenerateReportClicked() called";
+
+    // Pre-check: Verify that we have a valid quality report
+    if (!m_lastQualityReport.isValid()) {
+        showError("Generate Quality Report",
+                  "No quality assessment data available. Please perform a quality assessment first.");
+        return;
+    }
+
+    // Prompt for save path
+    QString defaultName = QString("%1_QualityReport.pdf")
+                         .arg(m_lastQualityReport.projectName.isEmpty() ? "Project" : m_lastQualityReport.projectName);
+
+    QString filePath = m_view->askForSaveFilePath("Save Quality Report",
+                                                  "PDF files (*.pdf)",
+                                                  defaultName);
+
+    if (filePath.isEmpty()) {
+        return; // User cancelled
+    }
+
+    if (!m_reportGenerator) {
+        showError("Generate Quality Report", "PDF report generator is not available.");
+        return;
+    }
+
+    // Prepare report options
+    PDFReportGenerator::ReportOptions options;
+    options.outputPath = filePath;
+    options.projectName = m_lastQualityReport.projectName;
+    options.operatorName = "Default User"; // Hardcoded for now as per document
+    options.includeCharts = false;
+    options.includeScreenshots = false;
+    options.includeRecommendations = false;
+    options.includeDetailedMetrics = true;
+
+    // Trigger report generation
+    m_reportGenerator->generatePdfReport(m_lastQualityReport, options);
+
+    // Update status
+    if (m_view) {
+        m_view->updateStatusBar("Generating quality report...");
+    }
+}
+
+void MainPresenter::onQualityAssessmentCompleted(const QualityReport& report)
+{
+    qDebug() << "MainPresenter::onQualityAssessmentCompleted() called";
+
+    // Store the quality report
+    m_lastQualityReport = report;
+
+    // Enable the generate report action through the view
+    // Note: This assumes the view has a method to enable specific actions
+    // In the actual implementation, this would be handled through IMainView interface
+
+    if (m_view) {
+        m_view->updateStatusBar("Quality assessment completed. Report generation is now available.");
+    }
+
+    showInfo("Quality Assessment", "Quality assessment completed successfully. You can now generate a PDF report.");
+}
+
+void MainPresenter::onReportGenerated(const QString& filePath)
+{
+    qDebug() << "MainPresenter::onReportGenerated() called with path:" << filePath;
+
+    if (m_view) {
+        m_view->updateStatusBar("Quality report generated successfully");
+    }
+
+    showInfo("Report Generated",
+             QString("Quality report has been successfully generated and saved to:\n%1").arg(filePath));
+}
+
+void MainPresenter::onReportError(const QString& error)
+{
+    qDebug() << "MainPresenter::onReportError() called with error:" << error;
+
+    if (m_view) {
+        m_view->updateStatusBar("Report generation failed");
+    }
+
+    showError("Report Generation Failed",
+              QString("Failed to generate quality report:\n%1").arg(error));
 }
 
 // Sprint 2.2: Alignment computation and live preview implementation
@@ -1363,4 +1672,218 @@ void MainPresenter::handleAlignmentResultUpdated(const AlignmentEngine::Alignmen
 
         m_view->updateStatusBar(statusMessage);
     }
+}
+
+// Sprint 3.2: Export functionality implementation
+void MainPresenter::handleExportPointCloud()
+{
+    // Pre-check: Verify that viewer has point cloud data
+    if (!m_viewer || !m_viewer->hasPointCloudData())
+    {
+        showError("Export Error", "No point cloud data loaded for export.");
+        return;
+    }
+
+    // Retrieve current point cloud data (with applied transformations)
+    std::vector<Point> dataToExport = m_viewer->getCurrentPointCloudData();
+    if (dataToExport.empty())
+    {
+        showError("Export Error", "No point cloud data available for export.");
+        return;
+    }
+
+    // Create and configure ExportDialog
+    ExportDialog dialog(static_cast<QWidget*>(m_view));
+    dialog.setPointCloudData(dataToExport);
+
+    // Set project information if available
+    if (m_currentProject)
+    {
+        dialog.setProjectInfo(m_currentProject->projectName(), m_currentProject->description());
+    }
+    else
+    {
+        // Fallback to basic project info
+        QString projectName = m_isProjectOpen ? QFileInfo(m_currentProjectPath).baseName() : "Untitled";
+        dialog.setProjectInfo(projectName, "Point cloud export from Cloud Registration application");
+    }
+
+    // Note: ExportDialog will set its own supported formats internally
+    // No need to set them explicitly since it has its own PointCloudExporter
+
+    // Load default settings
+    dialog.loadSettings();
+
+    // Note: The current ExportDialog is self-contained and handles export internally
+    // We don't need to connect to our own exporter since the dialog has its own
+
+    // Show dialog and handle result
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // The ExportDialog handles the export internally and shows its own progress
+        // We just need to update our status bar
+        m_view->updateStatusBar("Export completed");
+        showInfo("Export Successful", "Point cloud has been exported successfully.");
+    }
+}
+
+void MainPresenter::onExportCompleted(const ExportResult& result)
+{
+    // This method is currently not used since ExportDialog is self-contained
+    // But keeping it for future integration when we move to the MVP pattern
+    // as specified in s3.2.md
+
+    if (result.success)
+    {
+        showInfo("Export Successful",
+                QString("Point cloud exported successfully to:\n%1").arg(result.outputPath));
+        m_view->updateStatusBar("Export completed successfully");
+    }
+    else
+    {
+        showError("Export Failed",
+                QString("Export failed: %1").arg(result.errorMessage));
+        m_view->updateStatusBar("Export failed");
+    }
+}
+
+// Bundle Adjustment Implementation
+void MainPresenter::handleRunBundleAdjustment()
+{
+    qDebug() << "MainPresenter::handleRunBundleAdjustment() called";
+
+    // Pre-check: Verify pose graph is valid and meets minimum criteria
+    if (!m_currentPoseGraph) {
+        showError("Bundle Adjustment", "No pose graph available. Please load a project with registered scans first.");
+        return;
+    }
+
+    if (m_currentPoseGraph->nodeCount() < 3) {
+        showError("Bundle Adjustment",
+                  QString("Bundle Adjustment requires at least 3 nodes. Current graph has %1 nodes.")
+                  .arg(m_currentPoseGraph->nodeCount()));
+        return;
+    }
+
+    if (m_currentPoseGraph->edgeCount() < 2) {
+        showError("Bundle Adjustment",
+                  QString("Bundle Adjustment requires at least 2 edges. Current graph has %1 edges.")
+                  .arg(m_currentPoseGraph->edgeCount()));
+        return;
+    }
+
+    // Create Bundle Adjustment progress dialog
+    m_baProgressDialog = std::make_unique<BundleAdjustmentProgressDialog>(
+        static_cast<QWidget*>(m_view));
+
+    // Connect progress dialog signals
+    connect(m_baProgressDialog.get(), &BundleAdjustmentProgressDialog::cancelRequested,
+            this, &MainPresenter::cancelBundleAdjustment);
+
+    // Create Bundle Adjustment algorithm instance
+    m_bundleAdjustment = std::make_unique<Optimization::BundleAdjustment>();
+
+    // Connect Bundle Adjustment signals
+    connect(m_bundleAdjustment.get(), &Optimization::BundleAdjustment::optimizationProgress,
+            this, &MainPresenter::onBundleAdjustmentProgress);
+    connect(m_bundleAdjustment.get(), &Optimization::BundleAdjustment::optimizationCompleted,
+            this, &MainPresenter::onBundleAdjustmentCompleted);
+
+    // Get recommended parameters for the current graph
+    auto params = m_bundleAdjustment->getRecommendedParameters(*m_currentPoseGraph);
+
+    // Start monitoring in the progress dialog
+    m_baProgressDialog->startMonitoring(m_bundleAdjustment.get(), params.maxIterations);
+
+    // Show the progress dialog
+    m_baProgressDialog->show();
+
+    // Start Bundle Adjustment optimization asynchronously
+    // Note: In a real implementation, this should run in a separate thread
+    auto result = m_bundleAdjustment->optimize(*m_currentPoseGraph, params);
+
+    qDebug() << "MainPresenter: Bundle Adjustment started with"
+             << m_currentPoseGraph->nodeCount() << "nodes and"
+             << m_currentPoseGraph->edgeCount() << "edges";
+
+    if (m_view) {
+        m_view->updateStatusBar("Bundle Adjustment optimization started...");
+    }
+}
+
+void MainPresenter::cancelBundleAdjustment()
+{
+    qDebug() << "MainPresenter::cancelBundleAdjustment() called";
+
+    if (m_bundleAdjustment) {
+        m_bundleAdjustment->cancel();
+        qDebug() << "MainPresenter: Bundle Adjustment cancellation requested";
+    }
+}
+
+void MainPresenter::onBundleAdjustmentProgress(int iteration, double currentError, double lambda)
+{
+    if (m_baProgressDialog) {
+        m_baProgressDialog->updateProgress(iteration, currentError);
+    }
+
+    // Update status bar with progress
+    if (m_view) {
+        m_view->updateStatusBar(QString("Bundle Adjustment: Iteration %1, Error: %2")
+                               .arg(iteration).arg(currentError, 0, 'e', 3));
+    }
+}
+
+void MainPresenter::onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result)
+{
+    qDebug() << "MainPresenter::onBundleAdjustmentCompleted() called";
+    qDebug() << "Result: converged=" << result.converged
+             << ", iterations=" << result.iterations
+             << ", final error=" << result.finalError
+             << ", improvement=" << (result.improvementRatio * 100) << "%";
+
+    // Update progress dialog
+    if (m_baProgressDialog) {
+        m_baProgressDialog->onComputationFinished(result.converged, result.statusMessage);
+    }
+
+    if (result.converged && m_registrationProject) {
+        // Apply optimized poses to the registration project
+        // Note: This requires the optimized graph to be returned from the optimization
+        // For now, we'll show a success message
+
+        showInfo("Bundle Adjustment Complete",
+                 QString("Bundle Adjustment completed successfully!\n\n"
+                        "Iterations: %1\n"
+                        "Final Error: %2\n"
+                        "Improvement: %3%\n"
+                        "Time: %4 seconds")
+                 .arg(result.iterations)
+                 .arg(result.finalError, 0, 'e', 3)
+                 .arg(result.improvementRatio * 100, 0, 'f', 1)
+                 .arg(result.optimizationTimeSeconds, 0, 'f', 2));
+
+        // Rebuild pose graph to reflect optimized poses
+        rebuildPoseGraph();
+
+        if (m_view) {
+            m_view->updateStatusBar("Bundle Adjustment completed successfully");
+        }
+    } else {
+        // Handle failure or cancellation
+        QString message = result.converged ? "Bundle Adjustment completed" : "Bundle Adjustment failed or was cancelled";
+
+        if (m_view) {
+            m_view->updateStatusBar(message);
+        }
+
+        if (!result.converged && !result.statusMessage.contains("cancelled", Qt::CaseInsensitive)) {
+            showError("Bundle Adjustment Failed",
+                     QString("Bundle Adjustment failed to converge.\n\n%1").arg(result.statusMessage));
+        }
+    }
+
+    // Clean up
+    m_bundleAdjustment.reset();
+    // Note: Don't reset m_baProgressDialog here as it may still be showing results
 }

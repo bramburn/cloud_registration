@@ -92,6 +92,13 @@ void SidebarWidget::setSQLiteManager(SQLiteManager* manager)
     m_model->setSQLiteManager(manager);
 }
 
+void SidebarWidget::setRegistrationProject(Registration::RegistrationProject* project)
+{
+    if (m_model) {
+        m_model->setRegistrationProject(project);
+    }
+}
+
 // Sprint 4: Removed setter methods - SidebarWidget now only emits signals
 // void setProjectManager(ProjectManager *manager);
 // void setPointCloudLoadManager(PointCloudLoadManager *manager);

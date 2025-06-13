@@ -12,6 +12,19 @@ PDFReportGenerator::PDFReportGenerator(QObject* parent) : QObject(parent) {}
 
 PDFReportGenerator::~PDFReportGenerator() = default;
 
+// Sprint 6.2: New signature that emits signals
+void PDFReportGenerator::generatePdfReport(const QualityReport& report, const ReportOptions& options)
+{
+    // Call the legacy method and emit appropriate signals
+    bool success = generatePdfReport(report, options.outputPath, options);
+
+    if (success) {
+        emit reportGenerated(options.outputPath);
+    } else {
+        emit reportError("Failed to generate PDF report");
+    }
+}
+
 bool PDFReportGenerator::generatePdfReport(const QualityReport& report,
                                            const QString& outputPath,
                                            const ReportOptions& options)

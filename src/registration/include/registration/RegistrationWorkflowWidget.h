@@ -68,6 +68,7 @@ signals:
     void stepChanged(RegistrationStep step);
     void projectChanged();
     void targetDetectionRequested();
+    void automaticAlignmentRequested();
 
 public slots:
     void goNext();

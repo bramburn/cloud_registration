@@ -117,6 +117,11 @@ public slots:
      */
     void onToggleEdgeWeights(bool visible);
 
+    /**
+     * @brief Handle Bundle Adjustment button click
+     */
+    void onRunBundleAdjustment();
+
 signals:
     /**
      * @brief Emitted when a node is selected
@@ -135,6 +140,11 @@ signals:
      * @brief Emitted when the view is updated
      */
     void viewUpdated();
+
+    /**
+     * @brief Emitted when user requests Bundle Adjustment
+     */
+    void bundleAdjustmentRequested();
 
 protected:
     /**
@@ -172,6 +182,10 @@ private:
     QColor getEdgeColor(float rmsError) const;
     QString formatRmsError(float rmsError) const;
 
+    // Bundle Adjustment support
+    void updateBundleAdjustmentButtonState();
+    bool isBundleAdjustmentEnabled() const;
+
     // UI components
     QVBoxLayout* m_mainLayout;
     QHBoxLayout* m_toolbarLayout;
@@ -184,6 +198,7 @@ private:
     QPushButton* m_fitToViewButton;
     QPushButton* m_resetViewButton;
     QPushButton* m_exportButton;
+    QPushButton* m_runBundleAdjustmentButton;
     QCheckBox* m_showLabelsCheckBox;
     QCheckBox* m_showWeightsCheckBox;
     QLabel* m_statusLabel;
@@ -199,6 +214,9 @@ private:
     bool m_showNodeLabels;
     bool m_showEdgeWeights;
     double m_currentZoom;
+
+    // Current graph for Bundle Adjustment validation
+    const Registration::PoseGraph* m_currentGraph;
 
     // Constants
     static constexpr double NODE_RADIUS = 20.0;

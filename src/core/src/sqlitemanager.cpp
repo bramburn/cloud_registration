@@ -1,4 +1,6 @@
 #include "core/sqlitemanager.h"
+#include "core/scaninfo.h"
+#include "core/clusterinfo.h"
 
 SQLiteManager::SQLiteManager(QObject* parent) : QObject(parent) {}
 
@@ -37,4 +39,18 @@ QStringList SQLiteManager::getRecentProjects()
 {
     // Stub implementation - return empty list
     return QStringList();
+}
+
+QList<ScanInfo> SQLiteManager::getAllScans() const
+{
+    // Stub implementation - return empty list for now
+    // In a real implementation, this would query the database
+    return QList<ScanInfo>();
+}
+
+QList<ClusterInfo> SQLiteManager::getAllClusters() const
+{
+    // Stub implementation - return empty list for now
+    // In a real implementation, this would query the database
+    return QList<ClusterInfo>();
 }
