@@ -103,6 +103,16 @@ signals:
      */
     void autoRecomputeChanged(bool enabled);
 
+    /**
+     * @brief Emitted when user requests to accept the current alignment
+     */
+    void acceptAlignmentRequested();
+
+    /**
+     * @brief Emitted when user requests to cancel the current alignment
+     */
+    void cancelAlignmentRequested();
+
 private slots:
     /**
      * @brief Handle alignment button click
@@ -128,6 +138,16 @@ private slots:
      * @brief Show detailed error report
      */
     void onShowDetailedReport();
+
+    /**
+     * @brief Handle accept alignment button click
+     */
+    void onAcceptAlignmentClicked();
+
+    /**
+     * @brief Handle cancel alignment button click
+     */
+    void onCancelAlignmentClicked();
 
 private:
     /**
@@ -201,6 +221,8 @@ private:
     QPushButton* m_alignButton;
     QPushButton* m_clearButton;
     QPushButton* m_reportButton;
+    QPushButton* m_acceptButton;
+    QPushButton* m_cancelButton;
     QProgressBar* m_progressBar;
 
     // Configuration

@@ -58,4 +58,45 @@ target_include_directories(ExportDialogTests PRIVATE
 )
 add_test(NAME ExportDialogTests COMMAND ExportDialogTests)
 
+# AlignmentControlPanel Tests (MVP3 S3.1)
+add_executable(AlignmentControlPanelTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_alignmentcontrolpanel.cpp
+)
+target_link_libraries(AlignmentControlPanelTests PRIVATE
+    UI                  # Link against the UI library
+    Registration        # For AlignmentEngine
+    GTest::gtest_main   # Google Test framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(AlignmentControlPanelTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui           # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration # Registration headers
+)
+add_test(NAME AlignmentControlPanelTests COMMAND AlignmentControlPanelTests)
+
+# Sprint 7.1: Pose Graph Viewer Widget Tests
+add_executable(PoseGraphViewerWidgetTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_posegraphviewerwidget.cpp
+)
+target_link_libraries(PoseGraphViewerWidgetTests PRIVATE
+    UI                  # Link against the UI library
+    Registration        # For PoseGraph classes
+    Core                # Indirect dependency
+    GTest::gtest_main   # Google Test framework
+    GMock::gmock        # Google Mock framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(PoseGraphViewerWidgetTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui           # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration # Registration headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core       # Core headers
+)
+add_test(NAME PoseGraphViewerWidgetTests COMMAND PoseGraphViewerWidgetTests)
+
 message(STATUS "Configuring UI tests...")
