@@ -12,6 +12,8 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
+#include "registration/RegistrationProject.h"
+#include "ui/ExportDialog.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -26,6 +28,7 @@ MainPresenter::MainPresenter(IMainView* view,
       m_viewer(nullptr),
       m_projectManager(projectManager),
       m_loadManager(loadManager),
+      m_currentProject(nullptr),
       m_isFileOpen(false),
       m_isProjectOpen(false),
       m_isParsingInProgress(false),
@@ -112,6 +115,10 @@ void MainPresenter::setupConnections()
             connect(sidebar, &SidebarWidget::dragDropOperationRequested, this, &MainPresenter::handleDragDropOperation);
         }
     }
+
+    // Sprint 3.2: Export functionality connections
+    // Note: Currently ExportDialog is self-contained, so no connections needed
+    // This will be updated when we implement the full MVP pattern as per s3.2.md
 }
 
 void MainPresenter::handleNewProject()
@@ -992,4 +999,79 @@ void MainPresenter::handleCancelAlignment()
 
     // Placeholder implementation for now
     showInfo("Cancel Alignment", "Alignment cancellation functionality will be fully implemented when AlignmentEngine is integrated.");
+}
+
+
+
+// Sprint 3.2: Export functionality implementation
+void MainPresenter::handleExportPointCloud()
+{
+    // Pre-check: Verify that viewer has point cloud data
+    if (!m_viewer || !m_viewer->hasPointCloudData())
+    {
+        showError("Export Error", "No point cloud data loaded for export.");
+        return;
+    }
+
+    // Retrieve current point cloud data (with applied transformations)
+    std::vector<Point> dataToExport = m_viewer->getCurrentPointCloudData();
+    if (dataToExport.empty())
+    {
+        showError("Export Error", "No point cloud data available for export.");
+        return;
+    }
+
+    // Create and configure ExportDialog
+    ExportDialog dialog(static_cast<QWidget*>(m_view));
+    dialog.setPointCloudData(dataToExport);
+
+    // Set project information if available
+    if (m_currentProject)
+    {
+        dialog.setProjectInfo(m_currentProject->projectName(), m_currentProject->description());
+    }
+    else
+    {
+        // Fallback to basic project info
+        QString projectName = m_isProjectOpen ? QFileInfo(m_currentProjectPath).baseName() : "Untitled";
+        dialog.setProjectInfo(projectName, "Point cloud export from Cloud Registration application");
+    }
+
+    // Set available formats from the exporter
+    dialog.setAvailableFormats(m_exporter->getSupportedFormats());
+
+    // Load default settings
+    dialog.loadSettings();
+
+    // Note: The current ExportDialog is self-contained and handles export internally
+    // We don't need to connect to our own exporter since the dialog has its own
+
+    // Show dialog and handle result
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        // The ExportDialog handles the export internally and shows its own progress
+        // We just need to update our status bar
+        m_view->updateStatusBar("Export completed");
+        showInfo("Export Successful", "Point cloud has been exported successfully.");
+    }
+}
+
+void MainPresenter::onExportCompleted(const ExportResult& result)
+{
+    // This method is currently not used since ExportDialog is self-contained
+    // But keeping it for future integration when we move to the MVP pattern
+    // as specified in s3.2.md
+
+    if (result.success)
+    {
+        showInfo("Export Successful",
+                QString("Point cloud exported successfully to:\n%1").arg(result.outputPath));
+        m_view->updateStatusBar("Export completed successfully");
+    }
+    else
+    {
+        showError("Export Failed",
+                QString("Export failed: %1").arg(result.errorMessage));
+        m_view->updateStatusBar("Export failed");
+    }
 }

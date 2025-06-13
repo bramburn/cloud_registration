@@ -14,6 +14,8 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class RegistrationProject;
+struct ExportResult;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
@@ -203,6 +205,8 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    // Sprint 3.2: Export functionality
+    void handleExportPointCloud();
 
 private slots:
         /**
@@ -258,6 +262,8 @@ private slots:
          * @param totalBytes Total memory usage in bytes.
          */
     void onMemoryUsageChanged(size_t totalBytes);
+    // Sprint 3.2: Export functionality slots
+    void onExportCompleted(const ExportResult& result);
 
 private:
         /**
@@ -301,6 +307,7 @@ private:
          */
     void clearPointCloudData();
 
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -311,6 +318,8 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
+    // Sprint 3.2: Export functionality
+    RegistrationProject* m_currentProject;
 
          // Application state
     QString m_currentProjectPath;
