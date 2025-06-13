@@ -368,6 +368,17 @@ private:
      */
     void triggerAlignmentPreview();
 
+    /**
+     * @brief Handle alignment result updates from AlignmentEngine
+     *
+     * This slot receives the complete alignment result and updates both the
+     * PointCloudViewerWidget with the dynamic transformation and the
+     * AlignmentControlPanel with quality metrics.
+     *
+     * @param result Complete alignment result with transformation and error statistics
+     */
+    void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
