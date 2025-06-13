@@ -165,6 +165,18 @@ public:
      */
     void setQualityThresholds(float rmsThreshold, float maxErrorThreshold);
 
+    // --- Target Detection Integration ---
+
+    /**
+     * @brief Start target detection process
+     * @param scanId ID of the scan to process
+     * @param mode Detection mode (automatic, manual, or both)
+     * @param params Detection parameters
+     */
+    void startTargetDetection(const QString& scanId,
+                             int mode,
+                             const QVariantMap& params);
+
 signals:
     /**
      * @brief Emitted when transformation is updated
@@ -196,6 +208,27 @@ signals:
      * @param count New correspondence count
      */
     void correspondencesChanged(int count);
+
+    // Target detection signals
+    /**
+     * @brief Emitted when target detection progress updates
+     * @param percentage Progress percentage (0-100)
+     * @param stage Current processing stage
+     */
+    void targetDetectionProgress(int percentage, const QString& stage);
+
+    /**
+     * @brief Emitted when target detection completes successfully
+     * @param scanId ID of the processed scan
+     * @param targets List of detected targets
+     */
+    void targetDetectionCompleted(const QString& scanId, const QVariantList& targets);
+
+    /**
+     * @brief Emitted when target detection encounters an error
+     * @param error Error message
+     */
+    void targetDetectionError(const QString& error);
 
 private slots:
     /**

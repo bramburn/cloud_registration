@@ -239,3 +239,40 @@ void AlignmentEngine::setQualityThresholds(float rmsThreshold, float maxErrorThr
         triggerRecomputeIfEnabled();
     }
 }
+
+void AlignmentEngine::startTargetDetection(const QString& scanId, int mode, const QVariantMap& params)
+{
+    qDebug() << "Starting target detection for scan:" << scanId << "with mode:" << mode;
+
+    // Emit progress signal
+    emit targetDetectionProgress(0, "Initializing target detection...");
+
+    // For now, this is a placeholder implementation
+    // In a complete implementation, this would:
+    // 1. Get point cloud data from PointCloudLoadManager
+    // 2. Create appropriate detector (SphereDetector, NaturalPointSelector)
+    // 3. Run detection asynchronously
+    // 4. Emit progress updates
+    // 5. Emit completion or error signals
+
+    // Simulate some processing time and progress
+    QTimer::singleShot(100, this, [this, scanId]() {
+        emit targetDetectionProgress(25, "Loading point cloud data...");
+    });
+
+    QTimer::singleShot(200, this, [this, scanId]() {
+        emit targetDetectionProgress(50, "Running detection algorithms...");
+    });
+
+    QTimer::singleShot(300, this, [this, scanId]() {
+        emit targetDetectionProgress(75, "Processing results...");
+    });
+
+    QTimer::singleShot(400, this, [this, scanId]() {
+        emit targetDetectionProgress(100, "Detection completed");
+
+        // For now, emit empty results - in real implementation this would contain actual targets
+        QVariantList emptyTargets;
+        emit targetDetectionCompleted(scanId, emptyTargets);
+    });
+}

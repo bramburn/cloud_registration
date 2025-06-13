@@ -12,6 +12,10 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
+#include "registration/AlignmentEngine.h"
+#include "registration/RegistrationWorkflowWidget.h"
+#include "registration/TargetManager.h"
+#include "ui/TargetDetectionDialog.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -31,7 +35,8 @@ MainPresenter::MainPresenter(IMainView* view,
       m_isParsingInProgress(false),
       m_currentMemoryUsage(0),
       m_currentFPS(0.0f),
-      m_currentVisiblePoints(0)
+      m_currentVisiblePoints(0),
+      m_connectedWorkflowWidget(nullptr)
 {
     if (m_view)
     {
@@ -326,6 +331,12 @@ void MainPresenter::onParsingFinished(bool success, const QString& message, cons
         QFileInfo fileInfo(m_currentFilePath);
         m_view->updateStatusBar(QString("Loaded %1 points from %2").arg(points.size() / 3).arg(fileInfo.fileName()));
 
+        // Enable target detection if workflow widget is connected
+        if (m_connectedWorkflowWidget)
+        {
+            m_connectedWorkflowWidget->enableTargetDetection(true);
+        }
+
         showInfo("File Opened", message);
     }
     else
@@ -468,6 +479,12 @@ void MainPresenter::clearPointCloudData()
     }
     m_currentScanNames.clear();
     m_view->updateScanList(QStringList());
+
+    // Disable target detection when no data is available
+    if (m_connectedWorkflowWidget)
+    {
+        m_connectedWorkflowWidget->enableTargetDetection(false);
+    }
 }
 
 // Sprint 4: Sidebar-related method implementations
@@ -883,4 +900,86 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
     }
+}
+
+void MainPresenter::handleTargetDetectionClicked()
+{
+    // Check if we have loaded scans
+    if (!m_isFileOpen || m_currentScanNames.isEmpty())
+    {
+        showError("Target Detection", "Please load point cloud scans first.");
+        return;
+    }
+
+    // Get the current scan ID (for now, use the first scan)
+    QString currentScanId = m_currentScanNames.first();
+
+    // Get point cloud data from the load manager
+    std::vector<PointFullData> pointCloudData;
+    if (m_loadManager)
+    {
+        // For now, we'll create a placeholder - in a real implementation,
+        // this would get the actual point cloud data from the load manager
+        // pointCloudData = m_loadManager->getLoadedPointFullData(currentScanId);
+    }
+
+    // Create target manager if not available
+    static TargetManager* targetManager = new TargetManager(this);
+
+    // Create and show the target detection dialog
+    TargetDetectionDialog dialog(targetManager, static_cast<QWidget*>(m_view));
+    dialog.setPointCloudData(currentScanId, pointCloudData);
+
+    // Connect dialog signals
+    connect(&dialog, &TargetDetectionDialog::detectionCompleted,
+            this, [this](const QString& scanId, const TargetDetectionBase::DetectionResult& result) {
+                // Handle detection completion
+                showInfo("Target Detection",
+                        QString("Detection completed for scan %1. Found %2 targets.")
+                        .arg(scanId)
+                        .arg(result.targets.size()));
+            });
+
+    connect(&dialog, &TargetDetectionDialog::manualSelectionRequested,
+            this, [this](const QString& scanId) {
+                // Handle manual selection mode activation
+                showInfo("Manual Selection",
+                        QString("Manual selection mode activated for scan %1. "
+                               "Click on points in the 3D view to select targets.")
+                        .arg(scanId));
+            });
+
+    // Show dialog modally
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        m_view->updateStatusBar("Target detection completed successfully");
+    }
+    else
+    {
+        m_view->updateStatusBar("Target detection cancelled");
+    }
+}
+
+void MainPresenter::connectToWorkflowWidget(RegistrationWorkflowWidget* workflowWidget)
+{
+    if (!workflowWidget)
+    {
+        qWarning() << "MainPresenter::connectToWorkflowWidget: workflowWidget is null";
+        return;
+    }
+
+    // Store reference to workflow widget
+    m_connectedWorkflowWidget = workflowWidget;
+
+    // Connect the target detection signal from workflow widget to our handler
+    connect(workflowWidget, &RegistrationWorkflowWidget::targetDetectionRequested,
+            this, &MainPresenter::handleTargetDetectionClicked);
+
+    // Enable target detection when scans are loaded
+    if (m_isFileOpen && !m_currentScanNames.isEmpty())
+    {
+        workflowWidget->enableTargetDetection(true);
+    }
+
+    qDebug() << "MainPresenter connected to RegistrationWorkflowWidget for target detection";
 }

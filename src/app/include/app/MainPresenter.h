@@ -17,12 +17,12 @@ class PointCloudLoadManager;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -195,6 +195,17 @@ public slots:
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
 
+    /**
+     * @brief Handle target detection request from workflow widget.
+     */
+    void handleTargetDetectionClicked();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget for target detection integration.
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
+
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -319,6 +330,8 @@ private:
          // Sidebar state management
     QStringList m_loadedScans;
         QStringList m_lockedClusters;
+        // Workflow widget integration
+        class RegistrationWorkflowWidget* m_connectedWorkflowWidget;
 };
 
 #endif  // MAINPRESENTER_H

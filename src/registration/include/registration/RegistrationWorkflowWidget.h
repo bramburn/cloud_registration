@@ -59,11 +59,15 @@ public:
     bool canGoBack() const;
     void enableNavigation(bool enabled);
 
+    // Target detection control
+    void enableTargetDetection(bool enabled);
+
 signals:
     void workflowStarted();
     void workflowCompleted();
     void stepChanged(RegistrationStep step);
     void projectChanged();
+    void targetDetectionRequested();
 
 public slots:
     void goNext();

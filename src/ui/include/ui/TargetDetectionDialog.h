@@ -1,182 +1,213 @@
-#ifndef EXPORTDIALOG_H
-#define EXPORTDIALOG_H
+#ifndef TARGETDETECTIONDIALOG_H
+#define TARGETDETECTIONDIALOG_H
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
 #include <QDoubleSpinBox>
-#include <QFileDialog>
-#include <QGridLayout>
 #include <QGroupBox>
-#include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
-#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
-#include <QVBoxLayout>
+#include <QTabWidget>
+#include <QTableWidget>
+#include <QTextEdit>
 
-#include "../export/IFormatWriter.h"
+#include <memory>
+#include <vector>
 
-/**
- * @brief Export options structure
- */
-struct ExportOptions
-{
-    QString outputPath;
-    QString format;  // "e57", "las", "ply", "xyz"
+#include "core/pointdata.h"
+#include "registration/TargetDetectionBase.h"
 
-    // Data options
-    bool includeColor = true;
-    bool includeIntensity = true;
-    bool includeNormals = false;
-
-    // Coordinate system
-    QString sourceCRS = "EPSG:4326";
-    QString targetCRS = "EPSG:4326";
-    bool transformCoordinates = false;
-
-    // Format-specific options
-    QVariantMap formatOptions;
-
-    // Processing options
-    bool enableSubsampling = false;
-    double subsamplingRatio = 1.0;
-    bool enableFiltering = false;
-    double filterRadius = 0.1;
-
-    // Quality options
-    int precision = 6;        // Decimal places for coordinates
-    QString separator = " ";  // For text formats
-    bool writeHeader = true;
-
-    // Project information
-    QString projectName;
-    QString description;
-    QString coordinateSystem;
-};
+// Forward declarations
+class TargetManager;
+class SphereDetector;
+class NaturalPointSelector;
+class SphereTarget;
+class NaturalPointTarget;
 
 /**
- * @brief Export Dialog for Point Cloud Data
+ * @brief Target Detection Dialog for Point Cloud Registration
  *
- * Sprint 6 User Story 1: Multi-Format Point Cloud Export
- * Provides user-friendly interface for configuring and executing point cloud exports.
+ * Sprint 5.1: Target Detection UI & Mode Activation
+ * Provides user interface for configuring and initiating target detection
+ * on point cloud data for registration purposes.
  */
-class ExportDialog : public QDialog
+class TargetDetectionDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit ExportDialog(QWidget* parent = nullptr);
-    ~ExportDialog() override;
+    /**
+     * @brief Detection mode enumeration
+     */
+    enum DetectionMode
+    {
+        AutomaticSpheres = 0,      ///< Automatic sphere detection only
+        ManualNaturalPoints = 1,   ///< Manual natural point selection only
+        Both = 2                   ///< Both automatic and manual detection
+    };
 
-    // Configuration
-    void setPointCloudData(const std::vector<Point>& points);
-    void setProjectInfo(const QString& name, const QString& description);
-    void setAvailableFormats(const QStringList& formats);
-    void setAvailableCRS(const QStringList& crsList);
+public:
+    /**
+     * @brief Constructor
+     * @param targetManager Pointer to target manager for storing results
+     * @param parent Parent widget
+     */
+    explicit TargetDetectionDialog(TargetManager* targetManager, QWidget* parent = nullptr);
 
-    // Results
-    ExportOptions getExportOptions() const;
-    QString getSelectedFormat() const;
-    QString getOutputPath() const;
+    /**
+     * @brief Destructor
+     */
+    ~TargetDetectionDialog() override = default;
 
-    // State management
-    void resetToDefaults();
-    void loadSettings();
-    void saveSettings();
+    // Configuration methods
+    /**
+     * @brief Set point cloud data for detection
+     * @param scanId ID of the scan
+     * @param points Point cloud data
+     */
+    void setPointCloudData(const QString& scanId, const std::vector<PointFullData>& points);
+
+    /**
+     * @brief Get current detection parameters from UI
+     * @return Detection parameters structure
+     */
+    TargetDetectionBase::DetectionParams getDetectionParameters() const;
+
+    /**
+     * @brief Set detection parameters in UI
+     * @param params Detection parameters to set
+     */
+    void setDetectionParameters(const TargetDetectionBase::DetectionParams& params);
+
+    /**
+     * @brief Get current detection mode
+     * @return Selected detection mode
+     */
+    DetectionMode getDetectionMode() const;
 
 public slots:
-    void accept() override;
-    void reject() override;
+    /**
+     * @brief Start the detection process
+     */
+    void startDetection();
+
+    /**
+     * @brief Cancel ongoing detection
+     */
+    void cancelDetection();
+
+    /**
+     * @brief Reset parameters to default values
+     */
+    void resetToDefaults();
+
+    /**
+     * @brief Load parameters from file
+     */
+    void loadParameters();
+
+    /**
+     * @brief Save parameters to file
+     */
+    void saveParameters();
 
 private slots:
-    void onBrowseClicked();
-    void onFormatChanged();
-    void onCRSChanged();
-    void onPreviewClicked();
-    void onAdvancedToggled(bool enabled);
-    void onTransformCoordsToggled(bool enabled);
-    void updateEstimatedSize();
-    void validateInput();
+    // Detection progress and completion handlers
+    void onDetectionProgress(int percentage, const QString& stage);
+    void onDetectionCompleted(const TargetDetectionBase::DetectionResult& result);
+    void onDetectionError(const QString& error);
+
+    // UI event handlers
+    void onDetectionModeChanged();
+    void onParametersChanged();
+    void onTargetSelected();
+    void onAcceptTargets();
+    void onRejectTargets();
 
 signals:
-    void exportRequested(const ExportOptions& options);
-    void previewRequested(const ExportOptions& options);
+    /**
+     * @brief Emitted when detection is completed and targets are accepted
+     * @param scanId ID of the scan
+     * @param result Detection result
+     */
+    void detectionCompleted(const QString& scanId, const TargetDetectionBase::DetectionResult& result);
+
+    /**
+     * @brief Emitted when manual selection mode is requested
+     * @param scanId ID of the scan for manual selection
+     */
+    void manualSelectionRequested(const QString& scanId);
 
 private:
+    // UI setup methods
     void setupUI();
-    void setupBasicOptions();
-    void setupFormatOptions();
-    void setupCoordinateOptions();
-    void setupAdvancedOptions();
-    void setupButtons();
+    QWidget* createParameterControls();
+    QWidget* createDetectionControls();
+    QWidget* createResultsDisplay();
 
-    void updateFormatSpecificOptions();
-    void updateCoordinateSystemOptions();
-    void updateEstimatedFileSize();
-    QString formatFileSize(qint64 bytes) const;
+    // Parameter management
+    void updateParameterControls();
+    void updateResultsTable(const TargetDetectionBase::DetectionResult& result);
+    bool validateParameters() const;
+    TargetDetectionBase::DetectionParams getParametersFromUI() const;
+    void setUIFromParameters(const TargetDetectionBase::DetectionParams& params);
+
+private:
+    // Core components
+    TargetManager* m_targetManager;
+    SphereDetector* m_sphereDetector;
+    NaturalPointSelector* m_naturalPointSelector;
+
+    // Data
+    QString m_currentScanId;
+    std::vector<PointFullData> m_currentPoints;
+    TargetDetectionBase::DetectionResult m_lastResult;
+
+    // State
+    bool m_detectionRunning;
 
     // UI Components
-    QVBoxLayout* m_mainLayout;
+    QTabWidget* m_tabWidget;
 
-    // Basic options
-    QGroupBox* m_basicGroup;
-    QLineEdit* m_pathEdit;
-    QPushButton* m_browseButton;
-    QComboBox* m_formatCombo;
-    QLabel* m_estimatedSizeLabel;
+    // Parameter controls
+    QComboBox* m_detectionModeCombo;
+    QGroupBox* m_commonParamsGroup;
+    QGroupBox* m_sphereParamsGroup;
+    QGroupBox* m_naturalPointParamsGroup;
 
-    // Data options
-    QGroupBox* m_dataGroup;
-    QCheckBox* m_includeColorCheck;
-    QCheckBox* m_includeIntensityCheck;
-    QCheckBox* m_includeNormalsCheck;
+    // Common parameter controls
+    QDoubleSpinBox* m_distanceThresholdSpin;
+    QSpinBox* m_maxIterationsSpin;
+    QDoubleSpinBox* m_minQualitySpin;
+    QCheckBox* m_enablePreprocessingCheck;
 
-    // Coordinate system options
-    QGroupBox* m_coordinateGroup;
-    QComboBox* m_sourceCRSCombo;
-    QComboBox* m_targetCRSCombo;
-    QCheckBox* m_transformCoordsCheck;
-    QLabel* m_crsWarningLabel;
+    // Sphere parameter controls
+    QDoubleSpinBox* m_minRadiusSpin;
+    QDoubleSpinBox* m_maxRadiusSpin;
+    QSpinBox* m_minInliersSpin;
 
-    // Format-specific options
-    QGroupBox* m_formatGroup;
-    QWidget* m_formatOptionsWidget;
-    QVBoxLayout* m_formatOptionsLayout;
+    // Natural point parameter controls
+    QDoubleSpinBox* m_neighborhoodRadiusSpin;
+    QDoubleSpinBox* m_curvatureThresholdSpin;
 
-    // Advanced options
-    QGroupBox* m_advancedGroup;
-    QCheckBox* m_advancedToggle;
-    QCheckBox* m_enableSubsamplingCheck;
-    QDoubleSpinBox* m_subsamplingRatioSpin;
-    QCheckBox* m_enableFilteringCheck;
-    QDoubleSpinBox* m_filterRadiusSpin;
-    QSpinBox* m_precisionSpin;
-    QLineEdit* m_separatorEdit;
-    QCheckBox* m_writeHeaderCheck;
-
-    // Progress and status
+    // Detection controls
+    QPushButton* m_startButton;
+    QPushButton* m_cancelButton;
+    QPushButton* m_resetButton;
+    QPushButton* m_loadParamsButton;
+    QPushButton* m_saveParamsButton;
+    QPushButton* m_manualSelectionButton;
     QProgressBar* m_progressBar;
     QLabel* m_statusLabel;
 
-    // Buttons
-    QHBoxLayout* m_buttonLayout;
-    QPushButton* m_previewButton;
-    QPushButton* m_exportButton;
-    QPushButton* m_cancelButton;
-
-    // Data
-    std::vector<Point> m_pointCloudData;
-    QString m_projectName;
-    QString m_projectDescription;
-    QStringList m_availableFormats;
-    QStringList m_availableCRS;
-
-    // State
-    bool m_isExporting = false;
-    qint64 m_estimatedFileSize = 0;
+    // Results display
+    QTableWidget* m_resultsTable;
+    QPushButton* m_acceptButton;
+    QPushButton* m_rejectButton;
+    QTextEdit* m_logTextEdit;
 };
 
-#endif  // EXPORTDIALOG_H
+#endif  // TARGETDETECTIONDIALOG_H

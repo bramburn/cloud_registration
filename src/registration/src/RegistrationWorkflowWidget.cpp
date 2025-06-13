@@ -201,17 +201,41 @@ QWidget* RegistrationWorkflowWidget::createTargetDetectionWidget()
     instructions->setWordWrap(true);
     layout->addWidget(instructions);
 
-    // Placeholder for target detection UI
-    QTextEdit* placeholder = new QTextEdit();
-    placeholder->setPlainText("Target detection interface will be implemented here.\n\n"
-                              "This will include:\n"
-                              "- Automatic sphere detection\n"
-                              "- Checkerboard pattern detection\n"
-                              "- Manual point selection tools\n"
-                              "- Target quality assessment");
-    placeholder->setMaximumHeight(200);
-    placeholder->setReadOnly(true);
-    layout->addWidget(placeholder);
+    // Target Detection button
+    QPushButton* targetDetectionButton = new QPushButton("Target Detection");
+    targetDetectionButton->setMinimumHeight(40);
+    targetDetectionButton->setStyleSheet("QPushButton { "
+                                        "font-size: 14px; "
+                                        "font-weight: bold; "
+                                        "background-color: #4CAF50; "
+                                        "color: white; "
+                                        "border: none; "
+                                        "border-radius: 6px; "
+                                        "} "
+                                        "QPushButton:hover { "
+                                        "background-color: #45a049; "
+                                        "} "
+                                        "QPushButton:pressed { "
+                                        "background-color: #3d8b40; "
+                                        "} "
+                                        "QPushButton:disabled { "
+                                        "background-color: #cccccc; "
+                                        "color: #666666; "
+                                        "}");
+
+    // Initially disabled - will be enabled when scans are loaded
+    targetDetectionButton->setEnabled(false);
+
+    // Connect to signal that will be handled by MainPresenter
+    connect(targetDetectionButton, &QPushButton::clicked, this, &RegistrationWorkflowWidget::targetDetectionRequested);
+
+    layout->addWidget(targetDetectionButton);
+
+    // Status label for target detection
+    QLabel* statusLabel = new QLabel("Load scans to enable target detection");
+    statusLabel->setObjectName("statusLabel");
+    statusLabel->setStyleSheet("color: #666; font-style: italic; margin-top: 10px;");
+    layout->addWidget(statusLabel);
 
     layout->addStretch();
     return groupBox;
@@ -395,6 +419,33 @@ void RegistrationWorkflowWidget::enableNavigation(bool enabled)
 {
     navigationEnabled_ = enabled;
     updateNavigationButtons();
+}
+
+void RegistrationWorkflowWidget::enableTargetDetection(bool enabled)
+{
+    // Find the target detection button in the target detection widget
+    if (targetDetectionWidget_)
+    {
+        QPushButton* targetDetectionButton = targetDetectionWidget_->findChild<QPushButton*>();
+        if (targetDetectionButton)
+        {
+            targetDetectionButton->setEnabled(enabled);
+        }
+
+        // Update status label
+        QLabel* statusLabel = targetDetectionWidget_->findChild<QLabel*>("statusLabel");
+        if (statusLabel)
+        {
+            if (enabled)
+            {
+                statusLabel->setText("Ready for target detection");
+            }
+            else
+            {
+                statusLabel->setText("Load scans to enable target detection");
+            }
+        }
+    }
 }
 
 void RegistrationWorkflowWidget::goNext()
