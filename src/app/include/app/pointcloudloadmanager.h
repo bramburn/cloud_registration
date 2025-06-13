@@ -45,6 +45,13 @@ public:
     // Sprint 6.1: Get loaded point data for deviation analysis
     std::vector<PointFullData> getLoadedPointFullData(const QString& scanId) const;
 
+private:
+    // Helper method for generating test sphere data
+    void generateSpherePoints(std::vector<PointFullData>& points,
+                             const QVector3D& center,
+                             float radius,
+                             int numPoints) const;
+
 signals:
     void loadingStarted(const QString& filePath);
     void loadingProgress(int percentage, const QString& stage);

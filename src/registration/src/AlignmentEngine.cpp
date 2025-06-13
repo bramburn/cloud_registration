@@ -7,8 +7,15 @@
 #include "../algorithms/ICPRegistration.h"
 #include "analysis/DifferenceAnalysis.h"
 #include "core/pointdata.h"
+#include "registration/SphereDetector.h"
+#include "registration/TargetManager.h"
+#include "app/pointcloudloadmanager.h"
 
-AlignmentEngine::AlignmentEngine(QObject* parent) : QObject(parent), m_computationTimer(new QTimer(this))
+AlignmentEngine::AlignmentEngine(QObject* parent)
+    : QObject(parent),
+      m_computationTimer(new QTimer(this)),
+      m_loadManager(nullptr),
+      m_targetManager(nullptr)
 {
     // Initialize current result
     m_currentResult.transformation.setToIdentity();
@@ -247,37 +254,115 @@ void AlignmentEngine::startTargetDetection(const QString& scanId, int mode, cons
 {
     qDebug() << "Starting target detection for scan:" << scanId << "with mode:" << mode;
 
-    // Emit progress signal
+    if (!m_loadManager)
+    {
+        emit targetDetectionError("Point cloud load manager not available");
+        return;
+    }
+
+    if (!m_targetManager)
+    {
+        emit targetDetectionError("Target manager not available");
+        return;
+    }
+
+    // Emit initial progress
     emit targetDetectionProgress(0, "Initializing target detection...");
 
-    // For now, this is a placeholder implementation
-    // In a complete implementation, this would:
-    // 1. Get point cloud data from PointCloudLoadManager
-    // 2. Create appropriate detector (SphereDetector, NaturalPointSelector)
-    // 3. Run detection asynchronously
-    // 4. Emit progress updates
-    // 5. Emit completion or error signals
+    // Get point cloud data from PointCloudLoadManager
+    std::vector<PointFullData> points = m_loadManager->getLoadedPointFullData(scanId);
 
-    // Simulate some processing time and progress
-    QTimer::singleShot(100, this, [this, scanId]() {
-        emit targetDetectionProgress(25, "Loading point cloud data...");
-    });
+    if (points.empty())
+    {
+        emit targetDetectionError("No point cloud data available for scan: " + scanId);
+        return;
+    }
 
-    QTimer::singleShot(200, this, [this, scanId]() {
-        emit targetDetectionProgress(50, "Running detection algorithms...");
-    });
+    emit targetDetectionProgress(10, "Point cloud data loaded...");
 
-    QTimer::singleShot(300, this, [this, scanId]() {
-        emit targetDetectionProgress(75, "Processing results...");
-    });
+    // Convert QVariantMap to DetectionParams
+    TargetDetectionBase::DetectionParams detectionParams;
+    detectionParams.fromVariantMap(params);
 
-    QTimer::singleShot(400, this, [this, scanId]() {
-        emit targetDetectionProgress(100, "Detection completed");
+    // Check if mode includes automatic spheres (mode 0 = AutomaticSpheres, mode 2 = Both)
+    if (mode == 0 || mode == 2)
+    {
+        // Create and configure SphereDetector
+        m_sphereDetector = std::make_unique<SphereDetector>(this);
 
-        // For now, emit empty results - in real implementation this would contain actual targets
-        QVariantList emptyTargets;
-        emit targetDetectionCompleted(scanId, emptyTargets);
-    });
+        // Connect detector signals to relay slots
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionProgress,
+                this, &AlignmentEngine::onDetectionProgress);
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionCompleted,
+                this, &AlignmentEngine::onDetectionCompleted);
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionError,
+                this, &AlignmentEngine::onDetectionError);
+
+        emit targetDetectionProgress(20, "Starting sphere detection...");
+
+        // Start asynchronous detection
+        m_sphereDetector->detectAsync(points, detectionParams);
+    }
+    else
+    {
+        // For manual modes, just emit completion with empty result
+        TargetDetectionBase::DetectionResult emptyResult;
+        emptyResult.success = true;
+        emptyResult.processedPoints = static_cast<int>(points.size());
+        emit targetDetectionCompleted(emptyResult);
+    }
+}
+
+void AlignmentEngine::cancelTargetDetection()
+{
+    qDebug() << "Cancelling target detection";
+
+    if (m_sphereDetector)
+    {
+        m_sphereDetector->cancel();
+    }
+}
+
+void AlignmentEngine::onDetectionProgress(int percentage, const QString& stage)
+{
+    // Relay progress signal from detector
+    emit targetDetectionProgress(percentage, stage);
+}
+
+void AlignmentEngine::onDetectionCompleted(const TargetDetectionBase::DetectionResult& result)
+{
+    qDebug() << "Target detection completed with" << result.targets.size() << "targets";
+
+    if (m_targetManager && result.success)
+    {
+        // Add all detected targets to the target manager
+        int addedCount = 0;
+        for (const auto& target : result.targets)
+        {
+            if (m_targetManager->addTarget(target->scanId(), target))
+            {
+                addedCount++;
+            }
+        }
+        qDebug() << "Added" << addedCount << "targets to TargetManager";
+    }
+
+    // Relay completion signal
+    emit targetDetectionCompleted(result);
+
+    // Clean up detector
+    m_sphereDetector.reset();
+}
+
+void AlignmentEngine::onDetectionError(const QString& error)
+{
+    qDebug() << "Target detection error:" << error;
+
+    // Relay error signal
+    emit targetDetectionError(error);
+
+    // Clean up detector
+    m_sphereDetector.reset();
 }
 
 void AlignmentEngine::startAutomaticAlignment(const QString& sourceScanId,

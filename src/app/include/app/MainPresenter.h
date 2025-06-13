@@ -269,6 +269,11 @@ public slots:
     void handleTargetDetectionClicked();
 
     /**
+     * @brief Cancel currently running target detection
+     */
+    void cancelTargetDetection();
+
+    /**
      * @brief Connect to a RegistrationWorkflowWidget for target detection integration.
      * @param workflowWidget Pointer to the workflow widget to connect
      */

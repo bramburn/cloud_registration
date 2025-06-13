@@ -1013,19 +1013,39 @@ void MainPresenter::handleTargetDetectionClicked()
     std::vector<PointFullData> pointCloudData;
     if (m_loadManager)
     {
-        // For now, we'll create a placeholder - in a real implementation,
-        // this would get the actual point cloud data from the load manager
-        // pointCloudData = m_loadManager->getLoadedPointFullData(currentScanId);
+        pointCloudData = m_loadManager->getLoadedPointFullData(currentScanId);
     }
 
-    // Create target manager if not available
-    static TargetManager* targetManager = new TargetManager(this);
+    // Ensure we have target manager and alignment engine
+    if (!m_targetManager)
+    {
+        m_targetManager = new TargetManager(this);
+    }
+
+    if (!m_alignmentEngine)
+    {
+        m_alignmentEngine = new AlignmentEngine(this);
+        m_alignmentEngine->setPointCloudLoadManager(m_loadManager);
+        m_alignmentEngine->setTargetManager(m_targetManager);
+    }
 
     // Create and show the target detection dialog
-    TargetDetectionDialog dialog(targetManager, static_cast<QWidget*>(m_view));
+    TargetDetectionDialog dialog(m_targetManager, static_cast<QWidget*>(m_view));
     dialog.setPointCloudData(currentScanId, pointCloudData);
 
-    // Connect dialog signals
+    // Connect AlignmentEngine signals to dialog
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionProgress,
+            &dialog, &TargetDetectionDialog::onDetectionProgress);
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionCompleted,
+            &dialog, &TargetDetectionDialog::onDetectionCompleted);
+    connect(m_alignmentEngine, &AlignmentEngine::targetDetectionError,
+            &dialog, &TargetDetectionDialog::onDetectionError);
+
+    // Connect dialog cancel signal to MainPresenter
+    connect(&dialog, &TargetDetectionDialog::cancelDetectionRequested,
+            this, &MainPresenter::cancelTargetDetection);
+
+    // Connect dialog completion signals
     connect(&dialog, &TargetDetectionDialog::detectionCompleted,
             this, [this](const QString& scanId, const TargetDetectionBase::DetectionResult& result) {
                 // Handle detection completion
@@ -1044,6 +1064,10 @@ void MainPresenter::handleTargetDetectionClicked()
                         .arg(scanId));
             });
 
+    // Connect dialog start detection to AlignmentEngine
+    connect(&dialog, &TargetDetectionDialog::detectionStartRequested,
+            m_alignmentEngine, &AlignmentEngine::startTargetDetection);
+
     // Show dialog modally
     if (dialog.exec() == QDialog::Accepted)
     {
@@ -1052,6 +1076,16 @@ void MainPresenter::handleTargetDetectionClicked()
     else
     {
         m_view->updateStatusBar("Target detection cancelled");
+    }
+}
+
+void MainPresenter::cancelTargetDetection()
+{
+    qDebug() << "MainPresenter::cancelTargetDetection() called";
+
+    if (m_alignmentEngine)
+    {
+        m_alignmentEngine->cancelTargetDetection();
     }
 }
 
