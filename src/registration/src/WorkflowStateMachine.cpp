@@ -13,59 +13,15 @@ const QMap<RegistrationStep, QList<RegistrationStep>> WorkflowStateMachine::vali
 
 WorkflowStateMachine::WorkflowStateMachine(QObject* parent)
     : QObject(parent)
-    , stateMachine_(new QStateMachine(this))
-    , selectScansState_(nullptr)
-    , targetDetectionState_(nullptr)
-    , manualAlignmentState_(nullptr)
-    , icpRegistrationState_(nullptr)
-    , qualityReviewState_(nullptr)
-    , exportState_(nullptr)
     , currentStep_(RegistrationStep::SelectScans)
 {
-    setupStateMachine();
-    
     // Initialize step completion status
     for (const auto& step : getAllSteps()) {
         stepCompletionStatus_[step] = false;
     }
 }
 
-void WorkflowStateMachine::setupStateMachine()
-{
-    createStates();
-    setupTransitions();
-    connectSignals();
-    
-    stateMachine_->setInitialState(selectScansState_);
-    stateMachine_->start();
-}
 
-void WorkflowStateMachine::createStates()
-{
-    selectScansState_ = new QState(stateMachine_);
-    targetDetectionState_ = new QState(stateMachine_);
-    manualAlignmentState_ = new QState(stateMachine_);
-    icpRegistrationState_ = new QState(stateMachine_);
-    qualityReviewState_ = new QState(stateMachine_);
-    exportState_ = new QState(stateMachine_);
-}
-
-void WorkflowStateMachine::setupTransitions()
-{
-    // Define transitions between states
-    // Note: In a real implementation, these would be triggered by specific signals
-    // For now, we'll manage transitions manually through transitionTo()
-}
-
-void WorkflowStateMachine::connectSignals()
-{
-    connect(selectScansState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-    connect(targetDetectionState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-    connect(manualAlignmentState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-    connect(icpRegistrationState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-    connect(qualityReviewState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-    connect(exportState_, &QState::entered, this, &WorkflowStateMachine::onStateEntered);
-}
 
 bool WorkflowStateMachine::canTransitionTo(RegistrationStep nextStep) const
 {
@@ -176,11 +132,7 @@ RegistrationStep WorkflowStateMachine::getStepByIndex(int index) const
     return RegistrationStep::SelectScans;
 }
 
-void WorkflowStateMachine::onStateEntered()
-{
-    // This slot is called when any state is entered
-    // Additional state-specific logic can be added here
-}
+
 
 bool WorkflowStateMachine::validateTransition(RegistrationStep from, RegistrationStep to) const
 {
@@ -217,18 +169,7 @@ RegistrationStep WorkflowStateMachine::getPreviousStep(RegistrationStep current)
     return current;
 }
 
-QState* WorkflowStateMachine::getStateForStep(RegistrationStep step) const
-{
-    switch (step) {
-        case RegistrationStep::SelectScans: return selectScansState_;
-        case RegistrationStep::TargetDetection: return targetDetectionState_;
-        case RegistrationStep::ManualAlignment: return manualAlignmentState_;
-        case RegistrationStep::ICPRegistration: return icpRegistrationState_;
-        case RegistrationStep::QualityReview: return qualityReviewState_;
-        case RegistrationStep::Export: return exportState_;
-    }
-    return selectScansState_;
-}
+
 
 // Utility functions
 QString registrationStepToString(RegistrationStep step)

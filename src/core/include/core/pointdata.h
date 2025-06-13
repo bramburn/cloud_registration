@@ -8,12 +8,15 @@
 // Simple 3D point structure for algorithms and analysis
 struct Point3D {
     float x, y, z;
+    float intensity;
+    bool hasIntensity;
 
-    Point3D() : x(0), y(0), z(0) {}
-    Point3D(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
+    Point3D() : x(0), y(0), z(0), intensity(0), hasIntensity(false) {}
+    Point3D(float x_, float y_, float z_) : x(x_), y(y_), z(z_), intensity(0), hasIntensity(false) {}
+    Point3D(float x_, float y_, float z_, float intensity_) : x(x_), y(y_), z(z_), intensity(intensity_), hasIntensity(true) {}
 
     // Conversion from PointFullData
-    explicit Point3D(const PointFullData& point) : x(point.x), y(point.y), z(point.z) {}
+    explicit Point3D(const PointFullData& point) : x(point.x), y(point.y), z(point.z), intensity(point.intensity), hasIntensity(true) {}
 
     // Conversion to QVector3D
     QVector3D toQVector3D() const { return QVector3D(x, y, z); }

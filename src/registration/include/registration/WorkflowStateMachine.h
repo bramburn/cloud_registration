@@ -1,8 +1,7 @@
-#pragma once
+#ifndef WORKFLOWSTATEMACHINE_H
+#define WORKFLOWSTATEMACHINE_H
 
 #include <QObject>
-#include <QStateMachine>
-#include <QState>
 #include <QMap>
 #include <QList>
 
@@ -66,40 +65,21 @@ signals:
     void workflowCompleted();
     void workflowReset();
 
-private slots:
-    void onStateEntered();
-
 private:
-    // State machine setup
-    void setupStateMachine();
-    void createStates();
-    void setupTransitions();
-    void connectSignals();
-    
     // Validation
     bool validateTransition(RegistrationStep from, RegistrationStep to) const;
     QString getTransitionBlockReason(RegistrationStep from, RegistrationStep to) const;
-    
+
     // Helper methods
     RegistrationStep getNextStep(RegistrationStep current) const;
     RegistrationStep getPreviousStep(RegistrationStep current) const;
-    QState* getStateForStep(RegistrationStep step) const;
 
-    // Qt State Machine components
-    QStateMachine* stateMachine_;
-    QState* selectScansState_;
-    QState* targetDetectionState_;
-    QState* manualAlignmentState_;
-    QState* icpRegistrationState_;
-    QState* qualityReviewState_;
-    QState* exportState_;
-    
     // Current state tracking
     RegistrationStep currentStep_;
-    
+
     // Step completion tracking
     QMap<RegistrationStep, bool> stepCompletionStatus_;
-    
+
     // Valid transitions matrix
     static const QMap<RegistrationStep, QList<RegistrationStep>> validTransitions_;
 };

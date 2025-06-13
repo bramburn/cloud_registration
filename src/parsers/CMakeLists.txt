@@ -23,9 +23,10 @@ target_include_directories(Parsers PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
-# Parsers library dependencies: Core, Qt components, and optionally E57Format, XercesC
+# Parsers library dependencies: Core, Interfaces, Qt components, and optionally E57Format, XercesC
 target_link_libraries(Parsers PUBLIC
     Core
+    Interfaces
     Qt6::Core
 )
 

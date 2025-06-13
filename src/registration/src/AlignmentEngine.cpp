@@ -1,4 +1,4 @@
-#include "AlignmentEngine.h"
+#include "registration/AlignmentEngine.h"
 #include "../algorithms/LeastSquaresAlignment.h"
 #include <QDebug>
 #include <QElapsedTimer>
