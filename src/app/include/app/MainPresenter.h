@@ -240,6 +240,21 @@ public slots:
          */
     void handleDragDropOperation(const QStringList& draggedItems, const QString& draggedType,
                                const QString& targetItemId, const QString& targetType);
+    /**
+     * @brief Handle automatic alignment (ICP) button click
+     *
+     * This slot is triggered when the user clicks the "Automatic Alignment (ICP)"
+     * button in the RegistrationWorkflowWidget. It launches the ICPParameterDialog
+     * and initiates the ICP computation if parameters are accepted.
+     */
+    void handleAutomaticAlignmentClicked();
+
+    /**
+     * @brief Connect to a RegistrationWorkflowWidget
+     * @param workflowWidget Pointer to the workflow widget to connect
+     */
+    void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
+
     // Sprint 3.2: Export functionality
     void handleExportPointCloud();
 

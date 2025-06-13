@@ -64,6 +64,7 @@ signals:
     void workflowCompleted();
     void stepChanged(RegistrationStep step);
     void projectChanged();
+    void automaticAlignmentRequested();
 
 public slots:
     void goNext();

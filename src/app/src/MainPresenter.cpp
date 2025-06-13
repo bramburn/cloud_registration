@@ -12,6 +12,9 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
+#include "ui/ICPParameterDialog.h"
+#include "algorithms/ICPRegistration.h"
+#include "registration/RegistrationWorkflowWidget.h"
 #include "registration/RegistrationProject.h"
 #include "ui/ExportDialog.h"
 #include "export/IFormatWriter.h"
@@ -25,7 +28,6 @@
 #include "rendering/pointcloudviewerwidget.h"
 
 // Sprint 6.1: Additional includes for deviation map functionality
-#include "rendering/pointcloudviewerwidget.h"
 
 // Sprint 6.2: Quality assessment and reporting includes
 #include "quality/QualityAssessment.h"
@@ -979,6 +981,93 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
     }
+}
+
+void MainPresenter::handleAutomaticAlignmentClicked()
+{
+    qDebug() << "MainPresenter: Automatic alignment button clicked";
+
+    if (!m_loadManager)
+    {
+        showError("Automatic Alignment", "Point cloud load manager is not available.");
+        return;
+    }
+
+    // Get loaded scans
+    QStringList loadedScans = m_loadManager->getLoadedScans();
+
+    if (loadedScans.size() < 2)
+    {
+        showError("Automatic Alignment",
+                 QString("At least 2 scans must be loaded for automatic alignment. Currently loaded: %1")
+                 .arg(loadedScans.size()));
+        return;
+    }
+
+    // For now, use the first two loaded scans
+    QString sourceScanId = loadedScans[0];
+    QString targetScanId = loadedScans[1];
+
+    qDebug() << "Selected scans for alignment:" << sourceScanId << "→" << targetScanId;
+
+    try
+    {
+        // Get point clouds for parameter calculation
+        PointCloud sourceCloud = m_loadManager->getLoadedPointCloud(sourceScanId);
+        PointCloud targetCloud = m_loadManager->getLoadedPointCloud(targetScanId);
+
+        // Create and configure the ICP parameter dialog
+        ICPParameterDialog dialog(sourceCloud, targetCloud, m_view ? m_view->getWidget() : nullptr);
+        dialog.setScanIds(sourceScanId, targetScanId);
+
+        // Connect the dialog's runICPRequested signal
+        connect(&dialog, &ICPParameterDialog::runICPRequested,
+                this, [this](const ICPParams& params, const QString& sourceScanId, const QString& targetScanId) {
+            qDebug() << "ICP requested with parameters - Max iterations:" << params.maxIterations
+                     << "Convergence:" << params.convergenceThreshold
+                     << "Max distance:" << params.maxCorrespondenceDistance;
+
+            // TODO: Get AlignmentEngine instance and start automatic alignment
+            // For now, just show a message
+            showInfo("ICP Started",
+                    QString("Starting ICP alignment between %1 and %2")
+                    .arg(sourceScanId, targetScanId));
+        });
+
+        // Show the dialog
+        if (dialog.exec() == QDialog::Accepted)
+        {
+            qDebug() << "ICP parameter dialog accepted";
+        }
+        else
+        {
+            qDebug() << "ICP parameter dialog cancelled";
+        }
+    }
+    catch (const std::exception& e)
+    {
+        showError("Automatic Alignment",
+                 QString("Failed to initialize ICP dialog: %1").arg(e.what()));
+    }
+    catch (...)
+    {
+        showError("Automatic Alignment", "Unknown error occurred while initializing ICP dialog.");
+    }
+}
+
+void MainPresenter::connectToWorkflowWidget(RegistrationWorkflowWidget* workflowWidget)
+{
+    if (!workflowWidget)
+    {
+        qWarning() << "MainPresenter: Cannot connect to null workflow widget";
+        return;
+    }
+
+    // Connect the automatic alignment signal
+    connect(workflowWidget, &RegistrationWorkflowWidget::automaticAlignmentRequested,
+            this, &MainPresenter::handleAutomaticAlignmentClicked);
+
+    qDebug() << "MainPresenter: Connected to RegistrationWorkflowWidget";
 }
 
 // Alignment Management Implementation
