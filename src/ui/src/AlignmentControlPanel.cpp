@@ -286,11 +286,9 @@ void AlignmentControlPanel::updateCorrespondenceCount(int count)
 
 void AlignmentControlPanel::onAlignmentButtonClicked()
 {
-    if (m_alignmentEngine)
-    {
-        emit alignmentRequested();
-        m_alignmentEngine->recomputeAlignment();
-    }
+    // Emit signal to request alignment computation
+    // The MainPresenter will handle the actual computation logic
+    emit alignmentRequested();
 }
 
 void AlignmentControlPanel::onClearCorrespondencesClicked()

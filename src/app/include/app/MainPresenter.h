@@ -14,15 +14,17 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class TargetManager;
+class AlignmentEngine;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
@@ -68,6 +70,17 @@ class MainPresenter : public QObject
          * @param loadManager Pointer to load manager.
          */
     void setPointCloudLoadManager(PointCloudLoadManager* loadManager);
+    /**
+     * @brief Set the target manager.
+     * @param targetManager Pointer to target manager.
+     */
+    void setTargetManager(TargetManager* targetManager);
+
+    /**
+     * @brief Set the alignment engine.
+     * @param alignmentEngine Pointer to alignment engine.
+     */
+    void setAlignmentEngine(AlignmentEngine* alignmentEngine);
 
 public slots:
         /**
@@ -292,6 +305,15 @@ private:
          */
     void clearPointCloudData();
 
+    /**
+     * @brief Trigger alignment computation preview
+     *
+     * This slot is connected to AlignmentControlPanel::alignmentRequested() signal.
+     * It retrieves correspondences from TargetManager and initiates alignment computation
+     * through AlignmentEngine.
+     */
+    void triggerAlignmentPreview();
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -302,6 +324,8 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
+        TargetManager* m_targetManager;
+        AlignmentEngine* m_alignmentEngine;
 
          // Application state
     QString m_currentProjectPath;

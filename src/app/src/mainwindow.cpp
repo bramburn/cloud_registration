@@ -13,6 +13,9 @@
 #include "ui/loadingsettingsdialog.h"
 #include "ui/projecthubwidget.h"
 #include "ui/sidebarwidget.h"
+#include "ui/AlignmentControlPanel.h"
+#include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
 // Sprint 1.2: Scan Import functionality
 #include "app/scanimportmanager.h"
 #include "core/sqlitemanager.h"
@@ -53,12 +56,15 @@ MainWindow::MainWindow(QWidget* parent)
       m_projectView(nullptr),
       m_projectSplitter(nullptr),
       m_sidebar(nullptr),
+      m_alignmentControlPanel(nullptr),
       m_mainContentArea(nullptr),
       m_viewer(nullptr),
       m_viewerWidget(nullptr),
       m_progressDialog(nullptr),
       m_projectManager(new ProjectManager(this)),
       m_loadManager(new PointCloudLoadManager(this)),
+      m_targetManager(new TargetManager(this)),
+      m_alignmentEngine(new AlignmentEngine(this)),
       m_currentProject(nullptr),
       m_newProjectAction(nullptr),
       m_openProjectAction(nullptr),
@@ -125,8 +131,18 @@ MainWindow::MainWindow(QWidget* parent)
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, nullptr, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
+        m_presenter->setTargetManager(m_targetManager);
+        m_presenter->setAlignmentEngine(m_alignmentEngine);
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
+
+        // Sprint 2.1: Setup AlignmentControlPanel with AlignmentEngine
+        qDebug() << "Setting up AlignmentControlPanel...";
+        if (m_alignmentControlPanel && m_alignmentEngine)
+        {
+            m_alignmentControlPanel->setAlignmentEngine(m_alignmentEngine);
+        }
+        qDebug() << "AlignmentControlPanel setup completed";
 
         // Sprint 6: Initialize export and quality assessment components
         qDebug() << "Initializing Sprint 6 components...";
@@ -283,12 +299,15 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
       m_projectView(nullptr),
       m_projectSplitter(nullptr),
       m_sidebar(nullptr),
+      m_alignmentControlPanel(nullptr),
       m_mainContentArea(nullptr),
       m_viewer(nullptr),
       m_viewerWidget(nullptr),
       m_progressDialog(nullptr),
       m_projectManager(new ProjectManager(this)),
       m_loadManager(new PointCloudLoadManager(this)),
+      m_targetManager(new TargetManager(this)),
+      m_alignmentEngine(new AlignmentEngine(this)),
       m_currentProject(nullptr),
       m_newProjectAction(nullptr),
       m_openProjectAction(nullptr),
@@ -339,8 +358,18 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, m_e57Parser, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
+        m_presenter->setTargetManager(m_targetManager);
+        m_presenter->setAlignmentEngine(m_alignmentEngine);
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
+
+        // Sprint 2.1: Setup AlignmentControlPanel with AlignmentEngine
+        qDebug() << "Setting up AlignmentControlPanel...";
+        if (m_alignmentControlPanel && m_alignmentEngine)
+        {
+            m_alignmentControlPanel->setAlignmentEngine(m_alignmentEngine);
+        }
+        qDebug() << "AlignmentControlPanel setup completed";
 
         qDebug() << "Setting up menu bar...";
         setupMenuBar();
@@ -477,6 +506,11 @@ void MainWindow::setupUI()
     m_sidebar = new SidebarWidget(this);
     m_sidebar->setMinimumWidth(250);
     m_sidebar->setMaximumWidth(400);
+
+    // Create Alignment Control Panel
+    m_alignmentControlPanel = new AlignmentControlPanel(this);
+    m_alignmentControlPanel->setMinimumWidth(250);
+    m_alignmentControlPanel->setMaximumWidth(400);
 
     // Create main content area with point cloud viewer
     m_mainContentArea = new QWidget();
@@ -2901,4 +2935,9 @@ void MainWindow::onQualityAssessmentCompleted()
 {
     setStatusMessage("Quality assessment completed");
     m_generateReportAction->setEnabled(true);
+}
+
+AlignmentControlPanel* MainWindow::getAlignmentControlPanel()
+{
+    return m_alignmentControlPanel;
 }

@@ -12,6 +12,9 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
+#include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
+#include "ui/AlignmentControlPanel.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -26,6 +29,8 @@ MainPresenter::MainPresenter(IMainView* view,
       m_viewer(nullptr),
       m_projectManager(projectManager),
       m_loadManager(loadManager),
+      m_targetManager(nullptr),
+      m_alignmentEngine(nullptr),
       m_isFileOpen(false),
       m_isProjectOpen(false),
       m_isParsingInProgress(false),
@@ -54,6 +59,16 @@ void MainPresenter::setProjectManager(ProjectManager* projectManager)
 void MainPresenter::setPointCloudLoadManager(PointCloudLoadManager* loadManager)
 {
     m_loadManager = loadManager;
+}
+
+void MainPresenter::setTargetManager(TargetManager* targetManager)
+{
+    m_targetManager = targetManager;
+}
+
+void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
+{
+    m_alignmentEngine = alignmentEngine;
 }
 
 void MainPresenter::setupConnections()
@@ -110,6 +125,16 @@ void MainPresenter::setupConnections()
             // Connect new Sprint 4 operations
             connect(sidebar, &SidebarWidget::clusterLockToggleRequested, this, &MainPresenter::handleClusterLockToggle);
             connect(sidebar, &SidebarWidget::dragDropOperationRequested, this, &MainPresenter::handleDragDropOperation);
+        }
+    }
+
+    // Connect alignment control panel signals if available
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            connect(alignmentPanel, &AlignmentControlPanel::alignmentRequested, this, &MainPresenter::triggerAlignmentPreview);
         }
     }
 }
@@ -882,5 +907,38 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     else
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
+    }
+}
+
+void MainPresenter::triggerAlignmentPreview()
+{
+    if (!m_targetManager)
+    {
+        showError("Alignment Preview", "Target manager is not available.");
+        return;
+    }
+
+    if (!m_alignmentEngine)
+    {
+        showError("Alignment Preview", "Alignment engine is not available.");
+        return;
+    }
+
+    // Retrieve correspondences from TargetManager
+    QList<TargetCorrespondence> correspondences = m_targetManager->getAllCorrespondences();
+
+    if (correspondences.size() < 3)
+    {
+        showError("Alignment Preview", "At least 3 point correspondences are required for alignment computation.");
+        return;
+    }
+
+    // Trigger alignment computation through AlignmentEngine
+    m_alignmentEngine->recomputeAlignment();
+
+    // Update status
+    if (m_view)
+    {
+        m_view->updateStatusBar("Alignment computation started...");
     }
 }
