@@ -133,6 +133,11 @@ MainWindow::MainWindow(QWidget* parent)
         m_presenter->setProjectManager(m_projectManager);
         m_presenter->setTargetManager(m_targetManager);
         m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
 
@@ -354,12 +359,51 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
         setupUI();
         qDebug() << "UI setup completed";
 
+        // Sprint 6: Initialize export and quality assessment components
+        qDebug() << "Initializing Sprint 6 components...";
+        m_exporter = std::make_unique<PointCloudExporter>(this);
+        m_qualityAssessment = std::make_unique<QualityAssessment>(this);
+        m_reportGenerator = std::make_unique<PDFReportGenerator>(this);
+        m_crsManager = std::make_unique<CoordinateSystemManager>(this);
+
+        // Connect Sprint 6 signals
+        connect(m_exporter.get(),
+                &PointCloudExporter::exportCompleted,
+                this,
+                [this](const ExportResult& result)
+                {
+                    if (result.success)
+                    {
+                        onExportCompleted(result.outputPath);
+                    }
+                    else
+                    {
+                        QMessageBox::critical(this, "Export Failed", result.errorMessage);
+                    }
+                });
+
+        connect(m_qualityAssessment.get(),
+                &QualityAssessment::assessmentCompleted,
+                this,
+                [this](const QualityReport& report)
+                {
+                    m_lastQualityReport = new QualityReport(report);
+                    onQualityAssessmentCompleted();
+                });
+
+        qDebug() << "Sprint 6 components initialized";
+
         // Sprint 4: Initialize presenter after UI setup
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, m_e57Parser, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
         m_presenter->setTargetManager(m_targetManager);
         m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
 
@@ -2881,45 +2925,14 @@ void MainWindow::onQualityAssessment()
 
 void MainWindow::onGenerateQualityReport()
 {
-    if (!m_reportGenerator || !m_lastQualityReport)
+    // Sprint 6.2: Delegate to MainPresenter instead of handling directly
+    if (m_presenter)
     {
-        QMessageBox::warning(this, "Report Error", "No quality assessment data available for report generation");
-        return;
-    }
-
-    QString outputPath = QFileDialog::getSaveFileName(this,
-                                                      "Save Quality Report",
-                                                      QString("%1_quality_report.pdf").arg(m_currentFileName),
-                                                      "PDF Files (*.pdf);;All Files (*)");
-
-    if (outputPath.isEmpty())
-    {
-        return;
-    }
-
-    ReportOptions options;
-    options.outputPath = outputPath;
-    options.projectName = m_currentFileName.isEmpty() ? "Untitled Project" : m_currentFileName;
-    options.companyName = "FARO Technologies";
-    options.operatorName = QApplication::applicationName();
-    options.includeCharts = true;
-    options.includeRecommendations = true;
-    options.includeDetailedMetrics = true;
-
-    setStatusMessage("Generating quality report...");
-
-    bool success = m_reportGenerator->generateReport(*m_lastQualityReport, options);
-
-    if (success)
-    {
-        QMessageBox::information(this, "Report Generated", QString("Quality report saved to:\n%1").arg(outputPath));
-        setStatusMessage("Quality report generated successfully");
+        m_presenter->handleGenerateReportClicked();
     }
     else
     {
-        QMessageBox::critical(
-            this, "Report Error", QString("Failed to generate report: %1").arg(m_reportGenerator->getLastError()));
-        setStatusMessage("Report generation failed");
+        QMessageBox::warning(this, "Report Error", "Presenter not available for report generation");
     }
 }
 

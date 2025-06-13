@@ -20,6 +20,9 @@ class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
 class BundleAdjustmentProgressDialog;
+class QualityAssessment;
+class PDFReportGenerator;
+struct QualityReport;
 
 namespace Registration {
     class PoseGraph;
@@ -95,6 +98,18 @@ class MainPresenter : public QObject
      * @param alignmentEngine Pointer to alignment engine.
      */
     void setAlignmentEngine(AlignmentEngine* alignmentEngine);
+
+    /**
+     * @brief Set the quality assessment instance (Sprint 6.2)
+     * @param qualityAssessment Pointer to the quality assessment
+     */
+    void setQualityAssessment(QualityAssessment* qualityAssessment);
+
+    /**
+     * @brief Set the PDF report generator instance (Sprint 6.2)
+     * @param reportGenerator Pointer to the PDF report generator
+     */
+    void setPDFReportGenerator(PDFReportGenerator* reportGenerator);
 
 public slots:
         /**
@@ -342,6 +357,31 @@ private slots:
      * @param enabled Whether to show or hide the deviation map
      */
     void handleShowDeviationMapToggled(bool enabled);
+
+    /**
+     * @brief Handle generate quality report request (Sprint 6.2)
+     */
+    void handleGenerateReportClicked();
+
+private slots:
+    /**
+     * @brief Handle quality assessment completion (Sprint 6.2)
+     * @param report The completed quality report
+     */
+    void onQualityAssessmentCompleted(const QualityReport& report);
+
+    /**
+     * @brief Handle successful report generation (Sprint 6.2)
+     * @param filePath Path to the generated report
+     */
+    void onReportGenerated(const QString& filePath);
+
+    /**
+     * @brief Handle report generation error (Sprint 6.2)
+     * @param error Error message
+     */
+    void onReportError(const QString& error);
+
 private:
         /**
          * @brief Set up signal-slot connections between components.
@@ -449,6 +489,11 @@ private:
     // Bundle Adjustment Management
     std::unique_ptr<Optimization::BundleAdjustment> m_bundleAdjustment;
     std::unique_ptr<BundleAdjustmentProgressDialog> m_baProgressDialog;
+
+    // Sprint 6.2: Quality assessment and reporting
+    QualityAssessment* m_qualityAssessment;
+    PDFReportGenerator* m_reportGenerator;
+    QualityReport m_lastQualityReport;
 };
 
 #endif  // MAINPRESENTER_H
