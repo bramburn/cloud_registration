@@ -1,4 +1,4 @@
-#include "PDFReportGenerator.h"
+#include "quality/PDFReportGenerator.h"
 #include <QPainter>
 #include <QPagedPaintDevice>
 #include <QTextDocument>

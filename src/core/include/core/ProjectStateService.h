@@ -4,14 +4,87 @@
 #include <QObject>
 #include <QString>
 #include <QJsonObject>
+#include <QList>
+#include <QStringList>
+#include <QDateTime>
+#include <QDir>
 #include <memory>
 #include "core/project.h"
 
 // Forward declarations
+class QTimer;
+
+// Temporary type definitions for Sprint 7 - these will be properly defined in future sprints
+struct ScanInfo {
+    QString scanId;
+    QString scanName;
+    QString filePath;
+    QString filePathRelative;
+    QString absolutePath;
+    QString importType;
+    QString clusterId;
+    QString importDate;  // Changed from QDateTime to QString for compatibility
+
+    bool isValid() const {
+        return !scanId.isEmpty() && !scanName.isEmpty();
+    }
+
+    QString getFilePath(const QString& projectPath) const {
+        return QDir(projectPath).absoluteFilePath(filePathRelative);
+    }
+};
+
+struct ClusterInfo {
+    QString clusterId;
+    QString clusterName;
+    QString parentClusterId;
+    QString projectId;
+    QString creationDate;  // Changed from QDateTime to QString for compatibility
+    bool isLocked = false;
+
+    bool isValid() const {
+        return !clusterId.isEmpty() && !clusterName.isEmpty();
+    }
+};
+
+struct ProjectMetadata {
+    QString project_id;
+    QString project_name;
+    QString creation_date;
+    QString last_modified_date;
+    QString file_format_version;
+    QString description;
+
+    bool isValid() const {
+        return !project_name.isEmpty() && !file_format_version.isEmpty() && !creation_date.isEmpty();
+    }
+};
+
+enum class SaveResult {
+    Success,
+    Failed,
+    Cancelled,
+    UnknownError,
+    NoActiveProject,
+    MetadataCorrupted,
+    DatabaseMissing,
+    DatabaseCorrupted,
+    MetadataWriteFailed,
+    TransactionFailed,
+    DatabaseWriteFailed
+};
+
+enum class ProjectLoadResult {
+    Success,
+    Failed,
+    NotFound,
+    Corrupted
+};
+
+// Forward declarations for classes that have been moved to UI library
 class SQLiteManager;
 class ScanImportManager;
 class ProjectTreeModel;
-class QTimer;
 
 /**
  * @brief ProjectStateService - Manages the state of the currently active project
@@ -74,6 +147,17 @@ public:
     bool getClusterLockState(const QString& clusterId);
     bool deleteClusterRecursive(const QString& clusterId, bool deletePhysicalFiles = false);
     bool deleteScan(const QString& scanId, bool deletePhysicalFile = false);
+    QStringList getScansInCluster(const QString& clusterId);
+
+    // Additional methods for compatibility with ProjectManager
+    QString createProject(const QString& projectPath, const QString& name);
+    bool isProjectOpen() const;
+    ProjectInfo currentProject() const;
+    QString detailedError() const;
+    bool isValidProject(const QString& projectPath);
+
+    // Static utility methods (public)
+    static bool isProjectDirectory(const QString& path);
 
 signals:
     // Project lifecycle signals
@@ -141,7 +225,6 @@ private:
     static QString getMetadataFilePath(const QString& projectPath);
     static QString getDatabasePath(const QString& projectPath);
     static QString getScansSubfolder(const QString& projectPath);
-    static bool isProjectDirectory(const QString& path);
     
     // Data members
     SQLiteManager* m_sqliteManager;

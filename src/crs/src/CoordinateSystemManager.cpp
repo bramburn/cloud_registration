@@ -1,5 +1,5 @@
-#include "CoordinateSystemManager.h"
-#include "../export/IFormatWriter.h" // For Point struct
+#include "crs/CoordinateSystemManager.h"
+#include "export/IFormatWriter.h" // For Point struct
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>

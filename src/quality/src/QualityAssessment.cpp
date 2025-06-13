@@ -1,4 +1,4 @@
-#include "QualityAssessment.h"
+#include "quality/QualityAssessment.h"
 #include <QDebug>
 #include <QDateTime>
 #include <QElapsedTimer>

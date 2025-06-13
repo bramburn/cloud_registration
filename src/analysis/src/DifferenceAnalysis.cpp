@@ -1,4 +1,4 @@
-#include "DifferenceAnalysis.h"
+#include "analysis/DifferenceAnalysis.h"
 #include <QDebug>
 #include <QElapsedTimer>
 #include <algorithm>

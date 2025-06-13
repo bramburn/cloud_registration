@@ -11,8 +11,6 @@ set(CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/screenspaceerror.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ProjectStateService.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projectmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.cpp
 )
 
 set(CORE_HEADERS
@@ -26,8 +24,6 @@ set(CORE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/screenspaceerror.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/ProjectStateService.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/core/projectmanager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/progressmanager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/core/sqlitemanager.h
 )
 
 # Create Core static library
@@ -40,10 +36,11 @@ target_include_directories(Core PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/core>
 )
 
-# Core library dependencies (Qt6::Core for QObject, QString; Qt6::Gui for QVector3D)
+# Core library dependencies (Qt6::Core for QObject, QString; Qt6::Gui for QVector3D; Qt6::Sql for database operations)
 target_link_libraries(Core PUBLIC
     Qt6::Core
     Qt6::Gui
+    Qt6::Sql
 )
 
 message(STATUS "Configuring Core library...")

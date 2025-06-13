@@ -44,8 +44,8 @@ endif()
 # Output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# F1-S2-03: Find and link Qt6 components (Sprint 3: Added Sql for database support)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Test Sql)
+# F1-S2-03: Find and link Qt6 components (Sprint 3: Added Sql for database support, Sprint 6: Added PrintSupport for PDF generation)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Test Sql PrintSupport)
 
 # Sprint 2: Task 4.2 - Find third-party libraries (optional for Sprint 1 scaffolding)
 find_package(Eigen3 CONFIG QUIET)
@@ -102,7 +102,7 @@ add_subdirectory(src/core)
 add_subdirectory(src/algorithms)
 add_subdirectory(src/analysis)
 add_subdirectory(src/crs)
-add_subdirectory(src/detection)
+# src/detection moved to src/registration in Sprint 6
 add_subdirectory(src/export)
 add_subdirectory(src/features)
 add_subdirectory(src/implementations)

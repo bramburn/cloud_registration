@@ -1,32 +1,10 @@
-# Sprint 1: Interfaces Library - Placeholder CMakeLists.txt
-# This file defines the Interfaces static library containing interface definitions
-
-# Define source files for the Interfaces library
-set(INTERFACES_SOURCES
-    # Most interfaces are header-only, but include any implementation files here
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/IE57Parser.cpp
-)
-
-set(INTERFACES_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/IPointCloudProcessor.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IE57Parser.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IE57Writer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces/IPointCloudViewer.h
-)
-
-# Create Interfaces static library (might be header-only INTERFACE library later)
-add_library(Interfaces STATIC ${INTERFACES_SOURCES} ${INTERFACES_HEADERS})
-
-target_include_directories(Interfaces PUBLIC
+# Sprint 7: Interfaces Library - Complete Implementation
+# Define Interfaces as a header-only library
+add_library(Interfaces INTERFACE)
+target_include_directories(Interfaces INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>  # Temporary for files at current location
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/interfaces>
 )
-
-# Interfaces library dependencies: Core, Qt components
-target_link_libraries(Interfaces PUBLIC
-    Core
-    Qt6::Core
-)
-
-message(STATUS "Configuring Interfaces library...")
+# Interfaces might need to expose dependencies like Core for types it uses in its API
+target_link_libraries(Interfaces INTERFACE Core Qt6::Core) # Add if core types are used directly in interfaces headers
+message(STATUS "Configuring Interfaces library (Header-only)...")

@@ -1,4 +1,4 @@
-#include "core/progressmanager.h"
+#include "ui/progressmanager.h"
 
 ProgressManager::ProgressManager(QObject *parent)
     : QObject(parent)

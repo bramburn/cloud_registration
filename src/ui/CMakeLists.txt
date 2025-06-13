@@ -1,7 +1,7 @@
 # Sprint 6: UI Library - Complete Implementation
 # This file defines the UI static library containing user interface components
 
-# Define source files for the UI library (now moved to src/ui/src/)
+# Define source files for the UI library (now includes migrated files from src/ root)
 set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AlignmentControlPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ExportDialog.cpp
@@ -12,18 +12,23 @@ set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ViewerToolbar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorkflowProgressWidget.cpp
 
-    # Files now located in src/ui/src/ after migration from src/ root
+    # Files migrated from src/ root (as per repomix-output2.md analysis)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/createprojectdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/loadingsettingsdialog.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/mainwindow_simple.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projecthubwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sidebarwidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projecttreemodel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/IMainView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/IPointCloudViewer.cpp
 )
 
-# Define header files for the UI library (now moved to src/ui/include/ui/)
+# Define header files for the UI library (now includes migrated headers from src/ root)
 set(UI_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/AlignmentControlPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ExportDialog.h
@@ -34,18 +39,20 @@ set(UI_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ViewerToolbar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/WorkflowProgressWidget.h
 
-    # Headers now located in src/ui/include/ui/ after migration from src/ root
+    # Headers migrated from src/ root (as per repomix-output2.md analysis)
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/createprojectdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/loadingsettingsdialog.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/mainwindow_simple.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/projecthubwidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/recentprojectsmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/sidebarwidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/sqlitemanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/projecttreemodel.h
-
-    # Interfaces also moving to UI library
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/pointcloudloadmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/progressmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/IMainView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/IPointCloudViewer.h
 )
 
 # Create UI static library

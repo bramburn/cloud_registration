@@ -8,7 +8,7 @@ add_subdirectory(app)
 add_subdirectory(camera)
 add_subdirectory(core)
 add_subdirectory(crs)
-add_subdirectory(detection)
+# detection tests moved to registration in Sprint 6
 add_subdirectory(export)
 add_subdirectory(features)
 add_subdirectory(implementations)
@@ -60,16 +60,25 @@ set(ALL_TESTS
     PointCloudViewerDecouplingTests
     PointCloudViewerRenderingR4Tests  # If this test is used
 
+    # Registration Tests (Sprint 6)
+    TargetTests
+    TargetManagerTests
+    NaturalPointSelectorTests
+    SphereDetectorTests
+    RegistrationWorkflowTests
+    PoseGraphTests
+    AlignmentEngineTests
+    ErrorAnalysisTests
+
+    # Quality Tests (Sprint 6)
+    QualityReportingTests
+
     # New Modules' Tests (placeholders for now)
     DifferenceAnalysisTests  # Assuming tests/analysis defines this
     CoordinateSystemManagerTests  # Assuming tests/crs defines this
-    SphereDetectorTests  # Assuming tests/detection defines this
-    NaturalPointSelectorTests
     ExportWriterTests  # Consolidate E57Writer, LASWriter, PLYWriter, XYZWriter tests
     FeatureBasedRegistrationTests
     BundleAdjustmentTests
-    QualityAssessmentTests
-    PDFReportGeneratorTests
     # Add other new tests as they are defined and implemented
 )
 

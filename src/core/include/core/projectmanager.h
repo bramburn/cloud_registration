@@ -10,102 +10,12 @@
 #include <stdexcept>
 #include <memory>
 #include "core/project.h"
+#include "core/ProjectStateService.h"  // Include to get type definitions
 
 // Forward declarations
-class ProjectStateService;
 class RecentProjectsManager;
 
-// Scan metadata structure for database storage - Enhanced for Sprint 2.2
-struct ScanInfo {
-    QString scanId;
-    QString projectId;
-    QString scanName;
-    QString filePathRelative;           // Path if copied/moved (nullable for LINKED)
-    QString filePathAbsoluteLinked;     // Path if linked (nullable for COPIED/MOVED)
-    QString importType;                 // "COPIED", "MOVED", or "LINKED"
-    QString originalSourcePath;         // Original path if copied/moved (nullable for LINKED)
-    int pointCountEstimate = 0;         // Estimated point count from header
-    double boundingBoxMinX = 0.0;       // Bounding box minimum X
-    double boundingBoxMinY = 0.0;       // Bounding box minimum Y
-    double boundingBoxMinZ = 0.0;       // Bounding box minimum Z
-    double boundingBoxMaxX = 0.0;       // Bounding box maximum X
-    double boundingBoxMaxY = 0.0;       // Bounding box maximum Y
-    double boundingBoxMaxZ = 0.0;       // Bounding box maximum Z
-    QString dateAdded;
-    QString scanFileLastModified;       // Timestamp of source file at import
-    QString parentClusterId;            // ID of parent cluster (NULL if at project root)
-    QString absolutePath;               // Computed field for current file location
-
-    bool isValid() const {
-        if (scanId.isEmpty() || scanName.isEmpty() || importType.isEmpty()) {
-            return false;
-        }
-
-        // Validate import type specific requirements
-        if (importType == "LINKED") {
-            return !filePathAbsoluteLinked.isEmpty();
-        } else if (importType == "COPIED" || importType == "MOVED") {
-            return !filePathRelative.isEmpty();
-        }
-
-        return false;
-    }
-
-    // Get the actual file path based on import type
-    QString getFilePath(const QString &projectPath = QString()) const {
-        if (importType == "LINKED") {
-            return filePathAbsoluteLinked;
-        } else if (!filePathRelative.isEmpty() && !projectPath.isEmpty()) {
-            return QDir(projectPath).absoluteFilePath(filePathRelative);
-        }
-        return absolutePath; // Fallback to computed field
-    }
-};
-
-// Cluster metadata structure for database storage
-struct ClusterInfo {
-    QString clusterId;
-    QString projectId;
-    QString clusterName;
-    QString parentClusterId; // NULL if top-level cluster
-    QString creationDate;
-    bool isLocked = false;   // Sprint 2.3 - Lock state
-
-    bool isValid() const {
-        return !clusterId.isEmpty() && !clusterName.isEmpty() && !projectId.isEmpty();
-    }
-};
-
-// Sprint 3.1 - Enhanced project metadata structure
-struct ProjectMetadata {
-    QString name;
-    QString description;
-    QString created_date;
-    QString last_modified_date;
-    QString version;
-
-    bool isValid() const {
-        return !name.isEmpty() && !version.isEmpty() && !created_date.isEmpty();
-    }
-};
-
-// Sprint 3.1 - Enhanced result enums for better error handling
-enum class ProjectLoadResult {
-    Success,
-    MetadataCorrupted,
-    DatabaseCorrupted,
-    DatabaseMissing,
-    MetadataMissing,
-    UnknownError
-};
-
-enum class SaveResult {
-    Success,
-    MetadataWriteFailed,
-    DatabaseWriteFailed,
-    TransactionFailed,
-    UnknownError
-};
+// Note: ScanInfo, ClusterInfo, SaveResult, ProjectLoadResult are now defined in ProjectStateService.h
 
 class ProjectCreationException : public std::runtime_error {
 public:
@@ -154,7 +64,11 @@ public:
     // Sprint 3.1 - Enhanced getters (delegated to ProjectStateService)
     QString currentProjectPath() const;
     ProjectMetadata currentMetadata() const;
+    ProjectInfo currentProject() const;
+    bool isProjectOpen() const;
+    void closeProject();
     QString lastError() const;
+    QString detailedError() const;
     QString lastDetailedError() const;
 
     // Recent projects management (delegated to RecentProjectsManager)
@@ -222,6 +136,13 @@ private:
     // Service instances
     ProjectStateService* m_projectStateService;
     RecentProjectsManager* m_recentProjectsManager;
+
+    // Legacy member variables for compatibility
+    ProjectInfo m_currentProject;
+    QString m_currentProjectPath;
+    ProjectMetadata m_metadata;
+    QString m_lastError;
+    QString m_detailedError;
 
     static const QString METADATA_FILENAME;
     static const QString DATABASE_FILENAME;

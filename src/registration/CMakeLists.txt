@@ -21,24 +21,28 @@ set(REGISTRATION_SOURCES
 )
 
 set(REGISTRATION_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Target.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/TargetCorrespondence.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/TargetManager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/AlignmentEngine.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/ErrorAnalysis.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/FeatureBasedRegistration.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/PoseGraph.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/PoseGraphBuilder.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/RegistrationProject.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/RegistrationWorkflowWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/Target.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/TargetCorrespondence.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/TargetManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/AlignmentEngine.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/ErrorAnalysis.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/FeatureBasedRegistration.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/PoseGraph.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/PoseGraphBuilder.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/RegistrationProject.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/RegistrationWorkflowWidget.h
+
+    # Headers moved from detection/ to registration/ (Sprint 6)
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/TargetDetectionBase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/NaturalPointSelector.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/registration/SphereDetector.h
 )
 
 # Create Registration static library
 add_library(Registration STATIC ${REGISTRATION_SOURCES} ${REGISTRATION_HEADERS})
 
 target_include_directories(Registration PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>  # Temporary for files at current location
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/registration>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/registration>
 )
 
