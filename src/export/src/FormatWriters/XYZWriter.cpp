@@ -53,23 +53,23 @@ bool XYZWriter::writeHeader(const HeaderInfo& info)
 
     // Write optional header comments for XYZ format
     *stream_ << "# XYZ Point Cloud Export\n";
-    if (!info.projectName.isEmpty())
+    if (!info.title.isEmpty())
     {
-        *stream_ << "# Project: " << info.projectName << "\n";
+        *stream_ << "# Project: " << info.title << "\n";
     }
     if (!info.description.isEmpty())
     {
         *stream_ << "# Description: " << info.description << "\n";
     }
-    if (!info.coordinateSystem.isEmpty())
+    if (!info.coordinateSystemName.isEmpty())
     {
-        *stream_ << "# Coordinate System: " << info.coordinateSystem << "\n";
+        *stream_ << "# Coordinate System: " << info.coordinateSystemName << "\n";
     }
-    *stream_ << "# Point Count: " << info.pointCount << "\n";
+    *stream_ << "# Point Count: " << info.totalPoints << "\n";
     *stream_ << "# Format: X Y Z\n";
     *stream_ << "#\n";
 
-    qDebug() << "XYZWriter: Header written for" << info.pointCount << "points";
+    qDebug() << "XYZWriter: Header written for" << info.totalPoints << "points";
     return true;
 }
 

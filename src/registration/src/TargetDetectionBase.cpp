@@ -100,10 +100,7 @@ void TargetDetectionBase::calculateNormals(std::vector<PointFullData>& points, f
                 QVector3D v2 = neighbors[1] - centroid;
                 QVector3D normal = QVector3D::crossProduct(v1, v2).normalized();
 
-                points[i].nx = normal.x();
-                points[i].ny = normal.y();
-                points[i].nz = normal.z();
-                points[i].hasNormal = true;
+                points[i].normal = normal;
             }
         }
     }
@@ -200,18 +197,26 @@ void TargetDetectionBase::downsamplePoints(std::vector<PointFullData>& points, f
         if (voxelPoints.size() > 1)
         {
             float x = 0, y = 0, z = 0, intensity = 0;
+            int intensityCount = 0;
             for (const auto& p : voxelPoints)
             {
                 x += p.x;
                 y += p.y;
                 z += p.z;
-                intensity += p.intensity;
+                if (p.intensity.has_value())
+                {
+                    intensity += p.intensity.value();
+                    intensityCount++;
+                }
             }
             float count = static_cast<float>(voxelPoints.size());
             avgPoint.x = x / count;
             avgPoint.y = y / count;
             avgPoint.z = z / count;
-            avgPoint.intensity = intensity / count;
+            if (intensityCount > 0)
+            {
+                avgPoint.intensity = intensity / intensityCount;
+            }
         }
 
         downsampledPoints.push_back(avgPoint);

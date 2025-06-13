@@ -2,22 +2,10 @@
 #define SCREENSPACEERROR_H
 
 #include <QMatrix4x4>
+#include "core/pointdata.h"
 
 // Forward declarations
 struct AxisAlignedBoundingBox;
-struct ViewportInfo;
-
-/**
- * @brief ViewportInfo - Information about the current viewport
- */
-struct ViewportInfo
-{
-    int width = 1920;
-    int height = 1080;
-    float fov = 45.0f;
-    float nearPlane = 0.1f;
-    float farPlane = 1000.0f;
-};
 
 /**
  * @brief ScreenSpaceErrorCalculator - Utility class for screen space error calculations

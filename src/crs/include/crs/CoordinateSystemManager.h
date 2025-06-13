@@ -9,6 +9,10 @@
 #include <QVector3D>
 
 #include <vector>
+#include <memory>
+
+// Forward declarations
+struct Point;
 
 /**
  * @brief Coordinate Reference System definition
@@ -35,6 +39,11 @@ struct CRSDefinition
     double semiMajorAxis = 6378137.0;         // WGS84 default
     double flattening = 1.0 / 298.257223563;  // WGS84 default
 
+    // Transformation parameters
+    QVector3D origin;
+    QVector3D scale = QVector3D(1.0, 1.0, 1.0);
+    QVector3D rotation;
+
     // Additional metadata
     QVariantMap customParameters;
     bool isValid = true;
@@ -58,6 +67,9 @@ struct TransformationParameters
     QVector3D translation;     // dx, dy, dz in meters
     QVector3D rotation;        // rx, ry, rz in radians
     double scaleFactor = 1.0;  // scale factor (unitless)
+
+    // Transformation matrix
+    QMatrix4x4 transformationMatrix;
 
     // Additional transformation methods
     QString transformationMethod = "Helmert7";
@@ -103,13 +115,20 @@ class CoordinateSystemManager : public QObject
     Q_OBJECT
 
 public:
+    // Constants
+    static const double EARTH_RADIUS;
+    static const double DEGREES_TO_RADIANS;
+    static const double RADIANS_TO_DEGREES;
+
     explicit CoordinateSystemManager(QObject* parent = nullptr);
     ~CoordinateSystemManager() override;
 
     // CRS Management
+    QStringList getAvailableCRS() const;
     QList<CRSDefinition> getAvailableSystems() const;
     CRSDefinition getCRSDefinition(const QString& code) const;
     bool addCustomCRS(const CRSDefinition& crs);
+    bool removeCustomCRS(const QString& code);
     bool removeCRS(const QString& code);
 
     // Predefined CRS
@@ -118,11 +137,14 @@ public:
 
     // Validation
     bool isValidCRS(const QString& code) const;
+    bool isTransformationAvailable(const QString& sourceCRS, const QString& targetCRS) const;
     bool isTransformationSupported(const QString& sourceCRS, const QString& targetCRS) const;
 
     // Transformation
     CRSPoint transformPoint(const CRSPoint& point, const QString& targetCRS);
+    QVector3D transformPoint(const QVector3D& point, const QString& sourceCRS, const QString& targetCRS) const;
     std::vector<CRSPoint> transformPoints(const std::vector<CRSPoint>& points, const QString& targetCRS);
+    std::vector<Point> transformPoints(const std::vector<Point>& points, const QString& sourceCRS, const QString& targetCRS) const;
 
     // Transformation parameters
     TransformationParameters getTransformationParameters(const QString& sourceCRS, const QString& targetCRS) const;
@@ -132,6 +154,12 @@ public:
     QString getUnitsForCRS(const QString& code) const;
     QString getTypeForCRS(const QString& code) const;
     QStringList searchCRS(const QString& searchTerm) const;
+    QMatrix4x4 calculateTransformationMatrix(const QString& sourceCRS, const QString& targetCRS) const;
+
+    // Validation and file operations
+    QString validateCRSDefinition(const CRSDefinition& definition) const;
+    bool loadCRSDefinitions(const QString& filePath);
+    bool saveCRSDefinitions(const QString& filePath) const;
 
     // Configuration
     void setDefaultCRS(const QString& code)
@@ -146,11 +174,19 @@ public:
 signals:
     void crsAdded(const QString& code);
     void crsRemoved(const QString& code);
-    void transformationProgress(int percentage, const QString& stage);
+    void crsDefinitionsUpdated();
+    void transformationProgress(int percentage, const QString& stage) const;
     void transformationCompleted(int pointsTransformed);
     void transformationError(const QString& error);
 
 private:
+    // Forward declaration of private implementation
+    struct PrivateData;
+    std::unique_ptr<PrivateData> d;
+
+    // Error handling
+    mutable QString m_lastError;
+
     // Core transformation methods
     CRSPoint performGeographicToProjected(const CRSPoint& point, const CRSDefinition& targetCRS);
     CRSPoint performProjectedToGeographic(const CRSPoint& point, const CRSDefinition& sourceCRS);
@@ -161,6 +197,9 @@ private:
     CRSPoint performUTMInverseProjection(const CRSPoint& projectedPoint, int zone, bool isNorth);
     CRSPoint performMercatorProjection(const CRSPoint& geographicPoint, const CRSDefinition& crs);
     CRSPoint performMercatorInverseProjection(const CRSPoint& projectedPoint, const CRSDefinition& crs);
+
+    // Matrix creation
+    QMatrix4x4 createTransformationMatrix(const CRSDefinition& source, const CRSDefinition& target) const;
 
     // Utility methods
     int getUTMZone(double longitude) const;

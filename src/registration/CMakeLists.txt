@@ -48,11 +48,12 @@ target_include_directories(Registration PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
-# Registration library dependencies: Core, Algorithms, Features, Qt components
+# Registration library dependencies: Core, Algorithms, Features, UI, Qt components
 target_link_libraries(Registration PUBLIC
     Core
     Algorithms
     Features
+    UI
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

@@ -11,8 +11,6 @@
 
 #include <cmath>
 
-#include "export/IFormatWriter.h"
-
 PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
     : QOpenGLWidget(parent),
       m_vertexBuffer(QOpenGLBuffer::VertexBuffer),

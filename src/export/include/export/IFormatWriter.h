@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "export/ExportTypes.h"
+
 /**
  * @brief Point structure for export operations
  */
@@ -23,19 +25,7 @@ struct Point
     }
 };
 
-/**
- * @brief Header information for export files
- */
-struct HeaderInfo
-{
-    QString projectName;
-    QString description;
-    QString coordinateSystem;
-    size_t pointCount = 0;
-    double minX = 0.0, minY = 0.0, minZ = 0.0;
-    double maxX = 0.0, maxY = 0.0, maxZ = 0.0;
-    QVariantMap customFields;
-};
+// HeaderInfo is defined in ExportTypes.h
 
 /**
  * @brief Abstract base class for format writers
@@ -99,6 +89,12 @@ public:
      * @return true if intensity is supported
      */
     virtual bool supportsIntensity() const = 0;
+
+    /**
+     * @brief Get the last error message
+     * @return Error message string
+     */
+    virtual QString getLastError() const = 0;
 };
 
 #endif  // IFORMATWRITER_H

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "export/IFormatWriter.h"  // For Point struct
+#include "core/pointdata.h"  // For Point struct
 
 // Constants
 const double CoordinateSystemManager::EARTH_RADIUS = 6378137.0;  // WGS84 semi-major axis

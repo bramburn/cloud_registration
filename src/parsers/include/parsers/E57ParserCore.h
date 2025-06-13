@@ -147,7 +147,7 @@ private:
     // Point data extraction helpers
     std::vector<CorePointData> extractPointDataFromScan(int scanIndex, const CoreLoadingSettings& settings);
     bool inspectPointPrototype(const e57::StructureNode& scanHeader);
-    bool extractPointDataFromCompressedVector(const e57::CompressedVectorNode& cvNode,
+    bool extractPointDataFromCompressedVector(e57::CompressedVectorNode& cvNode,
                                               std::vector<CorePointData>& points,
                                               const CoreLoadingSettings& settings);
 

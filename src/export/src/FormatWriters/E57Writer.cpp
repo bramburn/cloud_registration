@@ -53,16 +53,16 @@ bool E57Writer::writeHeader(const HeaderInfo& info)
 
     // Write E57-style header (simplified for Sprint 7)
     *stream_ << "# E57 Point Cloud Export (Simplified Format)\n";
-    *stream_ << "# Project: " << info.projectName << "\n";
+    *stream_ << "# Project: " << info.title << "\n";
     *stream_ << "# Description: " << info.description << "\n";
-    *stream_ << "# Coordinate System: " << info.coordinateSystem << "\n";
-    *stream_ << "# Point Count: " << info.pointCount << "\n";
-    *stream_ << "# Bounds: " << info.minX << "," << info.minY << "," << info.minZ << " to " << info.maxX << ","
-             << info.maxY << "," << info.maxZ << "\n";
+    *stream_ << "# Coordinate System: " << info.coordinateSystemName << "\n";
+    *stream_ << "# Point Count: " << info.totalPoints << "\n";
+    *stream_ << "# Bounds: " << info.boundingBoxMin.x() << "," << info.boundingBoxMin.y() << "," << info.boundingBoxMin.z()
+             << " to " << info.boundingBoxMax.x() << "," << info.boundingBoxMax.y() << "," << info.boundingBoxMax.z() << "\n";
     *stream_ << "# Format: X Y Z Intensity R G B\n";
     *stream_ << "#\n";
 
-    qDebug() << "E57Writer: Header written for" << info.pointCount << "points";
+    qDebug() << "E57Writer: Header written for" << info.totalPoints << "points";
     return true;
 }
 

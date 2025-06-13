@@ -579,7 +579,7 @@ bool E57ParserCore::inspectPointPrototype(const e57::StructureNode& scanHeader)
     }
 }
 
-bool E57ParserCore::extractPointDataFromCompressedVector(const e57::CompressedVectorNode& cvNode,
+bool E57ParserCore::extractPointDataFromCompressedVector(e57::CompressedVectorNode& cvNode,
                                                          std::vector<CorePointData>& points,
                                                          const CoreLoadingSettings& settings)
 {

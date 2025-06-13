@@ -1,6 +1,7 @@
 #include "export/PointCloudExporter.h"
 
 #include <QDebug>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QMutexLocker>
@@ -46,7 +47,12 @@ private:
     ExportOptions m_options;
 };
 
-PointCloudExporter::PointCloudExporter(QObject* parent) : QObject(parent) {}
+PointCloudExporter::PointCloudExporter(QObject* parent)
+    : QObject(parent)
+    , m_isExporting(false)
+    , m_cancelRequested(false)
+{
+}
 
 PointCloudExporter::~PointCloudExporter()
 {
@@ -97,10 +103,10 @@ ExportResult PointCloudExporter::exportPointCloud(const std::vector<Point>& poin
 
         // Transform coordinates if needed
         std::vector<Point> transformedPoints = points;
-        if (options.sourceCRS != options.targetCRS)
+        if (options.coordinateSystem != CoordinateSystem::Local)
         {
             emit progressUpdated(25, "Transforming coordinates...");
-            transformedPoints = transformCoordinates(points, options.sourceCRS, options.targetCRS);
+            transformedPoints = transformCoordinates(points, options.transformationMatrix, options.coordinateSystem);
         }
 
         emit progressUpdated(30, "Writing header...");
@@ -117,7 +123,7 @@ ExportResult PointCloudExporter::exportPointCloud(const std::vector<Point>& poin
 
         // Write points in batches
         size_t totalPoints = transformedPoints.size();
-        size_t batchSize = options.batchSize;
+        size_t batchSize = options.maxPointsPerChunk;
         size_t pointsWritten = 0;
 
         for (size_t i = 0; i < totalPoints; i += batchSize)
@@ -178,13 +184,13 @@ ExportResult PointCloudExporter::exportPointCloud(const std::vector<Point>& poin
         // Fill result
         result.success = true;
         result.pointsExported = pointsWritten;
-        result.exportTimeSeconds = timer.elapsed() / 1000.0;
+        result.exportDuration = timer.elapsed() / 1000.0;
 
         QFileInfo fileInfo(options.outputPath);
-        result.fileSizeBytes = fileInfo.size();
+        result.fileSize = fileInfo.size();
 
         qDebug() << "PointCloudExporter: Successfully exported" << pointsWritten << "points to" << options.outputPath
-                 << "in" << result.exportTimeSeconds << "seconds";
+                 << "in" << result.exportDuration << "seconds";
 
         return result;
     }
@@ -220,7 +226,7 @@ void PointCloudExporter::exportPointCloudAsync(const std::vector<Point>& points,
     // Connect signals
     connect(m_workerThread.get(), &QThread::started, m_worker.get(), &ExportWorker::doExport);
     connect(m_worker.get(), &ExportWorker::progressUpdated, this, &PointCloudExporter::progressUpdated);
-    connect(m_worker.get(), &ExportWorker::exportCompleted, this, &PointCloudExporter::onAsyncExportFinished);
+    connect(m_worker.get(), &ExportWorker::exportCompleted, this, &PointCloudExporter::onWorkerFinished);
     connect(m_workerThread.get(), &QThread::finished, m_workerThread.get(), &QThread::deleteLater);
 
     // Start export
@@ -239,33 +245,12 @@ void PointCloudExporter::cancelExport()
     }
 }
 
-bool PointCloudExporter::isExporting() const
-{
-    QMutexLocker locker(&m_mutex);
-    return m_isExporting;
-}
-
-QStringList PointCloudExporter::getSupportedFormats()
+QStringList PointCloudExporter::getSupportedFormats() const
 {
     return {"E57", "LAS", "PLY", "XYZ"};
 }
 
-QString PointCloudExporter::getFileExtension(ExportFormat format)
-{
-    switch (format)
-    {
-        case ExportFormat::E57:
-            return ".e57";
-        case ExportFormat::LAS:
-            return ".las";
-        case ExportFormat::PLY:
-            return ".ply";
-        case ExportFormat::XYZ:
-            return ".xyz";
-        default:
-            return ".dat";
-    }
-}
+
 
 QString PointCloudExporter::validateOptions(const ExportOptions& options)
 {
@@ -280,9 +265,9 @@ QString PointCloudExporter::validateOptions(const ExportOptions& options)
         return "Output directory does not exist";
     }
 
-    if (options.batchSize == 0)
+    if (options.maxPointsPerChunk == 0)
     {
-        return "Batch size must be greater than 0";
+        return "Max points per chunk must be greater than 0";
     }
 
     if (options.precision < 0 || options.precision > 15)
@@ -293,7 +278,7 @@ QString PointCloudExporter::validateOptions(const ExportOptions& options)
     return QString();  // Valid
 }
 
-void PointCloudExporter::onAsyncExportFinished()
+void PointCloudExporter::onWorkerFinished()
 {
     {
         QMutexLocker locker(&m_mutex);
@@ -328,26 +313,24 @@ std::unique_ptr<IFormatWriter> PointCloudExporter::createWriter(ExportFormat for
 }
 
 std::vector<Point>
-PointCloudExporter::transformCoordinates(const std::vector<Point>& points, const QString& fromCRS, const QString& toCRS)
+PointCloudExporter::transformCoordinates(const std::vector<Point>& points,
+                                        const QMatrix4x4& transformation,
+                                        CoordinateSystem targetSystem)
 {
     // For now, return points unchanged
-    // In a full implementation, this would use a coordinate transformation library
-    qDebug() << "PointCloudExporter: Coordinate transformation from" << fromCRS << "to" << toCRS << "not implemented";
+    // In a full implementation, this would apply the transformation matrix
+    qDebug() << "PointCloudExporter: Coordinate transformation not fully implemented";
     return points;
 }
 
 HeaderInfo PointCloudExporter::createHeaderInfo(const std::vector<Point>& points, const ExportOptions& options)
 {
-    HeaderInfo header;
-    header.pointCount = points.size();
-    header.projectName = options.projectName;
-    header.description = options.description;
-    header.hasColor = options.includeColor;
-    header.hasIntensity = options.includeIntensity;
+    HeaderInfo header = options.headerInfo;
+    header.totalPoints = points.size();
 
     if (!points.empty())
     {
-        calculateBounds(points, header.minBounds, header.maxBounds);
+        calculateBounds(points, header.boundingBoxMin, header.boundingBoxMax);
     }
 
     return header;

@@ -58,7 +58,7 @@ bool LASWriter::writeHeader(const HeaderInfo& info)
         return false;
     }
 
-    qDebug() << "LASWriter: Header written for" << info.pointCount << "points";
+    qDebug() << "LASWriter: Header written for" << info.totalPoints << "points";
     return true;
 }
 
@@ -170,9 +170,9 @@ bool LASWriter::writeLASHeader()
     *stream_ << 0.0 << 0.0 << 0.0;
 
     // Min/Max coordinates
-    *stream_ << headerInfo_.minX << headerInfo_.maxX;
-    *stream_ << headerInfo_.minY << headerInfo_.maxY;
-    *stream_ << headerInfo_.minZ << headerInfo_.maxZ;
+    *stream_ << headerInfo_.boundingBoxMin.x() << headerInfo_.boundingBoxMax.x();
+    *stream_ << headerInfo_.boundingBoxMin.y() << headerInfo_.boundingBoxMax.y();
+    *stream_ << headerInfo_.boundingBoxMin.z() << headerInfo_.boundingBoxMax.z();
 
     return true;
 }

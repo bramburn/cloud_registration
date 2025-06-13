@@ -63,20 +63,20 @@ bool PLYWriter::writeHeader(const HeaderInfo& info)
     *stream_ << "format ascii 1.0\n";
     *stream_ << "comment Created by CloudRegistration\n";
 
-    if (!info.projectName.isEmpty())
+    if (!info.title.isEmpty())
     {
-        *stream_ << "comment Project: " << info.projectName << "\n";
+        *stream_ << "comment Project: " << info.title << "\n";
     }
     if (!info.description.isEmpty())
     {
         *stream_ << "comment Description: " << info.description << "\n";
     }
-    if (!info.coordinateSystem.isEmpty())
+    if (!info.coordinateSystemName.isEmpty())
     {
-        *stream_ << "comment Coordinate System: " << info.coordinateSystem << "\n";
+        *stream_ << "comment Coordinate System: " << info.coordinateSystemName << "\n";
     }
 
-    *stream_ << "element vertex " << info.pointCount << "\n";
+    *stream_ << "element vertex " << info.totalPoints << "\n";
     *stream_ << "property float x\n";
     *stream_ << "property float y\n";
     *stream_ << "property float z\n";
@@ -88,7 +88,7 @@ bool PLYWriter::writeHeader(const HeaderInfo& info)
 
     headerWritten_ = true;
 
-    qDebug() << "PLYWriter: Header written for" << info.pointCount << "points";
+    qDebug() << "PLYWriter: Header written for" << info.totalPoints << "points";
     return true;
 }
 

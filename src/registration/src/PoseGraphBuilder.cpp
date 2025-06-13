@@ -1,5 +1,6 @@
 #include "registration/PoseGraphBuilder.h"
 #include "registration/RegistrationProject.h"
+#include "registration/RegistrationTypes.h"
 
 #include <QDebug>
 #include <QSet>

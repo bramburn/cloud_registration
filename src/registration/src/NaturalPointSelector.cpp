@@ -357,13 +357,13 @@ float NaturalPointSelector::calculateSelectionConfidence(const std::vector<Point
     float confidence = std::min(1.0f, distinctiveness);
 
     // Boost confidence if point has normal information
-    if (points[pointIndex].hasNormal)
+    if (points[pointIndex].hasNormal())
     {
         confidence *= 1.2f;
     }
 
     // Boost confidence if point has intensity information
-    if (points[pointIndex].hasIntensity)
+    if (points[pointIndex].hasIntensity())
     {
         confidence *= 1.1f;
     }

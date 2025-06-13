@@ -88,8 +88,8 @@ TargetDetectionBase::DetectionResult SphereDetector::detect(const std::vector<Po
         QString targetId = generateTargetId("sphere");
         auto sphereTarget = std::make_shared<SphereTarget>(targetId, sphere.center, sphere.radius);
 
-        sphereTarget->setQuality(sphere.quality);
-        sphereTarget->setRMSError(sphere.rmsError);
+        sphereTarget->setConfidence(sphere.quality);
+        sphereTarget->setRmsError(sphere.rmsError);
         sphereTarget->setInlierCount(sphere.inlierCount);
 
         result.targets.append(sphereTarget);

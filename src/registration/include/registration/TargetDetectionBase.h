@@ -94,7 +94,7 @@ protected:
     void removeOutliers(std::vector<PointFullData>& points, int meanK = 50, float stddevMulThresh = 1.0f) const;
     void downsamplePoints(std::vector<PointFullData>& points, float voxelSize) const;
     QString generateTargetId(const QString& prefix) const;
-    void emitProgress(int percentage, const QString& stage);
+    void emitProgress(int percentage, const QString& stage) const;
 
 private:
     static int s_targetIdCounter;

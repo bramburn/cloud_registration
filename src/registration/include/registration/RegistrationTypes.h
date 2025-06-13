@@ -144,52 +144,9 @@ struct RegistrationParameters
     {}
 };
 
-/**
- * @brief Scan information for registration
- */
-struct ScanInfo
-{
-    QString scanId;
-    QString filePath;
-    QString name;
-    QString description;
-    QDateTime acquisitionTime;
-    QVector3D position;
-    QVector3D orientation;
-    QMatrix4x4 localTransformation;
-    bool isReference;
-    int pointCount;
-    QVector3D boundingBoxMin;
-    QVector3D boundingBoxMax;
-    
-    ScanInfo()
-        : isReference(false)
-        , pointCount(0)
-        , localTransformation(QMatrix4x4())
-    {}
-};
+// ScanInfo is defined in RegistrationProject.h
 
-/**
- * @brief Target correspondence structure
- */
-struct TargetCorrespondence
-{
-    QString sourceTargetId;
-    QString targetTargetId;
-    QVector3D sourcePosition;
-    QVector3D targetPosition;
-    float distance;
-    float confidence;
-    bool isManual;
-    bool isValid;
-    
-    TargetCorrespondence()
-        : distance(0.0f)
-        , confidence(1.0f)
-        , isManual(false)
-        , isValid(true)
-    {}
-};
+// TargetCorrespondence is defined in TargetCorrespondence.h
 
 /**
  * @brief Registration project state

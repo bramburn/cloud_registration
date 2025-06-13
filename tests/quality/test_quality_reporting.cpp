@@ -7,6 +7,9 @@
 #include "quality/PDFReportGenerator.h"
 #include "quality/QualityAssessment.h"
 
+// Include Point struct
+#include "export/IFormatWriter.h"
+
 class QualityReportingTest : public QObject
 {
     Q_OBJECT
@@ -54,25 +57,38 @@ void QualityReportingTest::testQualityAssessment()
 
     QualityAssessment assessment;
 
-    // Create test point clouds
-    std::vector<Point> sourceCloud = createTestPointCloud(500);
-    std::vector<Point> targetCloud = createTestPointCloud(500);
-    std::vector<Point> transformedCloud = sourceCloud;  // Perfect alignment for test
+    // Create test point clouds (convert Point to QualityPoint)
+    std::vector<Point> sourcePoints = createTestPointCloud(500);
+    std::vector<Point> targetPoints = createTestPointCloud(500);
+
+    std::vector<QualityPoint> sourceCloud;
+    std::vector<QualityPoint> targetCloud;
+
+    for (const auto& p : sourcePoints) {
+        sourceCloud.emplace_back(p.x, p.y, p.z, p.intensity);
+    }
+    for (const auto& p : targetPoints) {
+        targetCloud.emplace_back(p.x, p.y, p.z, p.intensity);
+    }
+
+    // Create correspondences for testing
+    std::vector<QualityCorrespondence> correspondences;
+    for (size_t i = 0; i < std::min(sourceCloud.size(), targetCloud.size()); ++i) {
+        correspondences.emplace_back(sourceCloud[i].toVector3D(), targetCloud[i].toVector3D(), 1.0f);
+    }
 
     // Test quality assessment
-    QualityReport report = assessment.assessRegistrationQuality(sourceCloud, targetCloud, transformedCloud);
+    QMatrix4x4 identity;
+    identity.setToIdentity();
+    QualityReport report = assessment.assessRegistration(sourceCloud, targetCloud, identity, correspondences);
 
-    QVERIFY(!report.metrics.qualityGrade.isEmpty());
+    QVERIFY(report.metrics.qualityGrade != 'F');
     QVERIFY(report.metrics.confidenceScore >= 0.0 && report.metrics.confidenceScore <= 1.0);
-    QVERIFY(report.metrics.rootMeanSquaredError >= 0.0);
+    QVERIFY(report.metrics.rmsError >= 0.0);
     QVERIFY(!report.recommendations.isEmpty());
 
-    // Test individual quality metrics
-    QualityMetrics metrics = assessment.assessPointCloudQuality(sourceCloud);
-    QVERIFY(metrics.totalPoints == sourceCloud.size());
-
     // Test overlap calculation
-    double overlap = assessment.calculateOverlapPercentage(sourceCloud, targetCloud, 0.1);
+    float overlap = assessment.calculateOverlapPercentage(sourceCloud, targetCloud, 0.1f);
     QVERIFY(overlap >= 0.0 && overlap <= 100.0);
 
     qDebug() << "QualityAssessment test passed";
@@ -87,25 +103,25 @@ void QualityReportingTest::testPDFReportGenerator()
     // Create test quality report
     QualityReport report;
     report.projectName = "PDF Test Project";
-    report.scanName = "Test Scan";
-    report.metrics.qualityGrade = "A";
-    report.metrics.rootMeanSquaredError = 0.005;
-    report.metrics.overlapPercentage = 85.0;
-    report.metrics.confidenceScore = 0.95;
-    report.summary = "Test quality assessment summary";
+    report.description = "Test quality assessment summary";
+    report.metrics.qualityGrade = 'A';
+    report.metrics.rmsError = 0.005f;
+    report.metrics.overlapPercentage = 85.0f;
+    report.metrics.confidenceScore = 0.95f;
     report.recommendations << "Test recommendation 1"
                            << "Test recommendation 2";
 
-    // Test report generation
-    ReportOptions options;
-    options.outputPath = m_tempDir->path() + "/test_report.pdf";
-    options.projectName = "PDF Test";
+    // Test report generation with new API
+    PDFReportGenerator::ReportOptions options;
     options.companyName = "Test Company";
-    options.operatorName = "Test Operator";
+    options.reportTitle = "PDF Test Report";
+    options.includeCharts = true;
+    options.includeRecommendations = true;
 
-    bool success = generator.generateReport(report, options);
+    QString outputPath = m_tempDir->path() + "/test_report.pdf";
+    bool success = generator.generatePdfReport(report, outputPath, options);
     QVERIFY(success);
-    verifyFileExists(options.outputPath);
+    verifyFileExists(outputPath);
 
     qDebug() << "PDFReportGenerator test passed";
 }
@@ -114,28 +130,45 @@ void QualityReportingTest::testQualityReportWorkflow()
 {
     qDebug() << "Testing quality report workflow...";
 
-    // Create test point clouds
-    std::vector<Point> sourceCloud = createTestPointCloud(300);
-    std::vector<Point> targetCloud = createTestPointCloud(300);
-    std::vector<Point> transformedCloud = sourceCloud;
+    // Create test point clouds (convert Point to QualityPoint)
+    std::vector<Point> sourcePoints = createTestPointCloud(300);
+    std::vector<Point> targetPoints = createTestPointCloud(300);
+
+    std::vector<QualityPoint> sourceCloud;
+    std::vector<QualityPoint> targetCloud;
+
+    for (const auto& p : sourcePoints) {
+        sourceCloud.emplace_back(p.x, p.y, p.z, p.intensity);
+    }
+    for (const auto& p : targetPoints) {
+        targetCloud.emplace_back(p.x, p.y, p.z, p.intensity);
+    }
+
+    // Create correspondences for testing
+    std::vector<QualityCorrespondence> correspondences;
+    for (size_t i = 0; i < std::min(sourceCloud.size(), targetCloud.size()); ++i) {
+        correspondences.emplace_back(sourceCloud[i].toVector3D(), targetCloud[i].toVector3D(), 1.0f);
+    }
 
     // Perform quality assessment
     QualityAssessment assessment;
-    QualityReport report = assessment.assessRegistrationQuality(sourceCloud, targetCloud, transformedCloud);
+    QMatrix4x4 identity;
+    identity.setToIdentity();
+    QualityReport report = assessment.assessRegistration(sourceCloud, targetCloud, identity, correspondences);
 
-    QVERIFY(!report.metrics.qualityGrade.isEmpty());
+    QVERIFY(report.metrics.qualityGrade != 'F');
 
     // Generate PDF report
     PDFReportGenerator generator;
-    ReportOptions options;
-    options.outputPath = m_tempDir->path() + "/workflow_report.pdf";
-    options.projectName = "Workflow Test";
+    PDFReportGenerator::ReportOptions options;
+    options.companyName = "Workflow Test Company";
     options.includeCharts = true;
     options.includeRecommendations = true;
 
-    bool success = generator.generateReport(report, options);
+    QString outputPath = m_tempDir->path() + "/workflow_report.pdf";
+    bool success = generator.generatePdfReport(report, outputPath, options);
     QVERIFY(success);
-    verifyFileExists(options.outputPath);
+    verifyFileExists(outputPath);
 
     qDebug() << "Quality report workflow test passed";
 }
