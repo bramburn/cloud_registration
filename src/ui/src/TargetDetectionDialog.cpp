@@ -101,11 +101,13 @@ void TargetDetectionDialog::startDetection()
     TargetDetectionBase::DetectionParams params = getParametersFromUI();
     DetectionMode mode = getDetectionMode();
 
+    // Emit signal to start detection through AlignmentEngine
+    emit detectionStartRequested(m_currentScanId, static_cast<int>(mode), params.toVariantMap());
+
     switch (mode)
     {
         case AutomaticSpheres:
-            m_logTextEdit->append("Running automatic sphere detection...");
-            m_sphereDetector->detectAsync(m_currentPoints, params);
+            m_logTextEdit->append("Starting automatic sphere detection...");
             break;
 
         case ManualNaturalPoints:
@@ -116,17 +118,22 @@ void TargetDetectionDialog::startDetection()
             m_cancelButton->setEnabled(false);
             m_progressBar->setVisible(false);
             emit manualSelectionRequested(m_currentScanId);
-            break;
+            return; // Don't set detection running for manual mode
 
         case Both:
-            m_logTextEdit->append("Running automatic sphere detection first...");
-            m_sphereDetector->detectAsync(m_currentPoints, params);
+            m_logTextEdit->append("Starting automatic sphere detection first...");
             break;
     }
 }
 
 void TargetDetectionDialog::cancelDetection()
 {
+    if (m_detectionRunning)
+    {
+        m_logTextEdit->append("Cancelling detection...");
+        emit cancelDetectionRequested();
+    }
+
     m_detectionRunning = false;
     m_startButton->setEnabled(true);
     m_cancelButton->setEnabled(false);
@@ -225,6 +232,7 @@ void TargetDetectionDialog::onDetectionProgress(int percentage, const QString& s
 {
     m_progressBar->setValue(percentage);
     m_statusLabel->setText(stage);
+    m_logTextEdit->append(QString("Progress: %1% - %2").arg(percentage).arg(stage));
     QApplication::processEvents();  // Keep UI responsive
 }
 

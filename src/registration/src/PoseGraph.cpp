@@ -199,4 +199,15 @@ int PoseGraph::getEdgeIndex(int fromNode, int toNode) const
     return -1;
 }
 
+void PoseGraph::updateNodeTransforms(const QMap<QString, QMatrix4x4>& newTransforms)
+{
+    for (auto& node : m_nodes) {
+        if (newTransforms.contains(node.scanId)) {
+            node.transform = newTransforms[node.scanId];
+            qDebug() << "Updated transform for node" << node.scanId;
+        }
+    }
+    qDebug() << "Updated transforms for" << newTransforms.size() << "nodes";
+}
+
 }  // namespace Registration

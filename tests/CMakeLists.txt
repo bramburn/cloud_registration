@@ -57,13 +57,17 @@ set(ALL_TESTS
     RecentProjectsManagerTests
     UIEnhancementTests
     ExportDialogTests
+    TargetDetectionDialogTests
 
     # Application Tests
     MainPresenterTests
+    MainPresenterTargetDetectionTests
 
     # Integration Tests
     IntegrationTests
     EndToEndIntegrationTests
+    TargetDetectionIntegrationTests
+    ManualAlignmentE2ETests
 
     # Performance Tests
     PerformanceOptimizationTests
@@ -75,6 +79,7 @@ set(ALL_TESTS
     NaturalPointSelectorTests
     SphereDetectorTests
     RegistrationWorkflowTests
+    RegistrationWorkflowWidgetTests
     AlignmentEngineTests
     ErrorAnalysisTests
 

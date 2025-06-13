@@ -8,6 +8,7 @@
 #include <random>
 
 #include "LeastSquaresAlignment.h"
+#include "core/profiling_macros.h"  // Sprint 7.3: Performance profiling
 
 // PointCloud implementation
 PointCloud::PointCloud(const std::vector<float>& pointData)
@@ -203,6 +204,8 @@ QMatrix4x4 ICPRegistration::compute(const PointCloud& source,
                                     const QMatrix4x4& initialGuess,
                                     const ICPParams& params)
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     if (source.empty() || target.empty())
     {
         qWarning() << "Cannot perform ICP on empty point clouds";
@@ -462,4 +465,97 @@ bool ICPRegistration::hasConverged(float currentError, float previousError, floa
 
     float errorChange = std::abs(previousError - currentError);
     return errorChange < threshold;
+}
+
+ICPParams ICPRegistration::getRecommendedParameters(const PointCloud& source, const PointCloud& target)
+{
+    ICPParams params;
+
+    if (source.empty() || target.empty())
+    {
+        qWarning() << "Cannot calculate recommended parameters for empty point clouds";
+        return params; // Return default parameters
+    }
+
+    // Calculate bounding box diagonal for both clouds to estimate scale
+    auto calculateBoundingBoxDiagonal = [](const PointCloud& cloud) -> float {
+        if (cloud.empty()) return 1.0f;
+
+        QVector3D minPoint = cloud.points[0];
+        QVector3D maxPoint = cloud.points[0];
+
+        for (const auto& point : cloud.points)
+        {
+            minPoint.setX(std::min(minPoint.x(), point.x()));
+            minPoint.setY(std::min(minPoint.y(), point.y()));
+            minPoint.setZ(std::min(minPoint.z(), point.z()));
+
+            maxPoint.setX(std::max(maxPoint.x(), point.x()));
+            maxPoint.setY(std::max(maxPoint.y(), point.y()));
+            maxPoint.setZ(std::max(maxPoint.z(), point.z()));
+        }
+
+        return (maxPoint - minPoint).length();
+    };
+
+    float sourceDiagonal = calculateBoundingBoxDiagonal(source);
+    float targetDiagonal = calculateBoundingBoxDiagonal(target);
+    float avgDiagonal = (sourceDiagonal + targetDiagonal) / 2.0f;
+
+    // Set parameters based on point cloud characteristics
+    size_t totalPoints = source.size() + target.size();
+
+    // Max iterations: more for larger/denser clouds
+    if (totalPoints > 1000000) // > 1M points
+    {
+        params.maxIterations = 100;
+    }
+    else if (totalPoints > 100000) // > 100K points
+    {
+        params.maxIterations = 75;
+    }
+    else
+    {
+        params.maxIterations = 50;
+    }
+
+    // Convergence threshold: tighter for larger clouds
+    if (totalPoints > 500000)
+    {
+        params.convergenceThreshold = 1e-6f;
+    }
+    else
+    {
+        params.convergenceThreshold = 1e-5f;
+    }
+
+    // Max correspondence distance: 5-10% of average bounding box diagonal
+    params.maxCorrespondenceDistance = std::max(0.01f, avgDiagonal * 0.075f);
+
+    // Outlier rejection: always recommended
+    params.useOutlierRejection = true;
+    params.outlierThreshold = 2.5f; // 2.5 standard deviations
+
+    // Subsampling: for very large clouds
+    if (totalPoints > 2000000) // > 2M points
+    {
+        params.subsamplingRatio = 0.5f; // Use 50% of points
+    }
+    else if (totalPoints > 1000000) // > 1M points
+    {
+        params.subsamplingRatio = 0.75f; // Use 75% of points
+    }
+    else
+    {
+        params.subsamplingRatio = 1.0f; // Use all points
+    }
+
+    qDebug() << "Recommended ICP parameters calculated:"
+             << "maxIterations:" << params.maxIterations
+             << "convergenceThreshold:" << params.convergenceThreshold
+             << "maxCorrespondenceDistance:" << params.maxCorrespondenceDistance
+             << "subsamplingRatio:" << params.subsamplingRatio
+             << "for" << totalPoints << "total points, avg diagonal:" << avgDiagonal;
+
+    return params;
 }

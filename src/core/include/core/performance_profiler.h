@@ -186,25 +186,6 @@ private:
     bool m_enabled = true;                        ///< Whether profiling is currently enabled
 };
 
-// Convenience macros for easy instrumentation
-/**
- * @brief Profile a named section using RAII
- * @param name Name of the section to profile
- */
-#define PROFILE_SECTION(name) PerformanceProfiler::SectionTimer __timer(name)
-
-/**
- * @brief Profile the current function using RAII
- *
- * This macro automatically generates a section name based on the current
- * function name, making it easy to profile entire functions.
- */
-#define PROFILE_FUNCTION() PROFILE_SECTION(QString("%1").arg(__FUNCTION__))
-
-/**
- * @brief Profile a named section with file and function context
- * @param name Custom name for the section
- */
-#define PROFILE_SECTION_DETAILED(name) PROFILE_SECTION(QString("%1::%2::%3").arg(__FILE__).arg(__FUNCTION__).arg(name))
+// Note: Profiling macros are now defined in profiling_macros.h for better organization
 
 #endif  // PERFORMANCE_PROFILER_H

@@ -6,9 +6,12 @@
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
+#include "core/profiling_macros.h"  // Sprint 7.3: Performance profiling
 
 QMatrix4x4 LeastSquaresAlignment::computeTransformation(const QList<QPair<QVector3D, QVector3D>>& correspondences)
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     // Validate input
     if (!validateCorrespondences(correspondences))
     {

@@ -144,4 +144,43 @@ target_include_directories(ErrorAnalysisTests PRIVATE
 )
 add_test(NAME ErrorAnalysisTests COMMAND ErrorAnalysisTests)
 
+# Registration Workflow Widget Tests (Sprint 5.1)
+add_executable(RegistrationWorkflowWidgetTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_registrationworkflowwidget.cpp
+)
+target_link_libraries(RegistrationWorkflowWidgetTests PRIVATE
+    Registration        # Link against the Registration library
+    Core                # Indirect dependency
+    GTest::gtest_main   # Google Test framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QVariantMap
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(RegistrationWorkflowWidgetTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core
+)
+add_test(NAME RegistrationWorkflowWidgetTests COMMAND RegistrationWorkflowWidgetTests)
+
+# Sprint 7.1: Pose Graph Builder Tests
+add_executable(PoseGraphBuilderTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_posegraphbuilder.cpp
+)
+target_link_libraries(PoseGraphBuilderTests PRIVATE
+    Registration
+    Core
+    GTest::gtest_main
+    GMock::gmock
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+)
+target_include_directories(PoseGraphBuilderTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core
+)
+add_test(NAME PoseGraphBuilderTests COMMAND PoseGraphBuilderTests)
+
 message(STATUS "Configuring Registration tests...")

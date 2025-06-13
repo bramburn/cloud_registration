@@ -8,13 +8,16 @@
 
 namespace Optimization
 {
-BundleAdjustment::BundleAdjustment(QObject* parent) : QObject(parent) {}
+BundleAdjustment::BundleAdjustment(QObject* parent) : QObject(parent), m_isCancelled(false) {}
 
 std::pair<std::unique_ptr<Registration::PoseGraph>, BundleAdjustment::Result>
 BundleAdjustment::optimize(const Registration::PoseGraph& initialGraph, const Parameters& params)
 {
     QElapsedTimer timer;
     timer.start();
+
+    // Reset cancellation flag
+    m_isCancelled = false;
 
     Result result;
 
@@ -48,6 +51,14 @@ BundleAdjustment::optimize(const Registration::PoseGraph& initialGraph, const Pa
         // Levenberg-Marquardt optimization loop
         for (int iteration = 0; iteration < params.maxIterations; ++iteration)
         {
+            // Check for cancellation
+            if (m_isCancelled)
+            {
+                result.statusMessage = "Optimization cancelled by user";
+                result.optimizationTimeSeconds = timer.elapsed() / 1000.0;
+                emit optimizationCompleted(result);
+                return {std::make_unique<Registration::PoseGraph>(initialGraph), result};
+            }
             // Compute Jacobian and error vector
             std::vector<std::vector<double>> jacobian = computeJacobian(state, initialGraph);
 
@@ -167,6 +178,12 @@ BundleAdjustment::Parameters BundleAdjustment::getRecommendedParameters(const Re
     params.verbose = (nodeCount <= 10);  // Enable verbose for small graphs
 
     return params;
+}
+
+void BundleAdjustment::cancel()
+{
+    m_isCancelled = true;
+    qDebug() << "Bundle adjustment cancellation requested";
 }
 
 double BundleAdjustment::calculateTotalError(const StateVector& state, const Registration::PoseGraph& graph) const

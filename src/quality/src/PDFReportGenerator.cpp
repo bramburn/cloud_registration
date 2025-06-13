@@ -12,6 +12,46 @@ PDFReportGenerator::PDFReportGenerator(QObject* parent) : QObject(parent) {}
 
 PDFReportGenerator::~PDFReportGenerator() = default;
 
+// Static factory method for ReportOptions
+PDFReportGenerator::ReportOptions PDFReportGenerator::ReportOptions::createDefault(const QString& projectName)
+{
+    ReportOptions options;
+
+    // Set project-specific defaults
+    if (!projectName.isEmpty()) {
+        options.projectName = projectName;
+        options.reportTitle = QString("Quality Report - %1").arg(projectName);
+    } else {
+        options.projectName = "Untitled Project";
+        options.reportTitle = "Point Cloud Registration Quality Report";
+    }
+
+    // Set other sensible defaults
+    options.operatorName = "Default User";
+    options.companyName = "CloudRegistration";
+    options.includeCharts = false;
+    options.includeScreenshots = false;
+    options.includeRecommendations = true;
+    options.includeDetailedMetrics = true;
+    options.logoPath = ""; // Empty by default
+    options.outputPath = ""; // Will be set by dialog
+
+    return options;
+}
+
+// Sprint 6.2: New signature that emits signals
+void PDFReportGenerator::generatePdfReport(const QualityReport& report, const ReportOptions& options)
+{
+    // Call the legacy method and emit appropriate signals
+    bool success = generatePdfReport(report, options.outputPath, options);
+
+    if (success) {
+        emit reportGenerated(options.outputPath);
+    } else {
+        emit reportError("Failed to generate PDF report");
+    }
+}
+
 bool PDFReportGenerator::generatePdfReport(const QualityReport& report,
                                            const QString& outputPath,
                                            const ReportOptions& options)
@@ -45,17 +85,26 @@ bool PDFReportGenerator::generatePdfReport(const QualityReport& report,
         drawSummarySection(painter, report);
         addVerticalSpace(20);
 
-        emit reportProgress(50, "Drawing metrics table");
-        drawMetricsTable(painter, report);
-        addVerticalSpace(20);
+        // Conditionally include detailed metrics based on options
+        if (options.includeDetailedMetrics) {
+            emit reportProgress(50, "Drawing metrics table");
+            drawMetricsTable(painter, report);
+            addVerticalSpace(20);
+        }
 
-        emit reportProgress(70, "Drawing charts section");
-        drawChartsSection(painter, report);
-        addVerticalSpace(20);
+        // Conditionally include charts based on options
+        if (options.includeCharts) {
+            emit reportProgress(70, "Drawing charts section");
+            drawChartsSection(painter, report);
+            addVerticalSpace(20);
+        }
 
-        emit reportProgress(85, "Drawing recommendations");
-        drawRecommendationsSection(painter, report);
-        addVerticalSpace(20);
+        // Conditionally include recommendations based on options
+        if (options.includeRecommendations) {
+            emit reportProgress(85, "Drawing recommendations");
+            drawRecommendationsSection(painter, report);
+            addVerticalSpace(20);
+        }
 
         emit reportProgress(95, "Drawing footer");
         drawFooter(painter, options);
@@ -99,7 +148,27 @@ void PDFReportGenerator::drawHeader(QPainter& painter, const QualityReport& repo
 
     QRect subtitleRect(m_layout.leftMargin, m_currentY, m_layout.contentWidth(), 20);
     painter.drawText(subtitleRect, Qt::AlignCenter, subtitle);
-    m_currentY += 30;
+    m_currentY += 25;
+
+    // Add operator and company information if provided
+    if (!options.operatorName.isEmpty() || !options.companyName.isEmpty()) {
+        QString operatorInfo;
+        if (!options.operatorName.isEmpty() && !options.companyName.isEmpty()) {
+            operatorInfo = QString("Operator: %1 | Company: %2")
+                          .arg(options.operatorName)
+                          .arg(options.companyName);
+        } else if (!options.operatorName.isEmpty()) {
+            operatorInfo = QString("Operator: %1").arg(options.operatorName);
+        } else {
+            operatorInfo = QString("Company: %1").arg(options.companyName);
+        }
+
+        QRect operatorRect(m_layout.leftMargin, m_currentY, m_layout.contentWidth(), 20);
+        painter.drawText(operatorRect, Qt::AlignCenter, operatorInfo);
+        m_currentY += 25;
+    } else {
+        m_currentY += 5; // Small spacing adjustment
+    }
 
     // Draw separator line
     painter.setPen(QPen(m_colors.lightGrey, 2));

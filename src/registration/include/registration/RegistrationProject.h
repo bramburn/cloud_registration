@@ -107,6 +107,9 @@ public:
     RegistrationResult getRegistrationResult(const QString& sourceScanId, const QString& targetScanId) const;
     bool hasRegistrationResult(const QString& sourceScanId, const QString& targetScanId) const;
 
+    // Sprint 6.1: Get latest registration result for deviation analysis
+    RegistrationResult getLatestRegistrationResult() const;
+
     // Project state
     enum RegistrationState
     {

@@ -78,6 +78,18 @@ public:
     virtual class SidebarWidget* getSidebar() = 0;
 
     /**
+     * @brief Get the main widget for dialog parenting
+     * @return Pointer to the main widget
+     */
+    virtual QWidget* getWidget() = 0;
+
+    /**
+     * @brief Get the alignment control panel (Sprint 2.1)
+     * @return Pointer to the alignment control panel
+     */
+    virtual class AlignmentControlPanel* getAlignmentControlPanel() = 0;
+
+    /**
      * @brief Show or hide the progress dialog
      * @param show true to show, false to hide
      * @param title Progress dialog title

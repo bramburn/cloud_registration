@@ -13,6 +13,9 @@
 #include "ui/loadingsettingsdialog.h"
 #include "ui/projecthubwidget.h"
 #include "ui/sidebarwidget.h"
+#include "ui/AlignmentControlPanel.h"
+#include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
 // Sprint 1.2: Scan Import functionality
 #include "app/scanimportmanager.h"
 #include "core/sqlitemanager.h"
@@ -45,6 +48,7 @@
 #include "quality/PDFReportGenerator.h"
 #include "quality/QualityAssessment.h"
 #include "ui/ExportDialog.h"
+#include "ui/UserPreferences.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -53,12 +57,15 @@ MainWindow::MainWindow(QWidget* parent)
       m_projectView(nullptr),
       m_projectSplitter(nullptr),
       m_sidebar(nullptr),
+      m_alignmentControlPanel(nullptr),
       m_mainContentArea(nullptr),
       m_viewer(nullptr),
       m_viewerWidget(nullptr),
       m_progressDialog(nullptr),
       m_projectManager(new ProjectManager(this)),
       m_loadManager(new PointCloudLoadManager(this)),
+      m_targetManager(new TargetManager(this)),
+      m_alignmentEngine(new AlignmentEngine(this)),
       m_currentProject(nullptr),
       m_newProjectAction(nullptr),
       m_openProjectAction(nullptr),
@@ -125,8 +132,23 @@ MainWindow::MainWindow(QWidget* parent)
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, nullptr, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
+        m_presenter->setTargetManager(m_targetManager);
+        m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
+
+        // Sprint 2.1: Setup AlignmentControlPanel with AlignmentEngine
+        qDebug() << "Setting up AlignmentControlPanel...";
+        if (m_alignmentControlPanel && m_alignmentEngine)
+        {
+            m_alignmentControlPanel->setAlignmentEngine(m_alignmentEngine);
+        }
+        qDebug() << "AlignmentControlPanel setup completed";
 
         // Sprint 6: Initialize export and quality assessment components
         qDebug() << "Initializing Sprint 6 components...";
@@ -283,12 +305,15 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
       m_projectView(nullptr),
       m_projectSplitter(nullptr),
       m_sidebar(nullptr),
+      m_alignmentControlPanel(nullptr),
       m_mainContentArea(nullptr),
       m_viewer(nullptr),
       m_viewerWidget(nullptr),
       m_progressDialog(nullptr),
       m_projectManager(new ProjectManager(this)),
       m_loadManager(new PointCloudLoadManager(this)),
+      m_targetManager(new TargetManager(this)),
+      m_alignmentEngine(new AlignmentEngine(this)),
       m_currentProject(nullptr),
       m_newProjectAction(nullptr),
       m_openProjectAction(nullptr),
@@ -335,12 +360,61 @@ MainWindow::MainWindow(IE57Parser* e57Parser, QWidget* parent)
         setupUI();
         qDebug() << "UI setup completed";
 
+        // Sprint 6: Initialize export and quality assessment components
+        qDebug() << "Initializing Sprint 6 components...";
+        m_exporter = std::make_unique<PointCloudExporter>(this);
+        m_qualityAssessment = std::make_unique<QualityAssessment>(this);
+        m_reportGenerator = std::make_unique<PDFReportGenerator>(this);
+        m_crsManager = std::make_unique<CoordinateSystemManager>(this);
+
+        // Connect Sprint 6 signals
+        connect(m_exporter.get(),
+                &PointCloudExporter::exportCompleted,
+                this,
+                [this](const ExportResult& result)
+                {
+                    if (result.success)
+                    {
+                        onExportCompleted(result.outputPath);
+                    }
+                    else
+                    {
+                        QMessageBox::critical(this, "Export Failed", result.errorMessage);
+                    }
+                });
+
+        connect(m_qualityAssessment.get(),
+                &QualityAssessment::assessmentCompleted,
+                this,
+                [this](const QualityReport& report)
+                {
+                    m_lastQualityReport = new QualityReport(report);
+                    onQualityAssessmentCompleted();
+                });
+
+        qDebug() << "Sprint 6 components initialized";
+
         // Sprint 4: Initialize presenter after UI setup
         qDebug() << "Initializing presenter...";
         m_presenter = std::make_unique<MainPresenter>(this, m_e57Parser, nullptr, this);
         m_presenter->setProjectManager(m_projectManager);
+        m_presenter->setTargetManager(m_targetManager);
+        m_presenter->setAlignmentEngine(m_alignmentEngine);
+
+        // Sprint 6.2: Set quality assessment and report generator
+        m_presenter->setQualityAssessment(m_qualityAssessment.get());
+        m_presenter->setPDFReportGenerator(m_reportGenerator.get());
+
         m_presenter->initialize();
         qDebug() << "Presenter initialized";
+
+        // Sprint 2.1: Setup AlignmentControlPanel with AlignmentEngine
+        qDebug() << "Setting up AlignmentControlPanel...";
+        if (m_alignmentControlPanel && m_alignmentEngine)
+        {
+            m_alignmentControlPanel->setAlignmentEngine(m_alignmentEngine);
+        }
+        qDebug() << "AlignmentControlPanel setup completed";
 
         qDebug() << "Setting up menu bar...";
         setupMenuBar();
@@ -478,6 +552,11 @@ void MainWindow::setupUI()
     m_sidebar->setMinimumWidth(250);
     m_sidebar->setMaximumWidth(400);
 
+    // Create Alignment Control Panel
+    m_alignmentControlPanel = new AlignmentControlPanel(this);
+    m_alignmentControlPanel->setMinimumWidth(250);
+    m_alignmentControlPanel->setMaximumWidth(400);
+
     // Create main content area with point cloud viewer
     m_mainContentArea = new QWidget();
     auto* contentLayout = new QVBoxLayout(m_mainContentArea);
@@ -561,7 +640,8 @@ void MainWindow::setupMenuBar()
     m_exportPointCloudAction->setShortcut(QKeySequence("Ctrl+E"));
     m_exportPointCloudAction->setEnabled(false);
     m_exportPointCloudAction->setStatusTip("Export point cloud to various formats");
-    connect(m_exportPointCloudAction, &QAction::triggered, this, &MainWindow::onExportPointCloud);
+    connect(m_exportPointCloudAction, &QAction::triggered,
+            [this]() { if (m_presenter) m_presenter->handleExportPointCloud(); });
 
     fileMenu->addSeparator();
 
@@ -613,6 +693,23 @@ void MainWindow::setupMenuBar()
     m_generateReportAction->setStatusTip("Generate PDF quality assessment report");
     connect(m_generateReportAction, &QAction::triggered, this, &MainWindow::onGenerateQualityReport);
 
+    // Sprint 7.3: Add performance report action
+    m_generatePerformanceReportAction = qualityMenu->addAction("Generate &Performance Report...");
+    m_generatePerformanceReportAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
+    m_generatePerformanceReportAction->setEnabled(false);
+    m_generatePerformanceReportAction->setStatusTip("Generate performance profiling report");
+    connect(m_generatePerformanceReportAction, &QAction::triggered, this, &MainWindow::onGeneratePerformanceReport);
+
+    qualityMenu->addSeparator();
+
+    // Sprint 6.1: Add deviation map toggle
+    m_showDeviationMapAction = qualityMenu->addAction("Show &Deviation Map");
+    m_showDeviationMapAction->setCheckable(true);
+    m_showDeviationMapAction->setShortcut(QKeySequence("Ctrl+D"));
+    m_showDeviationMapAction->setEnabled(false);
+    m_showDeviationMapAction->setStatusTip("Show colorized deviation map between registered scans");
+    connect(m_showDeviationMapAction, &QAction::toggled, this, &MainWindow::onShowDeviationMapToggled);
+
     qualityMenu->addSeparator();
 
     m_coordinateSystemAction = qualityMenu->addAction("&Coordinate System Settings...");
@@ -635,6 +732,9 @@ void MainWindow::setupMenuBar()
                                    "Built with Qt6 and OpenGL");
             });
     helpMenu->addAction(aboutAction);
+
+    // Sprint 7.3: Update performance report action state based on preferences
+    updatePerformanceReportActionState();
 }
 
 void MainWindow::setupStatusBar()
@@ -901,22 +1001,28 @@ void MainWindow::onLoadingFinished(bool success, const QString& message)
     cleanupProgressDialog();
     updateUIAfterParsing(success, message);
 
-    // Sprint 6: Enable export and quality assessment when data is loaded
+    // Sprint 3.2: Enable export when project is open and data is loaded
     if (success && m_viewer)
     {
         std::vector<Point> currentData = m_viewer->getCurrentPointCloudData();
         bool hasData = !currentData.empty();
+        bool hasProject = (m_currentProject != nullptr);
+
+        // Export should be enabled when: project is open AND data is loaded
+        // TODO: Add registration check when RegistrationProject integration is complete
+        bool enableExport = hasProject && hasData;
 
         if (m_exportPointCloudAction)
         {
-            m_exportPointCloudAction->setEnabled(hasData);
+            m_exportPointCloudAction->setEnabled(enableExport);
         }
         if (m_qualityAssessmentAction)
         {
             m_qualityAssessmentAction->setEnabled(hasData);
         }
 
-        qDebug() << "Sprint 6: Export and quality actions enabled:" << hasData;
+        qDebug() << "Sprint 3.2: Export action enabled:" << enableExport
+                 << "(hasProject:" << hasProject << ", hasData:" << hasData << ")";
     }
 }
 
@@ -2830,45 +2936,14 @@ void MainWindow::onQualityAssessment()
 
 void MainWindow::onGenerateQualityReport()
 {
-    if (!m_reportGenerator || !m_lastQualityReport)
+    // Sprint 6.2: Delegate to MainPresenter instead of handling directly
+    if (m_presenter)
     {
-        QMessageBox::warning(this, "Report Error", "No quality assessment data available for report generation");
-        return;
-    }
-
-    QString outputPath = QFileDialog::getSaveFileName(this,
-                                                      "Save Quality Report",
-                                                      QString("%1_quality_report.pdf").arg(m_currentFileName),
-                                                      "PDF Files (*.pdf);;All Files (*)");
-
-    if (outputPath.isEmpty())
-    {
-        return;
-    }
-
-    ReportOptions options;
-    options.outputPath = outputPath;
-    options.projectName = m_currentFileName.isEmpty() ? "Untitled Project" : m_currentFileName;
-    options.companyName = "FARO Technologies";
-    options.operatorName = QApplication::applicationName();
-    options.includeCharts = true;
-    options.includeRecommendations = true;
-    options.includeDetailedMetrics = true;
-
-    setStatusMessage("Generating quality report...");
-
-    bool success = m_reportGenerator->generateReport(*m_lastQualityReport, options);
-
-    if (success)
-    {
-        QMessageBox::information(this, "Report Generated", QString("Quality report saved to:\n%1").arg(outputPath));
-        setStatusMessage("Quality report generated successfully");
+        m_presenter->handleGenerateReportClicked();
     }
     else
     {
-        QMessageBox::critical(
-            this, "Report Error", QString("Failed to generate report: %1").arg(m_reportGenerator->getLastError()));
-        setStatusMessage("Report generation failed");
+        QMessageBox::warning(this, "Report Error", "Presenter not available for report generation");
     }
 }
 
@@ -2901,4 +2976,50 @@ void MainWindow::onQualityAssessmentCompleted()
 {
     setStatusMessage("Quality assessment completed");
     m_generateReportAction->setEnabled(true);
+}
+
+// Sprint 6.1: Deviation map toggle implementation
+void MainWindow::onShowDeviationMapToggled(bool enabled)
+{
+    qDebug() << "Show deviation map toggled:" << enabled;
+
+    if (m_presenter)
+    {
+        m_presenter->handleShowDeviationMapToggled(enabled);
+    }
+    else
+    {
+        qWarning() << "No presenter available for deviation map toggle";
+    }
+}
+
+// Sprint 7.3: Performance report generation implementation
+void MainWindow::onGeneratePerformanceReport()
+{
+    qDebug() << "Generate performance report requested";
+
+    if (m_presenter)
+    {
+        m_presenter->handleGeneratePerformanceReportClicked();
+    }
+    else
+    {
+        QMessageBox::warning(this, "Performance Report Error", "Presenter not available for performance report generation");
+    }
+}
+
+AlignmentControlPanel* MainWindow::getAlignmentControlPanel()
+{
+    return m_alignmentControlPanel;
+}
+
+// Sprint 7.3: Update performance report action state based on preferences
+void MainWindow::updatePerformanceReportActionState()
+{
+    if (m_generatePerformanceReportAction)
+    {
+        bool profilingEnabled = UserPreferences::instance().getValue("advanced/profilingEnabled", false).toBool();
+        m_generatePerformanceReportAction->setEnabled(profilingEnabled);
+        qDebug() << "Performance report action enabled:" << profilingEnabled;
+    }
 }

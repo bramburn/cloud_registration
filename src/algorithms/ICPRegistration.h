@@ -142,6 +142,14 @@ public:
         return m_isRunning;
     }
 
+    /**
+     * @brief Get recommended ICP parameters based on input point clouds
+     * @param source Source point cloud
+     * @param target Target point cloud
+     * @return Recommended ICPParams with intelligent defaults
+     */
+    static ICPParams getRecommendedParameters(const PointCloud& source, const PointCloud& target);
+
 signals:
     /**
      * @brief Emitted during ICP iterations to report progress

@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "registration/Target.h"
+#include "core/profiling_macros.h"  // Sprint 7.3: Performance profiling
 
 NaturalPointSelector::NaturalPointSelector(QObject* parent)
     : TargetDetectionBase(parent),
@@ -32,6 +33,8 @@ NaturalPointSelector::SelectionResult NaturalPointSelector::selectPoint(const st
                                                                         const QSize& viewportSize,
                                                                         float selectionRadius)
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     SelectionResult result;
 
     if (points.empty())

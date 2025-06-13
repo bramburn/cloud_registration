@@ -116,6 +116,23 @@ QGroupBox* AlignmentControlPanel::createControlsGroup()
     m_progressBar->setVisible(false);
     layout->addWidget(m_progressBar);
 
+    // Finalization buttons
+    QHBoxLayout* finalizationLayout = new QHBoxLayout();
+
+    m_acceptButton = new QPushButton("Accept Alignment");
+    m_acceptButton->setEnabled(false);
+    m_acceptButton->setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }");
+    connect(m_acceptButton, &QPushButton::clicked, this, &AlignmentControlPanel::onAcceptAlignmentClicked);
+    finalizationLayout->addWidget(m_acceptButton);
+
+    m_cancelButton = new QPushButton("Cancel");
+    m_cancelButton->setEnabled(false);
+    m_cancelButton->setStyleSheet("QPushButton { background-color: #f44336; color: white; }");
+    connect(m_cancelButton, &QPushButton::clicked, this, &AlignmentControlPanel::onCancelAlignmentClicked);
+    finalizationLayout->addWidget(m_cancelButton);
+
+    layout->addLayout(finalizationLayout);
+
     // Report button
     m_reportButton = new QPushButton("Show Detailed Report");
     m_reportButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
@@ -246,6 +263,9 @@ void AlignmentControlPanel::updateAlignmentResult(const AlignmentEngine::Alignme
 
     // Enable/disable report button
     m_reportButton->setEnabled(result.state == AlignmentEngine::AlignmentState::Valid);
+
+    // Sprint 4.3: Handle ICP-specific button states
+    updateICPButtonStates(result);
 }
 
 void AlignmentControlPanel::updateAlignmentState(AlignmentEngine::AlignmentState state, const QString& message)
@@ -286,11 +306,9 @@ void AlignmentControlPanel::updateCorrespondenceCount(int count)
 
 void AlignmentControlPanel::onAlignmentButtonClicked()
 {
-    if (m_alignmentEngine)
-    {
-        emit alignmentRequested();
-        m_alignmentEngine->recomputeAlignment();
-    }
+    // Emit signal to request alignment computation
+    // The MainPresenter will handle the actual computation logic
+    emit alignmentRequested();
 }
 
 void AlignmentControlPanel::onClearCorrespondencesClicked()
@@ -336,6 +354,16 @@ void AlignmentControlPanel::onShowDetailedReport()
     }
 }
 
+void AlignmentControlPanel::onAcceptAlignmentClicked()
+{
+    emit acceptAlignmentRequested();
+}
+
+void AlignmentControlPanel::onCancelAlignmentClicked()
+{
+    emit cancelAlignmentRequested();
+}
+
 void AlignmentControlPanel::updateUIState(AlignmentEngine::AlignmentState state)
 {
     bool canAlign =
@@ -343,6 +371,14 @@ void AlignmentControlPanel::updateUIState(AlignmentEngine::AlignmentState state)
          state == AlignmentEngine::AlignmentState::Insufficient);
 
     m_alignButton->setEnabled(canAlign && m_alignmentEngine && m_alignmentEngine->getCorrespondences().size() >= 3);
+
+    // Update finalization button states
+    // Accept button: enabled only when alignment is valid
+    m_acceptButton->setEnabled(state == AlignmentEngine::AlignmentState::Valid);
+
+    // Cancel button: enabled when manual alignment mode is active (not Idle)
+    bool isAlignmentActive = (state != AlignmentEngine::AlignmentState::Idle);
+    m_cancelButton->setEnabled(isAlignmentActive);
 
     // Update button text based on state
     switch (state)
@@ -379,4 +415,45 @@ QString AlignmentControlPanel::getQualityLevel(float rmsError) const
     if (rmsError <= 5.0f)
         return "Acceptable";
     return "Poor";
+}
+
+// Sprint 4.3: ICP-specific button state management
+void AlignmentControlPanel::updateICPButtonStates(const AlignmentEngine::AlignmentResult& result)
+{
+    // Check if this result is from ICP computation
+    bool isICPResult = result.message.contains("ICP", Qt::CaseInsensitive);
+
+    if (isICPResult && result.state == AlignmentEngine::AlignmentState::Valid)
+    {
+        // Enable Accept/Discard buttons for successful ICP results
+        m_acceptButton->setEnabled(true);
+        m_cancelButton->setEnabled(true);
+
+        // Update button text to be more specific for ICP
+        m_acceptButton->setText("Accept ICP Result");
+        m_cancelButton->setText("Discard ICP Result");
+
+        qDebug() << "AlignmentControlPanel: Enabled ICP Accept/Discard buttons";
+    }
+    else if (isICPResult && result.state != AlignmentEngine::AlignmentState::Valid)
+    {
+        // Disable buttons for failed ICP results
+        m_acceptButton->setEnabled(false);
+        m_cancelButton->setEnabled(false);
+
+        // Reset button text
+        m_acceptButton->setText("Accept Alignment");
+        m_cancelButton->setText("Cancel");
+
+        qDebug() << "AlignmentControlPanel: Disabled ICP buttons due to invalid result";
+    }
+    else
+    {
+        // For non-ICP results, use standard manual alignment button behavior
+        m_acceptButton->setText("Accept Alignment");
+        m_cancelButton->setText("Cancel");
+
+        // Standard button enablement logic is handled by updateUIState()
+        qDebug() << "AlignmentControlPanel: Using standard button behavior for non-ICP result";
+    }
 }

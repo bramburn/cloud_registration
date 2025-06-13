@@ -4,8 +4,18 @@
 #include <QElapsedTimer>
 
 #include "../algorithms/LeastSquaresAlignment.h"
+#include "../algorithms/ICPRegistration.h"
+#include "analysis/DifferenceAnalysis.h"
+#include "core/pointdata.h"
+#include "registration/SphereDetector.h"
+#include "registration/TargetManager.h"
+#include "app/pointcloudloadmanager.h"
 
-AlignmentEngine::AlignmentEngine(QObject* parent) : QObject(parent), m_computationTimer(new QTimer(this))
+AlignmentEngine::AlignmentEngine(QObject* parent)
+    : QObject(parent),
+      m_computationTimer(new QTimer(this)),
+      m_loadManager(nullptr),
+      m_targetManager(nullptr)
 {
     // Initialize current result
     m_currentResult.transformation.setToIdentity();
@@ -238,4 +248,311 @@ void AlignmentEngine::setQualityThresholds(float rmsThreshold, float maxErrorThr
     {
         triggerRecomputeIfEnabled();
     }
+}
+
+void AlignmentEngine::startTargetDetection(const QString& scanId, int mode, const QVariantMap& params)
+{
+    qDebug() << "Starting target detection for scan:" << scanId << "with mode:" << mode;
+
+    if (!m_loadManager)
+    {
+        emit targetDetectionError("Point cloud load manager not available");
+        return;
+    }
+
+    if (!m_targetManager)
+    {
+        emit targetDetectionError("Target manager not available");
+        return;
+    }
+
+    // Emit initial progress
+    emit targetDetectionProgress(0, "Initializing target detection...");
+
+    // Get point cloud data from PointCloudLoadManager
+    std::vector<PointFullData> points = m_loadManager->getLoadedPointFullData(scanId);
+
+    if (points.empty())
+    {
+        emit targetDetectionError("No point cloud data available for scan: " + scanId);
+        return;
+    }
+
+    emit targetDetectionProgress(10, "Point cloud data loaded...");
+
+    // Convert QVariantMap to DetectionParams
+    TargetDetectionBase::DetectionParams detectionParams;
+    detectionParams.fromVariantMap(params);
+
+    // Check if mode includes automatic spheres (mode 0 = AutomaticSpheres, mode 2 = Both)
+    if (mode == 0 || mode == 2)
+    {
+        // Create and configure SphereDetector
+        m_sphereDetector = std::make_unique<SphereDetector>(this);
+
+        // Connect detector signals to relay slots
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionProgress,
+                this, &AlignmentEngine::onDetectionProgress);
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionCompleted,
+                this, &AlignmentEngine::onDetectionCompleted);
+        connect(m_sphereDetector.get(), &TargetDetectionBase::detectionError,
+                this, &AlignmentEngine::onDetectionError);
+
+        emit targetDetectionProgress(20, "Starting sphere detection...");
+
+        // Start asynchronous detection
+        m_sphereDetector->detectAsync(points, detectionParams);
+    }
+    else
+    {
+        // For manual modes, just emit completion with empty result
+        TargetDetectionBase::DetectionResult emptyResult;
+        emptyResult.success = true;
+        emptyResult.processedPoints = static_cast<int>(points.size());
+        emit targetDetectionCompleted(emptyResult);
+    }
+}
+
+void AlignmentEngine::cancelTargetDetection()
+{
+    qDebug() << "Cancelling target detection";
+
+    if (m_sphereDetector)
+    {
+        m_sphereDetector->cancel();
+    }
+}
+
+void AlignmentEngine::onDetectionProgress(int percentage, const QString& stage)
+{
+    // Relay progress signal from detector
+    emit targetDetectionProgress(percentage, stage);
+}
+
+void AlignmentEngine::onDetectionCompleted(const TargetDetectionBase::DetectionResult& result)
+{
+    qDebug() << "Target detection completed with" << result.targets.size() << "targets";
+
+    if (m_targetManager && result.success)
+    {
+        // Add all detected targets to the target manager
+        int addedCount = 0;
+        for (const auto& target : result.targets)
+        {
+            if (m_targetManager->addTarget(target->scanId(), target))
+            {
+                addedCount++;
+            }
+        }
+        qDebug() << "Added" << addedCount << "targets to TargetManager";
+    }
+
+    // Relay completion signal
+    emit targetDetectionCompleted(result);
+
+    // Clean up detector
+    m_sphereDetector.reset();
+}
+
+void AlignmentEngine::onDetectionError(const QString& error)
+{
+    qDebug() << "Target detection error:" << error;
+
+    // Relay error signal
+    emit targetDetectionError(error);
+
+    // Clean up detector
+    m_sphereDetector.reset();
+}
+
+void AlignmentEngine::startAutomaticAlignment(const QString& sourceScanId,
+                                            const QString& targetScanId,
+                                            const ICPParams& params)
+{
+    qDebug() << "Starting automatic alignment between" << sourceScanId << "and" << targetScanId;
+
+    // Store scan IDs for reference
+    m_currentSourceScanId = sourceScanId;
+    m_currentTargetScanId = targetScanId;
+
+    // Create a new ICP algorithm instance
+    m_icpAlgorithm = std::make_unique<ICPRegistration>();
+
+    // Connect signals for progress updates
+    connect(m_icpAlgorithm.get(), &ICPRegistration::progressUpdated,
+            this, [this](int iteration, float rmsError, const QMatrix4x4& transformation) {
+        // Update current result with intermediate transformation
+        m_currentResult.transformation = transformation;
+        m_currentResult.errorStats.rmsError = rmsError;
+        m_currentResult.state = AlignmentState::Computing;
+        m_currentResult.message = QString("ICP iteration %1, RMS error: %2 mm")
+                                    .arg(iteration)
+                                    .arg(rmsError, 0, 'f', 3);
+
+        // Emit signals for real-time update
+        emit transformationUpdated(transformation);
+        emit qualityMetricsUpdated(rmsError);
+        emit alignmentResultUpdated(m_currentResult);
+        emit alignmentStateChanged(AlignmentState::Computing, m_currentResult.message);
+
+        // Relay progress signal for ICPProgressWidget
+        emit progressUpdated(iteration, rmsError, transformation);
+
+        qDebug() << "ICP progress:" << iteration << "iterations, RMS:" << rmsError;
+    });
+
+    // Connect signal for completion
+    connect(m_icpAlgorithm.get(), &ICPRegistration::computationFinished,
+            this, [this](bool success, const QMatrix4x4& finalTransform, float finalError, int iterations) {
+        // Update final result
+        m_currentResult.transformation = finalTransform;
+        m_currentResult.errorStats.rmsError = finalError;
+
+        if (success)
+        {
+            m_currentResult.state = AlignmentState::Valid;
+            m_currentResult.message = QString("ICP completed successfully after %1 iterations (RMS: %2 mm)")
+                                        .arg(iterations)
+                                        .arg(finalError, 0, 'f', 3);
+        }
+        else
+        {
+            m_currentResult.state = AlignmentState::Error;
+            m_currentResult.message = "ICP computation failed or was cancelled";
+        }
+
+        // Emit signals for final update
+        emit transformationUpdated(finalTransform);
+        emit qualityMetricsUpdated(finalError);
+        emit alignmentResultUpdated(m_currentResult);
+        emit alignmentStateChanged(m_currentResult.state, m_currentResult.message);
+
+        // Relay completion signal for ICPProgressWidget
+        emit computationFinished(success, finalTransform, finalError, iterations);
+
+        qDebug() << "ICP computation finished. Success:" << success
+                 << "Iterations:" << iterations
+                 << "Final RMS:" << finalError;
+    });
+
+    // TODO: Retrieve point clouds from PointCloudLoadManager
+    // For now, we'll use empty point clouds as placeholders
+    PointCloud sourceCloud;
+    PointCloud targetCloud;
+
+    // Set initial transformation to identity
+    QMatrix4x4 initialGuess;
+    initialGuess.setToIdentity();
+
+    // Start the computation asynchronously
+    QMetaObject::invokeMethod(m_icpAlgorithm.get(), [this, sourceCloud, targetCloud, initialGuess, params]() {
+        m_icpAlgorithm->compute(sourceCloud, targetCloud, initialGuess, params);
+    }, Qt::QueuedConnection);
+
+    // Update current state
+    m_currentResult.state = AlignmentState::Computing;
+    m_currentResult.message = "Starting ICP computation...";
+    emit alignmentStateChanged(AlignmentState::Computing, m_currentResult.message);
+}
+
+void AlignmentEngine::cancelAutomaticAlignment()
+{
+    if (m_icpAlgorithm && m_icpAlgorithm->isRunning())
+    {
+        qDebug() << "Cancelling automatic alignment";
+        m_icpAlgorithm->cancel();
+
+        // Update state
+        m_currentResult.state = AlignmentState::Cancelled;
+        m_currentResult.message = "ICP computation cancelled by user";
+        emit alignmentStateChanged(AlignmentState::Cancelled, m_currentResult.message);
+    }
+}
+
+// Sprint 4.3: ICP Result Management
+QMatrix4x4 AlignmentEngine::getLastICPTransform() const
+{
+    return m_currentResult.transformation;
+}
+
+float AlignmentEngine::getLastICPRMSError() const
+{
+    return m_currentResult.errorStats.rmsError;
+}
+
+bool AlignmentEngine::isCurrentResultFromICP() const
+{
+    // Check if the current result message contains ICP-related keywords
+    return m_currentResult.message.contains("ICP", Qt::CaseInsensitive);
+}
+
+// Sprint 6.1: Deviation analysis implementation
+std::vector<PointFullData> AlignmentEngine::analyzeDeviation(const std::vector<PointFullData>& source,
+                                                            const std::vector<PointFullData>& target,
+                                                            const QMatrix4x4& transform)
+{
+    qDebug() << "Starting deviation analysis with" << source.size() << "source and" << target.size() << "target points";
+
+    std::vector<PointFullData> colorizedPoints;
+
+    if (source.empty() || target.empty())
+    {
+        qWarning() << "Empty point clouds provided for deviation analysis";
+        return colorizedPoints;
+    }
+
+    // Convert PointFullData to Point3D for analysis
+    std::vector<Point3D> sourcePoints3D;
+    std::vector<Point3D> targetPoints3D;
+
+    sourcePoints3D.reserve(source.size());
+    targetPoints3D.reserve(target.size());
+
+    for (const auto& point : source)
+    {
+        sourcePoints3D.emplace_back(point.x, point.y, point.z);
+    }
+
+    for (const auto& point : target)
+    {
+        targetPoints3D.emplace_back(point.x, point.y, point.z);
+    }
+
+    // Perform difference analysis
+    Analysis::DifferenceAnalysis analyzer;
+    QVector<float> distances = analyzer.calculateDistances(sourcePoints3D, targetPoints3D, transform);
+
+    // Set a reasonable max distance (5cm default, or from preferences)
+    m_lastDeviationMaxDistance = 0.05f;
+
+    // Generate colors based on distances
+    QVector<QColor> colors = analyzer.generateColorMapColors(distances, m_lastDeviationMaxDistance);
+
+    // Create colorized point cloud
+    colorizedPoints.reserve(source.size());
+
+    for (size_t i = 0; i < source.size() && i < static_cast<size_t>(colors.size()); ++i)
+    {
+        PointFullData colorizedPoint = source[i];
+
+        // Apply transformation to position
+        QVector3D pos(colorizedPoint.x, colorizedPoint.y, colorizedPoint.z);
+        QVector3D transformedPos = transform.map(pos);
+        colorizedPoint.x = transformedPos.x();
+        colorizedPoint.y = transformedPos.y();
+        colorizedPoint.z = transformedPos.z();
+
+        // Set deviation color
+        QColor color = colors[static_cast<int>(i)];
+        colorizedPoint.r = static_cast<uint8_t>(color.red());
+        colorizedPoint.g = static_cast<uint8_t>(color.green());
+        colorizedPoint.b = static_cast<uint8_t>(color.blue());
+
+        colorizedPoints.push_back(colorizedPoint);
+    }
+
+    qDebug() << "Deviation analysis completed. Generated" << colorizedPoints.size() << "colorized points";
+    qDebug() << "Max deviation distance:" << m_lastDeviationMaxDistance << "m";
+
+    return colorizedPoints;
 }

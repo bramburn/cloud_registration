@@ -379,6 +379,17 @@ RegistrationProject::RegistrationResult RegistrationProject::getRegistrationResu
     return (it != registrationResults_.end()) ? *it : RegistrationResult();
 }
 
+RegistrationProject::RegistrationResult RegistrationProject::getLatestRegistrationResult() const
+{
+    if (registrationResults_.isEmpty())
+    {
+        return RegistrationResult();
+    }
+
+    // Return the most recently added registration result
+    return registrationResults_.last();
+}
+
 bool RegistrationProject::hasRegistrationResult(const QString& sourceScanId, const QString& targetScanId) const
 {
     return std::any_of(registrationResults_.begin(),

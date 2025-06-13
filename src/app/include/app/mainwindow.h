@@ -33,6 +33,9 @@ class QSlider;
 class QGroupBox;
 class MainPresenter;
 class IPointCloudViewer;
+class AlignmentControlPanel;
+class TargetManager;
+class AlignmentEngine;
 struct LasHeaderMetadata;
 
 // Sprint 6: Forward declarations
@@ -60,6 +63,7 @@ public:
     void setWindowTitle(const QString& title) override;
     IPointCloudViewer* getViewer() override;
     SidebarWidget* getSidebar() override;
+    AlignmentControlPanel* getAlignmentControlPanel() override;
     void showProgressDialog(bool show, const QString& title = QString(), const QString& message = QString()) override;
     void updateProgress(int percentage, const QString& message) override;
     void setActionsEnabled(bool enabled) override;
@@ -239,6 +243,12 @@ private slots:
     void onExportCompleted(const QString& filePath);
     void onQualityAssessmentCompleted();
 
+    // Sprint 6.1: Deviation map slot
+    void onShowDeviationMapToggled(bool enabled);
+
+    // Sprint 7.3: Performance profiling slot
+    void onGeneratePerformanceReport();
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -288,12 +298,16 @@ private:
     // Sprint 2.2: Performance statistics display
     void onStatsUpdated(float fps, int visiblePoints);
 
+    // Sprint 7.3: Performance profiling action state management
+    void updatePerformanceReportActionState();
+
     // Main UI Components
     QStackedWidget* m_centralStack;
     ProjectHubWidget* m_projectHub;
     QWidget* m_projectView;
     QSplitter* m_projectSplitter;
     SidebarWidget* m_sidebar;
+    AlignmentControlPanel* m_alignmentControlPanel;
     QWidget* m_mainContentArea;
 
     // Point cloud viewer (interface-based for decoupling)
@@ -304,6 +318,8 @@ private:
     // Project management
     ProjectManager* m_projectManager;
     PointCloudLoadManager* m_loadManager;
+    TargetManager* m_targetManager;
+    AlignmentEngine* m_alignmentEngine;
     Project* m_currentProject;
 
     // Menu actions
@@ -322,6 +338,12 @@ private:
     QAction* m_qualityAssessmentAction;
     QAction* m_generateReportAction;
     QAction* m_coordinateSystemAction;
+
+    // Sprint 6.1: Deviation map action
+    QAction* m_showDeviationMapAction;
+
+    // Sprint 7.3: Performance profiling action
+    QAction* m_generatePerformanceReportAction;
 
     // Sprint 1.2: Import guidance widgets
     QWidget* m_importGuidanceWidget;
