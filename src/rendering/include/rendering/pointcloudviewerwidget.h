@@ -25,6 +25,12 @@
 #include "rendering/GpuCuller.h"
 #include "core/screenspaceerror.h"
 
+// Forward declarations for Sprint 5.3
+class Target;
+class SphereTarget;
+class NaturalPointTarget;
+class NaturalPointSelector;
+
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
     Q_OBJECT
@@ -117,6 +123,12 @@ public:
     void getLODDistances(float& distance1, float& distance2) const;
     size_t getOctreeNodeCount() const;
 
+    // Sprint 5.3: Target visualization and manual selection
+    void updateTargetsForRendering(const QList<std::shared_ptr<Target>>& targets);
+    void highlightTarget(const QString& targetId);
+    void setPointPickingEnabled(bool enabled, const QString& scanId);
+    void addPointMarker(const QVector3D& position, const QColor& color = Qt::yellow);
+
 public slots:
     // IPointCloudViewer interface slots implementation
     void onLoadingStarted() override;
@@ -165,6 +177,9 @@ signals:
     void pointCloudLoadFailed(const QString& error);
     void pointCloudCleared();
     void stateChanged(ViewerState newState, const QString& message);
+
+    // Sprint 5.3: Target interaction signals
+    void pointPicked(QVector3D worldPos, QString scanId);
 
 protected:
     // OpenGL overrides
@@ -235,6 +250,12 @@ private:
 
     // Sprint 6.1: Deviation map rendering methods
     void renderDeviationMapLegend(float maxDistance);
+
+    // Sprint 5.3: Target rendering methods
+    void renderTargets();
+    void drawSphereTarget(const SphereTarget& target, const QMatrix4x4& mvpMatrix);
+    void drawNaturalPointTarget(const NaturalPointTarget& target, const QMatrix4x4& mvpMatrix);
+    QVector3D unprojectPoint(const QPoint& screenPos) const;
 
 private slots:
     void updateLoadingAnimation();
@@ -397,6 +418,13 @@ private:
     bool m_renderDeviationMap = false;                   ///< Flag to render deviation map
     bool m_legendVisible = false;                        ///< Flag to show deviation legend
     float m_legendMaxDistance = 0.0f;                    ///< Max distance for legend
+
+    // Sprint 5.3: Target visualization and manual selection
+    QList<std::shared_ptr<Target>> m_renderedTargets;   ///< Targets to render in 3D viewer
+    QString m_highlightedTargetId;                       ///< ID of currently highlighted target
+    bool m_pointPickingEnabled = false;                  ///< Flag for point picking mode
+    QString m_pickingScanId;                             ///< Scan ID for point picking
+    std::unique_ptr<NaturalPointSelector> m_naturalPointSelector; ///< Point selector instance
 };
 
 #endif  // POINTCLOUDVIEWERWIDGET_H

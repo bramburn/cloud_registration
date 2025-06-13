@@ -36,6 +36,9 @@ public:
     QList<Target*> getAllTargets() const;
     QStringList getTargetIds() const;
 
+    // Sprint 5.3: Shared pointer access for rendering
+    QList<std::shared_ptr<Target>> getSharedTargetsForScan(const QString& scanId) const;
+
     // Target queries
     int getTargetCount() const;
     int getTargetCountForScan(const QString& scanId) const;

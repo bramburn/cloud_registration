@@ -42,6 +42,7 @@ TargetDetectionDialog::TargetDetectionDialog(TargetManager* targetManager, QWidg
     // Set default parameters
     resetToDefaults();
 }
+}
 
 void TargetDetectionDialog::setPointCloudData(const QString& scanId, const std::vector<PointFullData>& points)
 {
@@ -114,10 +115,15 @@ void TargetDetectionDialog::startDetection()
             m_logTextEdit->append("Manual natural point selection mode activated.");
             m_statusLabel->setText("Ready for manual point selection");
             m_detectionRunning = false;
-            m_startButton->setEnabled(true);
+            m_startButton->setVisible(false);
             m_cancelButton->setEnabled(false);
             m_progressBar->setVisible(false);
-            emit manualSelectionRequested(m_currentScanId);
+
+            // Show manual selection UI
+            m_manualInstructionsLabel->setVisible(true);
+            m_doneManualSelectionButton->setVisible(true);
+
+            emit manualSelectionModeActivated(m_currentScanId);
             return; // Don't set detection running for manual mode
 
         case Both:
@@ -303,11 +309,25 @@ void TargetDetectionDialog::onTargetSelected()
         // Could emit signal to highlight target in 3D view
         auto target = m_lastResult.targets[currentRow];
         m_logTextEdit->append(QString("Selected target: %1 at %2")
-                                  .arg(target->getTargetId())
+                                  .arg(target->targetId())
                                   .arg(QString("(%1, %2, %3)")
-                                           .arg(target->getPosition().x())
-                                           .arg(target->getPosition().y())
-                                           .arg(target->getPosition().z())));
+                                           .arg(target->position().x())
+                                           .arg(target->position().y())
+                                           .arg(target->position().z())));
+    }
+}
+
+void TargetDetectionDialog::onTargetSelectedInList(int row)
+{
+    if (row >= 0 && row < m_lastResult.targets.size())
+    {
+        auto target = m_lastResult.targets[row];
+        QString targetId = target->targetId();
+
+        // Emit signal to highlight target in 3D viewer
+        emit highlightTargetRequested(targetId);
+
+        m_logTextEdit->append(QString("Highlighting target: %1").arg(targetId));
     }
 }
 
@@ -347,6 +367,18 @@ void TargetDetectionDialog::onRejectTargets()
 
     m_acceptButton->setEnabled(false);
     m_rejectButton->setEnabled(false);
+}
+
+void TargetDetectionDialog::onDoneManualSelection()
+{
+    // Exit manual selection mode
+    m_manualInstructionsLabel->setVisible(false);
+    m_doneManualSelectionButton->setVisible(false);
+    m_startButton->setVisible(true);
+
+    emit doneManualSelectionRequested();
+
+    m_logTextEdit->append("Manual selection mode ended.");
 }
 
 void TargetDetectionDialog::setupUI()
@@ -564,11 +596,24 @@ QWidget* TargetDetectionDialog::createDetectionControls()
     m_statusLabel = new QLabel("Ready");
     layout->addWidget(m_statusLabel);
 
-    // Manual selection button
+    // Manual selection controls
     m_manualSelectionButton = new QPushButton("Enable Manual Selection Mode");
-    connect(
-        m_manualSelectionButton, &QPushButton::clicked, [this]() { emit manualSelectionRequested(m_currentScanId); });
+    connect(m_manualSelectionButton, &QPushButton::clicked, [this]() {
+        emit manualSelectionModeActivated(m_currentScanId);
+    });
     layout->addWidget(m_manualSelectionButton);
+
+    // Manual selection instructions
+    m_manualInstructionsLabel = new QLabel("Click in the 3D viewer to select natural points");
+    m_manualInstructionsLabel->setVisible(false);
+    m_manualInstructionsLabel->setStyleSheet("QLabel { color: blue; font-weight: bold; }");
+    layout->addWidget(m_manualInstructionsLabel);
+
+    // Done manual selection button
+    m_doneManualSelectionButton = new QPushButton("Done Manual Selection");
+    m_doneManualSelectionButton->setVisible(false);
+    connect(m_doneManualSelectionButton, &QPushButton::clicked, this, &TargetDetectionDialog::onDoneManualSelection);
+    layout->addWidget(m_doneManualSelectionButton);
 
     return widget;
 }
@@ -585,7 +630,7 @@ QWidget* TargetDetectionDialog::createResultsDisplay()
     m_resultsTable->setHorizontalHeaderLabels(headers);
     m_resultsTable->horizontalHeader()->setStretchLastSection(true);
     m_resultsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    connect(m_resultsTable, &QTableWidget::currentRowChanged, this, &TargetDetectionDialog::onTargetSelected);
+    connect(m_resultsTable, &QTableWidget::currentRowChanged, this, &TargetDetectionDialog::onTargetSelectedInList);
 
     layout->addWidget(m_resultsTable);
 
@@ -628,6 +673,16 @@ void TargetDetectionDialog::updateParameterControls()
 
     // Update manual selection button visibility
     m_manualSelectionButton->setVisible(mode == ManualNaturalPoints || mode == Both);
+
+    // Update UI for manual selection mode
+    if (mode == ManualNaturalPoints)
+    {
+        m_startButton->setText("Enable Manual Selection");
+    }
+    else
+    {
+        m_startButton->setText("Start Detection");
+    }
 }
 
 void TargetDetectionDialog::updateResultsTable(const TargetDetectionBase::DetectionResult& result)

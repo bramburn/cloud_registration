@@ -22,6 +22,11 @@
 #include "registration/TargetManager.h"
 #include "registration/AlignmentEngine.h"
 #include "ui/TargetDetectionDialog.h"
+
+// Sprint 5.3: Target classes for manual selection
+#include "registration/Target.h"
+#include "registration/NaturalPointTarget.h"
+#include "rendering/pointcloudviewerwidget.h"
 #include "ui/AlignmentControlPanel.h"
 #include "ui/PoseGraphViewerWidget.h"
 #include "ui/BundleAdjustmentProgressDialog.h"
@@ -1072,22 +1077,17 @@ void MainPresenter::handleTargetDetectionClicked()
 
     // Connect dialog completion signals
     connect(&dialog, &TargetDetectionDialog::detectionCompleted,
-            this, [this](const QString& scanId, const TargetDetectionBase::DetectionResult& result) {
-                // Handle detection completion
-                showInfo("Target Detection",
-                        QString("Detection completed for scan %1. Found %2 targets.")
-                        .arg(scanId)
-                        .arg(result.targets.size()));
-            });
+            this, &MainPresenter::handleTargetDetectionCompleted);
 
-    connect(&dialog, &TargetDetectionDialog::manualSelectionRequested,
-            this, [this](const QString& scanId) {
-                // Handle manual selection mode activation
-                showInfo("Manual Selection",
-                        QString("Manual selection mode activated for scan %1. "
-                               "Click on points in the 3D view to select targets.")
-                        .arg(scanId));
-            });
+    // Sprint 5.3: Connect new signals for target visualization and manual selection
+    connect(&dialog, &TargetDetectionDialog::highlightTargetRequested,
+            this, &MainPresenter::handleHighlightTargetRequested);
+
+    connect(&dialog, &TargetDetectionDialog::manualSelectionModeActivated,
+            this, &MainPresenter::handleManualSelectionModeActivated);
+
+    connect(&dialog, &TargetDetectionDialog::doneManualSelectionRequested,
+            this, &MainPresenter::handleDoneManualSelection);
 
     // Connect dialog start detection to AlignmentEngine
     connect(&dialog, &TargetDetectionDialog::detectionStartRequested,
@@ -1112,6 +1112,144 @@ void MainPresenter::cancelTargetDetection()
     {
         m_alignmentEngine->cancelTargetDetection();
     }
+}
+
+// Sprint 5.3: Target visualization and manual selection implementation
+
+void MainPresenter::handleTargetDetectionCompleted(const QString& scanId, const TargetDetectionBase::DetectionResult& result)
+{
+    qDebug() << "MainPresenter::handleTargetDetectionCompleted() called for scan:" << scanId;
+
+    if (!m_targetManager || !m_viewer)
+    {
+        qWarning() << "Target manager or viewer not available";
+        return;
+    }
+
+    // Get all targets for the current scan and pass them to the viewer for rendering
+    QList<std::shared_ptr<Target>> allTargets = m_targetManager->getSharedTargetsForScan(scanId);
+
+    // Update the viewer with the targets for rendering
+    m_viewer->updateTargetsForRendering(allTargets);
+
+    qDebug() << "Updated viewer with" << allTargets.size() << "targets for rendering";
+}
+
+void MainPresenter::handleHighlightTargetRequested(const QString& targetId)
+{
+    qDebug() << "MainPresenter::handleHighlightTargetRequested() called for target:" << targetId;
+
+    if (!m_viewer)
+    {
+        qWarning() << "Viewer not available for target highlighting";
+        return;
+    }
+
+    // Pass the highlight request to the viewer
+    m_viewer->highlightTarget(targetId);
+}
+
+void MainPresenter::handleManualSelectionModeActivated(const QString& scanId)
+{
+    qDebug() << "MainPresenter::handleManualSelectionModeActivated() called for scan:" << scanId;
+
+    if (!m_viewer)
+    {
+        qWarning() << "Viewer not available for manual selection mode";
+        return;
+    }
+
+    // Enable point picking mode in the viewer
+    m_viewer->setPointPickingEnabled(true, scanId);
+
+    // Connect the pointPicked signal from viewer to our handler
+    // Cast to PointCloudViewerWidget to access the signal
+    if (auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer))
+    {
+        connect(viewerWidget, &PointCloudViewerWidget::pointPicked,
+                this, &MainPresenter::handleManualPointPicked, Qt::UniqueConnection);
+    }
+
+    qDebug() << "Manual selection mode activated for scan:" << scanId;
+}
+
+void MainPresenter::handleManualPointPicked(QVector3D worldPos, QString scanId)
+{
+    qDebug() << "MainPresenter::handleManualPointPicked() called at position:" << worldPos << "for scan:" << scanId;
+
+    if (!m_targetManager || !m_loadManager)
+    {
+        qWarning() << "Target manager or load manager not available";
+        return;
+    }
+
+    // Get the loaded point data for the scan
+    std::vector<PointFullData> points = m_loadManager->getLoadedPointFullData(scanId);
+    if (points.empty())
+    {
+        qWarning() << "No point data available for scan:" << scanId;
+        return;
+    }
+
+    // Use NaturalPointSelector to refine the picked point to an actual point on the geometry
+    // For now, we'll create a simple NaturalPointTarget directly from the picked position
+    // In a full implementation, we would use NaturalPointSelector::selectClosestPoint()
+
+    // Generate a unique target ID
+    QString targetId = QString("manual_point_%1_%2").arg(scanId).arg(QDateTime::currentMSecsSinceEpoch());
+
+    // Create a NaturalPointTarget
+    auto newTarget = std::make_shared<NaturalPointTarget>(targetId, worldPos, "Manually selected point");
+    newTarget->setConfidence(1.0f); // High confidence for manual selection
+    newTarget->setScanId(scanId);
+
+    // Add the target to the target manager
+    if (m_targetManager->addTarget(scanId, newTarget))
+    {
+        qDebug() << "Successfully added manual target:" << targetId;
+
+        // Add a visual marker in the viewer
+        if (m_viewer)
+        {
+            m_viewer->addPointMarker(worldPos, Qt::yellow);
+        }
+
+        // Update the target detection dialog if it's open
+        // This would require a reference to the dialog or a signal/slot mechanism
+        showInfo("Manual Selection", QString("Added natural point target at (%1, %2, %3)")
+                 .arg(worldPos.x(), 0, 'f', 3)
+                 .arg(worldPos.y(), 0, 'f', 3)
+                 .arg(worldPos.z(), 0, 'f', 3));
+    }
+    else
+    {
+        qWarning() << "Failed to add manual target to target manager";
+        showError("Manual Selection", "Failed to add the selected point as a target.");
+    }
+}
+
+void MainPresenter::handleDoneManualSelection()
+{
+    qDebug() << "MainPresenter::handleDoneManualSelection() called";
+
+    if (!m_viewer)
+    {
+        qWarning() << "Viewer not available";
+        return;
+    }
+
+    // Disable point picking mode in the viewer
+    m_viewer->setPointPickingEnabled(false, "");
+
+    // Disconnect the pointPicked signal
+    if (auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer))
+    {
+        disconnect(viewerWidget, &PointCloudViewerWidget::pointPicked,
+                   this, &MainPresenter::handleManualPointPicked);
+    }
+
+    qDebug() << "Manual selection mode deactivated";
+    showInfo("Manual Selection", "Manual selection mode ended.");
 }
 
 void MainPresenter::handleAutomaticAlignmentClicked()

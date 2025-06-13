@@ -12,6 +12,12 @@
 
 #include <cmath>
 
+// Sprint 5.3: Target visualization includes
+#include "registration/Target.h"
+#include "registration/SphereTarget.h"
+#include "registration/NaturalPointTarget.h"
+#include "registration/NaturalPointSelector.h"
+
 PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
     : QOpenGLWidget(parent),
       m_vertexBuffer(QOpenGLBuffer::VertexBuffer),
@@ -87,7 +93,9 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
       m_selectionMode(SelectionMode::Navigation),
       m_pointSelector(nullptr),
       m_showCrosshairs(false),
-      m_crosshairPosition(0, 0)
+      m_crosshairPosition(0, 0),
+      // Sprint 5.3: Initialize target visualization
+      m_naturalPointSelector(std::make_unique<NaturalPointSelector>(this))
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -369,6 +377,9 @@ void PointCloudViewerWidget::paintGL()
 
         // Draw UCS indicator
         drawUCS();
+
+        // Sprint 5.3: Render targets after main point cloud
+        renderTargets();
 
         // Update FPS counter
         updateFPS();
@@ -879,6 +890,23 @@ void PointCloudViewerWidget::mousePressEvent(QMouseEvent* event)
     m_lastMousePosition = event->pos();
     m_mousePressed = true;
     m_pressedButton = event->button();
+
+    // Sprint 5.3: Handle point picking mode
+    if (m_pointPickingEnabled && event->button() == Qt::LeftButton)
+    {
+        // Perform 3D point identification using NaturalPointSelector
+        if (m_naturalPointSelector)
+        {
+            // Get the 3D world position from screen coordinates
+            QVector3D worldPos = unprojectPoint(event->pos());
+
+            // Emit the pointPicked signal for MainPresenter to handle
+            emit pointPicked(worldPos, m_pickingScanId);
+        }
+
+        // Don't process normal camera controls when in picking mode
+        return;
+    }
 }
 
 void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent* event)
@@ -3304,4 +3332,221 @@ void PointCloudViewerWidget::renderDeviationMapLegend(float maxDistance)
     // Title
     painter.setFont(QFont("Arial", 12, QFont::Bold));
     painter.drawText(legendX, legendY - 5, "Deviation Distance");
+}
+
+// Sprint 5.3: Target visualization and manual selection implementation
+
+void PointCloudViewerWidget::updateTargetsForRendering(const QList<std::shared_ptr<Target>>& targets)
+{
+    m_renderedTargets = targets;
+    update(); // Trigger repaint
+}
+
+void PointCloudViewerWidget::highlightTarget(const QString& targetId)
+{
+    m_highlightedTargetId = targetId;
+    update(); // Trigger repaint
+}
+
+void PointCloudViewerWidget::setPointPickingEnabled(bool enabled, const QString& scanId)
+{
+    m_pointPickingEnabled = enabled;
+    m_pickingScanId = scanId;
+
+    // Change cursor to indicate picking mode
+    if (enabled)
+    {
+        setCursor(Qt::CrossCursor);
+    }
+    else
+    {
+        setCursor(Qt::ArrowCursor);
+    }
+}
+
+void PointCloudViewerWidget::addPointMarker(const QVector3D& position, const QColor& color)
+{
+    // This method adds a temporary visual marker for picked points
+    // For now, we'll just trigger an update - the actual marker rendering
+    // would be implemented as part of the target rendering system
+    Q_UNUSED(position)
+    Q_UNUSED(color)
+    update();
+}
+
+void PointCloudViewerWidget::renderTargets()
+{
+    if (m_renderedTargets.isEmpty())
+    {
+        return;
+    }
+
+    // Calculate MVP matrix for target rendering
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_dynamicTransform * m_modelMatrix;
+
+    // Disable depth testing temporarily for target rendering to ensure visibility
+    glDisable(GL_DEPTH_TEST);
+
+    // Iterate through targets and render them based on type
+    for (const auto& target : m_renderedTargets)
+    {
+        if (!target)
+        {
+            continue;
+        }
+
+        // Check if this target should be highlighted
+        bool isHighlighted = (target->targetId() == m_highlightedTargetId);
+
+        // Cast to specific target types and render accordingly
+        if (auto sphereTarget = std::dynamic_pointer_cast<SphereTarget>(target))
+        {
+            drawSphereTarget(*sphereTarget, mvpMatrix);
+        }
+        else if (auto naturalPointTarget = std::dynamic_pointer_cast<NaturalPointTarget>(target))
+        {
+            drawNaturalPointTarget(*naturalPointTarget, mvpMatrix);
+        }
+    }
+
+    // Re-enable depth testing
+    glEnable(GL_DEPTH_TEST);
+}
+
+void PointCloudViewerWidget::drawSphereTarget(const SphereTarget& target, const QMatrix4x4& mvpMatrix)
+{
+    // Simple wireframe sphere rendering using line segments
+    QVector3D center = target.position();
+    float radius = target.radius();
+
+    // Determine color based on highlighting
+    QVector3D color = (target.targetId() == m_highlightedTargetId) ?
+                      QVector3D(1.0f, 1.0f, 0.0f) :  // Yellow for highlighted
+                      QVector3D(1.0f, 0.0f, 1.0f);   // Magenta for normal
+
+    // Use immediate mode rendering for simplicity (can be optimized later)
+    glBegin(GL_LINES);
+    glColor3f(color.x(), color.y(), color.z());
+
+    // Draw wireframe sphere with latitude and longitude lines
+    const int segments = 16;
+    const float angleStep = 2.0f * M_PI / segments;
+
+    // Latitude lines
+    for (int i = 1; i < segments; ++i)
+    {
+        float lat = -M_PI/2 + (M_PI * i) / segments;
+        float y = radius * sin(lat);
+        float r = radius * cos(lat);
+
+        for (int j = 0; j < segments; ++j)
+        {
+            float lon1 = j * angleStep;
+            float lon2 = (j + 1) * angleStep;
+
+            QVector3D p1(center.x() + r * cos(lon1), center.y() + y, center.z() + r * sin(lon1));
+            QVector3D p2(center.x() + r * cos(lon2), center.y() + y, center.z() + r * sin(lon2));
+
+            QVector4D proj1 = mvpMatrix * QVector4D(p1, 1.0f);
+            QVector4D proj2 = mvpMatrix * QVector4D(p2, 1.0f);
+
+            glVertex3f(proj1.x(), proj1.y(), proj1.z());
+            glVertex3f(proj2.x(), proj2.y(), proj2.z());
+        }
+    }
+
+    // Longitude lines
+    for (int j = 0; j < segments; ++j)
+    {
+        float lon = j * angleStep;
+        for (int i = 0; i < segments; ++i)
+        {
+            float lat1 = -M_PI/2 + (M_PI * i) / segments;
+            float lat2 = -M_PI/2 + (M_PI * (i + 1)) / segments;
+
+            QVector3D p1(center.x() + radius * cos(lat1) * cos(lon),
+                         center.y() + radius * sin(lat1),
+                         center.z() + radius * cos(lat1) * sin(lon));
+            QVector3D p2(center.x() + radius * cos(lat2) * cos(lon),
+                         center.y() + radius * sin(lat2),
+                         center.z() + radius * cos(lat2) * sin(lon));
+
+            QVector4D proj1 = mvpMatrix * QVector4D(p1, 1.0f);
+            QVector4D proj2 = mvpMatrix * QVector4D(p2, 1.0f);
+
+            glVertex3f(proj1.x(), proj1.y(), proj1.z());
+            glVertex3f(proj2.x(), proj2.y(), proj2.z());
+        }
+    }
+
+    glEnd();
+}
+
+void PointCloudViewerWidget::drawNaturalPointTarget(const NaturalPointTarget& target, const QMatrix4x4& mvpMatrix)
+{
+    // Draw natural point target as a crosshair marker
+    QVector3D center = target.position();
+
+    // Determine color based on highlighting
+    QVector3D color = (target.targetId() == m_highlightedTargetId) ?
+                      QVector3D(1.0f, 1.0f, 0.0f) :  // Yellow for highlighted
+                      QVector3D(0.0f, 1.0f, 1.0f);   // Cyan for normal
+
+    // Size of the crosshair in world units
+    float size = 0.1f;
+
+    // Use immediate mode rendering for crosshair
+    glBegin(GL_LINES);
+    glColor3f(color.x(), color.y(), color.z());
+
+    // Horizontal line
+    QVector3D p1(center.x() - size, center.y(), center.z());
+    QVector3D p2(center.x() + size, center.y(), center.z());
+    QVector4D proj1 = mvpMatrix * QVector4D(p1, 1.0f);
+    QVector4D proj2 = mvpMatrix * QVector4D(p2, 1.0f);
+    glVertex3f(proj1.x(), proj1.y(), proj1.z());
+    glVertex3f(proj2.x(), proj2.y(), proj2.z());
+
+    // Vertical line
+    QVector3D p3(center.x(), center.y() - size, center.z());
+    QVector3D p4(center.x(), center.y() + size, center.z());
+    QVector4D proj3 = mvpMatrix * QVector4D(p3, 1.0f);
+    QVector4D proj4 = mvpMatrix * QVector4D(p4, 1.0f);
+    glVertex3f(proj3.x(), proj3.y(), proj3.z());
+    glVertex3f(proj4.x(), proj4.y(), proj4.z());
+
+    // Depth line
+    QVector3D p5(center.x(), center.y(), center.z() - size);
+    QVector3D p6(center.x(), center.y(), center.z() + size);
+    QVector4D proj5 = mvpMatrix * QVector4D(p5, 1.0f);
+    QVector4D proj6 = mvpMatrix * QVector4D(p6, 1.0f);
+    glVertex3f(proj5.x(), proj5.y(), proj5.z());
+    glVertex3f(proj6.x(), proj6.y(), proj6.z());
+
+    glEnd();
+}
+
+QVector3D PointCloudViewerWidget::unprojectPoint(const QPoint& screenPos) const
+{
+    // Convert screen coordinates to normalized device coordinates
+    float x = (2.0f * screenPos.x()) / width() - 1.0f;
+    float y = 1.0f - (2.0f * screenPos.y()) / height();
+    float z = 1.0f; // Far plane
+
+    // Create point in NDC
+    QVector4D ndc(x, y, z, 1.0f);
+
+    // Calculate inverse MVP matrix
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_dynamicTransform * m_modelMatrix;
+    QMatrix4x4 invMvp = mvpMatrix.inverted();
+
+    // Transform to world coordinates
+    QVector4D worldPos = invMvp * ndc;
+
+    if (worldPos.w() != 0.0f)
+    {
+        worldPos /= worldPos.w();
+    }
+
+    return QVector3D(worldPos.x(), worldPos.y(), worldPos.z());
 }

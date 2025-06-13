@@ -282,6 +282,32 @@ public slots:
      */
     void cancelTargetDetection();
 
+    // Sprint 5.3: Target visualization and manual selection
+    /**
+     * @brief Handle target detection completion and update viewer
+     */
+    void handleTargetDetectionCompleted(const QString& scanId, const TargetDetectionBase::DetectionResult& result);
+
+    /**
+     * @brief Handle target highlighting request from dialog
+     */
+    void handleHighlightTargetRequested(const QString& targetId);
+
+    /**
+     * @brief Handle manual selection mode activation
+     */
+    void handleManualSelectionModeActivated(const QString& scanId);
+
+    /**
+     * @brief Handle manual point picking from viewer
+     */
+    void handleManualPointPicked(QVector3D worldPos, QString scanId);
+
+    /**
+     * @brief Handle done manual selection request
+     */
+    void handleDoneManualSelection();
+
     /**
      * @brief Connect to a RegistrationWorkflowWidget for target detection integration.
      * @param workflowWidget Pointer to the workflow widget to connect

@@ -124,8 +124,10 @@ private slots:
     void onDetectionModeChanged();
     void onParametersChanged();
     void onTargetSelected();
+    void onTargetSelectedInList(int row);
     void onAcceptTargets();
     void onRejectTargets();
+    void onDoneManualSelection();
 
 signals:
     /**
@@ -153,6 +155,23 @@ signals:
      * @param params Detection parameters
      */
     void detectionStartRequested(const QString& scanId, int mode, const QVariantMap& params);
+
+    /**
+     * @brief Emitted when manual selection mode is activated
+     * @param scanId ID of the scan for manual selection
+     */
+    void manualSelectionModeActivated(const QString& scanId);
+
+    /**
+     * @brief Emitted when user requests to highlight a target
+     * @param targetId ID of the target to highlight
+     */
+    void highlightTargetRequested(const QString& targetId);
+
+    /**
+     * @brief Emitted when manual selection is done
+     */
+    void doneManualSelectionRequested();
 
 private:
     // UI setup methods
@@ -213,8 +232,10 @@ private:
     QPushButton* m_loadParamsButton;
     QPushButton* m_saveParamsButton;
     QPushButton* m_manualSelectionButton;
+    QPushButton* m_doneManualSelectionButton;
     QProgressBar* m_progressBar;
     QLabel* m_statusLabel;
+    QLabel* m_manualInstructionsLabel;
 
     // Results display
     QTableWidget* m_resultsTable;

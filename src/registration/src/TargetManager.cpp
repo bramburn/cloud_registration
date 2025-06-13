@@ -109,6 +109,26 @@ QList<Target*> TargetManager::getTargetsForScan(const QString& scanId) const
     return result;
 }
 
+QList<std::shared_ptr<Target>> TargetManager::getSharedTargetsForScan(const QString& scanId) const
+{
+    QList<std::shared_ptr<Target>> result;
+
+    auto it = scanTargets_.find(scanId);
+    if (it != scanTargets_.end())
+    {
+        for (const QString& targetId : it.value())
+        {
+            auto targetIt = targets_.find(targetId);
+            if (targetIt != targets_.end())
+            {
+                result.append(targetIt.value());
+            }
+        }
+    }
+
+    return result;
+}
+
 QList<Target*> TargetManager::getAllTargets() const
 {
     QList<Target*> result;
