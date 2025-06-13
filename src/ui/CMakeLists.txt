@@ -19,13 +19,7 @@ set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/recentprojectsmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sidebarwidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/sqlitemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/projecttreemodel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/progressmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/IMainView.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/IPointCloudViewer.cpp
 )
 
 # Define header files for the UI library (now includes migrated headers from src/ root)
@@ -46,13 +40,7 @@ set(UI_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/recentprojectsmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/sidebarwidget.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/sqlitemanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/projecttreemodel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/pointcloudloadmanager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/progressmanager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/scanimportmanager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/IMainView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/IPointCloudViewer.h
 )
 
 # Create UI static library

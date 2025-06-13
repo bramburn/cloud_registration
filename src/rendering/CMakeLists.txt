@@ -7,6 +7,7 @@ set(RENDERING_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GpuCuller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LODManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CameraController.cpp  # Moved from src/camera/
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudviewerwidget.cpp  # Moved from src/app/
 )
 
 set(RENDERING_HEADERS
@@ -14,6 +15,7 @@ set(RENDERING_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/GpuCuller.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/LODManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/CameraController.h  # Moved from src/camera/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/rendering/pointcloudviewerwidget.h  # Moved from src/app/
 )
 
 # Create Rendering static library
@@ -24,9 +26,10 @@ target_include_directories(Rendering PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration>
 )
 
-# Rendering library dependencies: Core, Qt OpenGL components
+# Rendering library dependencies: Core, Interfaces, Qt OpenGL components
 target_link_libraries(Rendering PUBLIC
     Core
+    Interfaces
     Qt6::Core
     Qt6::Gui
     Qt6::OpenGLWidgets

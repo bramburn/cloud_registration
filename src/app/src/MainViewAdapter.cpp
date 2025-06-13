@@ -1,6 +1,6 @@
-#include "MainViewAdapter.h"
+#include "app/MainViewAdapter.h"
 
-#include "mainwindow.h"
+#include "app/mainwindow.h"
 
 MainViewAdapter::MainViewAdapter(MainWindow* mainWindow, QObject* parent) : IMainView(parent), m_mainWindow(mainWindow)
 {

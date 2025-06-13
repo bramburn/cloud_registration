@@ -1,8 +1,8 @@
 #include <QFileInfo>
 
-#include "IMainView.h"
-#include "IPointCloudViewer.h"
-#include "MainPresenter.h"
+#include "interfaces/IMainView.h"
+#include "interfaces/IPointCloudViewer.h"
+#include "app/MainPresenter.h"
 #include "core/lasheadermetadata.h"
 
 // Additional methods for MainWindow compatibility

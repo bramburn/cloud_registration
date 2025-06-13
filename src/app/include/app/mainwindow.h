@@ -12,10 +12,10 @@
 #include <memory>
 #include <vector>
 
-#include "IMainView.h"
-#include "IPointCloudViewer.h"
-#include "progressmanager.h"
-#include "projectmanager.h"
+#include "interfaces/IMainView.h"
+#include "interfaces/IPointCloudViewer.h"
+#include "core/progressmanager.h"
+#include "core/projectmanager.h"
 
 class ProjectHubWidget;
 class SidebarWidget;

@@ -8,10 +8,10 @@
 #include <algorithm>
 #include <limits>
 
-#include "export/E57Writer.h"
-#include "export/LASWriter.h"
-#include "export/PLYWriter.h"
-#include "export/XYZWriter.h"
+#include "export/FormatWriters/E57Writer.h"
+#include "export/FormatWriters/LASWriter.h"
+#include "export/FormatWriters/PLYWriter.h"
+#include "export/FormatWriters/XYZWriter.h"
 
 /**
  * @brief Worker class for asynchronous export operations

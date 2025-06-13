@@ -6,5 +6,5 @@ target_include_directories(Interfaces INTERFACE
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/interfaces>
 )
 # Interfaces might need to expose dependencies like Core for types it uses in its API
-target_link_libraries(Interfaces INTERFACE Core Qt6::Core) # Add if core types are used directly in interfaces headers
+target_link_libraries(Interfaces INTERFACE Core Qt6::Core Qt6::Gui) # Add if core types are used directly in interfaces headers
 message(STATUS "Configuring Interfaces library (Header-only)...")

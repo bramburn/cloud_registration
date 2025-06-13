@@ -8,7 +8,8 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MainPresenter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MainPresenterExtensions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MainViewAdapter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudviewerwidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pointcloudloadmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scanimportmanager.cpp
     # Note: All other files previously at src/ root are assumed to be migrated to their modules
     # and should NOT be listed here.
 )
@@ -17,7 +18,8 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/app/mainwindow.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/app/MainPresenter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/app/MainViewAdapter.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/pointcloudviewerwidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/pointcloudloadmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/scanimportmanager.h
     # If MainPresenter_new.h is still distinct, include it here or integrate its content into MainPresenter.h
     # Assuming MainPresenter_new.h is consolidated into MainPresenter.h for this sprint.
 )

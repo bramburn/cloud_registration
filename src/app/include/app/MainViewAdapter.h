@@ -3,7 +3,7 @@
 
 #include <QObject>
 
-#include "IMainView.h"
+#include "interfaces/IMainView.h"
 
 class MainWindow;
 

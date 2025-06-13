@@ -19,11 +19,11 @@
 #include <memory>
 #include <vector>
 
-#include "IPointCloudViewer.h"
+#include "interfaces/IPointCloudViewer.h"
 #include "core/pointdata.h"
-#include "octree.h"
+#include "core/octree.h"
 #include "rendering/GpuCuller.h"
-#include "screenspaceerror.h"
+#include "core/screenspaceerror.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
