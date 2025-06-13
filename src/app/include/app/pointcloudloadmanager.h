@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "core/octree.h"
+
 // Forward declaration
 class PointCloud;
 
@@ -39,6 +41,9 @@ public:
     // Sprint 4.1: ICP integration methods
     PointCloud getLoadedPointCloud(const QString& scanId) const;
     QStringList getLoadedScans() const { return m_loadedScans; }
+
+    // Sprint 6.1: Get loaded point data for deviation analysis
+    std::vector<PointFullData> getLoadedPointFullData(const QString& scanId) const;
 
 signals:
     void loadingStarted(const QString& filePath);

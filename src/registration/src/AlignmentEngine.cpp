@@ -5,6 +5,8 @@
 
 #include "../algorithms/LeastSquaresAlignment.h"
 #include "../algorithms/ICPRegistration.h"
+#include "analysis/DifferenceAnalysis.h"
+#include "core/pointdata.h"
 
 AlignmentEngine::AlignmentEngine(QObject* parent) : QObject(parent), m_computationTimer(new QTimer(this))
 {
@@ -337,4 +339,75 @@ void AlignmentEngine::cancelAutomaticAlignment()
         m_currentResult.message = "ICP computation cancelled by user";
         emit alignmentStateChanged(AlignmentState::Cancelled, m_currentResult.message);
     }
+}
+
+// Sprint 6.1: Deviation analysis implementation
+std::vector<PointFullData> AlignmentEngine::analyzeDeviation(const std::vector<PointFullData>& source,
+                                                            const std::vector<PointFullData>& target,
+                                                            const QMatrix4x4& transform)
+{
+    qDebug() << "Starting deviation analysis with" << source.size() << "source and" << target.size() << "target points";
+
+    std::vector<PointFullData> colorizedPoints;
+
+    if (source.empty() || target.empty())
+    {
+        qWarning() << "Empty point clouds provided for deviation analysis";
+        return colorizedPoints;
+    }
+
+    // Convert PointFullData to Point3D for analysis
+    std::vector<Point3D> sourcePoints3D;
+    std::vector<Point3D> targetPoints3D;
+
+    sourcePoints3D.reserve(source.size());
+    targetPoints3D.reserve(target.size());
+
+    for (const auto& point : source)
+    {
+        sourcePoints3D.emplace_back(point.x, point.y, point.z);
+    }
+
+    for (const auto& point : target)
+    {
+        targetPoints3D.emplace_back(point.x, point.y, point.z);
+    }
+
+    // Perform difference analysis
+    Analysis::DifferenceAnalysis analyzer;
+    QVector<float> distances = analyzer.calculateDistances(sourcePoints3D, targetPoints3D, transform);
+
+    // Set a reasonable max distance (5cm default, or from preferences)
+    m_lastDeviationMaxDistance = 0.05f;
+
+    // Generate colors based on distances
+    QVector<QColor> colors = analyzer.generateColorMapColors(distances, m_lastDeviationMaxDistance);
+
+    // Create colorized point cloud
+    colorizedPoints.reserve(source.size());
+
+    for (size_t i = 0; i < source.size() && i < static_cast<size_t>(colors.size()); ++i)
+    {
+        PointFullData colorizedPoint = source[i];
+
+        // Apply transformation to position
+        QVector3D pos(colorizedPoint.x, colorizedPoint.y, colorizedPoint.z);
+        QVector3D transformedPos = transform.map(pos);
+        colorizedPoint.x = transformedPos.x();
+        colorizedPoint.y = transformedPos.y();
+        colorizedPoint.z = transformedPos.z();
+
+        // Set deviation color
+        QColor color = colors[static_cast<int>(i)];
+        colorizedPoint.r = static_cast<uint8_t>(color.red());
+        colorizedPoint.g = static_cast<uint8_t>(color.green());
+        colorizedPoint.b = static_cast<uint8_t>(color.blue());
+
+        colorizedPoints.push_back(colorizedPoint);
+    }
+
+    qDebug() << "Deviation analysis completed. Generated" << colorizedPoints.size() << "colorized points";
+    qDebug() << "Max deviation distance:" << m_lastDeviationMaxDistance << "m";
+
+    return colorizedPoints;
 }

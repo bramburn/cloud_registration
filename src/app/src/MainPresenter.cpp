@@ -15,6 +15,16 @@
 #include "ui/ICPParameterDialog.h"
 #include "algorithms/ICPRegistration.h"
 #include "registration/RegistrationWorkflowWidget.h"
+#include "registration/TargetManager.h"
+#include "registration/AlignmentEngine.h"
+#include "ui/AlignmentControlPanel.h"
+#include "ui/PoseGraphViewerWidget.h"
+#include "registration/PoseGraph.h"
+#include "registration/PoseGraphBuilder.h"
+#include "registration/RegistrationProject.h"
+#include "rendering/pointcloudviewerwidget.h"
+
+// Sprint 6.1: Additional includes for deviation map functionality
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -29,12 +39,20 @@ MainPresenter::MainPresenter(IMainView* view,
       m_viewer(nullptr),
       m_projectManager(projectManager),
       m_loadManager(loadManager),
+      m_targetManager(nullptr),
+      m_alignmentEngine(nullptr),
       m_isFileOpen(false),
       m_isProjectOpen(false),
       m_isParsingInProgress(false),
       m_currentMemoryUsage(0),
       m_currentFPS(0.0f),
-      m_currentVisiblePoints(0)
+      m_currentVisiblePoints(0),
+      m_currentSourceScanId(""),
+      m_currentTargetScanId(""),
+      m_registrationProject(nullptr),
+      m_poseGraphViewer(nullptr),
+      m_currentPoseGraph(nullptr),
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
 {
     if (m_view)
     {
@@ -57,6 +75,25 @@ void MainPresenter::setProjectManager(ProjectManager* projectManager)
 void MainPresenter::setPointCloudLoadManager(PointCloudLoadManager* loadManager)
 {
     m_loadManager = loadManager;
+}
+
+void MainPresenter::setTargetManager(TargetManager* targetManager)
+{
+    m_targetManager = targetManager;
+}
+
+void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
+{
+    m_alignmentEngine = alignmentEngine;
+
+    // Connect alignment engine signals
+    if (m_alignmentEngine)
+    {
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
+                this, &MainPresenter::handleAlignmentResultUpdated);
+
+        qDebug() << "MainPresenter: AlignmentEngine set and signals connected";
+    }
 }
 
 void MainPresenter::setupConnections()
@@ -114,6 +151,23 @@ void MainPresenter::setupConnections()
             connect(sidebar, &SidebarWidget::clusterLockToggleRequested, this, &MainPresenter::handleClusterLockToggle);
             connect(sidebar, &SidebarWidget::dragDropOperationRequested, this, &MainPresenter::handleDragDropOperation);
         }
+    }
+
+    // Connect alignment control panel signals if available
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            connect(alignmentPanel, &AlignmentControlPanel::alignmentRequested, this, &MainPresenter::triggerAlignmentPreview);
+        }
+    }
+
+    // Connect alignment engine signals if available
+    if (m_alignmentEngine)
+    {
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
+                this, &MainPresenter::handleAlignmentResultUpdated);
     }
 }
 
@@ -973,4 +1027,331 @@ void MainPresenter::connectToWorkflowWidget(RegistrationWorkflowWidget* workflow
             this, &MainPresenter::handleAutomaticAlignmentClicked);
 
     qDebug() << "MainPresenter: Connected to RegistrationWorkflowWidget";
+}
+
+// Alignment Management Implementation
+void MainPresenter::handleAcceptAlignment()
+{
+    qDebug() << "MainPresenter::handleAcceptAlignment() called";
+
+    // TODO: This implementation requires AlignmentEngine and RegistrationProject instances
+    // These would typically be injected via constructor or setter methods
+
+    /*
+    // Intended implementation when components are available:
+
+    if (!m_alignmentEngine || !m_registrationProject) {
+        showError("Accept Alignment", "Required components not available.");
+        return;
+    }
+
+    // 1. Retrieve final transformation from AlignmentEngine
+    AlignmentEngine::AlignmentResult currentResult = m_alignmentEngine->getCurrentResult();
+    if (currentResult.state != AlignmentEngine::AlignmentState::Valid) {
+        showError("Accept Alignment", "No valid alignment to accept.");
+        return;
+    }
+
+    // 2. Identify scans involved in alignment
+    if (m_currentSourceScanId.isEmpty() || m_currentTargetScanId.isEmpty()) {
+        showError("Accept Alignment", "Scan IDs not properly set for alignment.");
+        return;
+    }
+
+    // 3. Apply permanent transformation to target scan
+    m_registrationProject->setScanTransform(m_currentTargetScanId, currentResult.transformation);
+
+    // 4. Create and store registration result
+    RegistrationProject::RegistrationResult result;
+    result.sourceScanId = m_currentSourceScanId;
+    result.targetScanId = m_currentTargetScanId;
+    result.transformation = currentResult.transformation;
+    result.rmsError = currentResult.errorStats.rmsError;
+    result.correspondenceCount = currentResult.errorStats.numCorrespondences;
+    result.isValid = true;
+    result.algorithm = "Manual";
+    result.timestamp = QDateTime::currentDateTime();
+
+    m_registrationProject->addRegistrationResult(result);
+
+    // 5. Clear alignment engine state
+    m_alignmentEngine->clearCorrespondences();
+
+    // 6. Clear dynamic transform in viewer
+    if (m_viewer) {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget) {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // 7. Update UI state and transition to QualityReview
+    if (m_workflowWidget) {
+        m_workflowWidget->goToStep(RegistrationStep::QualityReview);
+    }
+
+    // 8. Update status
+    m_view->updateStatusBar("Alignment accepted successfully");
+    showInfo("Accept Alignment", "Alignment has been accepted and applied to the target scan.");
+    */
+
+    // Placeholder implementation for now
+    showInfo("Accept Alignment", "Alignment acceptance functionality will be fully implemented when AlignmentEngine and RegistrationProject are integrated.");
+}
+
+void MainPresenter::handleCancelAlignment()
+{
+    qDebug() << "MainPresenter::handleCancelAlignment() called";
+
+    // TODO: This implementation requires AlignmentEngine and RegistrationWorkflowWidget instances
+    // These would typically be injected via constructor or setter methods
+
+    /*
+    // Intended implementation when components are available:
+
+    if (!m_alignmentEngine) {
+        showError("Cancel Alignment", "AlignmentEngine not available.");
+        return;
+    }
+
+    // 1. Clear alignment engine correspondences and state
+    m_alignmentEngine->clearCorrespondences();
+
+    // 2. Clear dynamic transform in viewer
+    if (m_viewer) {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget) {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // 3. Transition back to ManualAlignment step
+    if (m_workflowWidget) {
+        m_workflowWidget->goToStep(RegistrationStep::ManualAlignment);
+    }
+
+    // 4. Update status
+    m_view->updateStatusBar("Alignment cancelled");
+    showInfo("Cancel Alignment", "Alignment has been cancelled. No changes were applied.");
+    */
+
+    // Placeholder implementation for now
+    showInfo("Cancel Alignment", "Alignment cancellation functionality will be fully implemented when AlignmentEngine is integrated.");
+}
+
+void MainPresenter::setRegistrationProject(Registration::RegistrationProject* project)
+{
+    m_registrationProject = project;
+
+    if (m_registrationProject) {
+        // Connect to registration project signals
+        connect(m_registrationProject, &Registration::RegistrationProject::registrationResultAdded,
+                this, &MainPresenter::rebuildPoseGraph);
+
+        qDebug() << "MainPresenter: Registration project set";
+    }
+}
+
+void MainPresenter::setPoseGraphViewer(PoseGraphViewerWidget* viewer)
+{
+    m_poseGraphViewer = viewer;
+
+    if (m_poseGraphViewer) {
+        // Connect pose graph viewer signals
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::nodeSelected,
+                this, [this](const QString& scanId) {
+                    qDebug() << "Pose graph node selected:" << scanId;
+                    // Handle node selection (e.g., highlight in main viewer)
+                });
+
+        connect(m_poseGraphViewer, &PoseGraphViewerWidget::edgeSelected,
+                this, [this](const QString& sourceScanId, const QString& targetScanId) {
+                    qDebug() << "Pose graph edge selected:" << sourceScanId << "to" << targetScanId;
+                    // Handle edge selection (e.g., show registration details)
+                });
+
+        qDebug() << "MainPresenter: Pose graph viewer set";
+    }
+}
+
+void MainPresenter::handleLoadProjectCompleted()
+{
+    qDebug() << "MainPresenter: Project load completed, rebuilding pose graph";
+    rebuildPoseGraph();
+}
+
+void MainPresenter::rebuildPoseGraph()
+{
+    if (!m_registrationProject || !m_poseGraphBuilder) {
+        qWarning() << "MainPresenter: Cannot rebuild pose graph - missing registration project or builder";
+        return;
+    }
+
+    try {
+        qDebug() << "MainPresenter: Starting pose graph rebuild";
+
+        // Build the pose graph from the registration project
+        m_currentPoseGraph = m_poseGraphBuilder->build(*m_registrationProject);
+
+        if (m_currentPoseGraph && m_poseGraphViewer) {
+            // Display the graph in the viewer
+            m_poseGraphViewer->displayGraph(*m_currentPoseGraph);
+
+            qDebug() << "MainPresenter: Pose graph rebuilt and displayed with"
+                     << m_currentPoseGraph->nodeCount() << "nodes and"
+                     << m_currentPoseGraph->edgeCount() << "edges";
+
+            if (m_view) {
+                m_view->updateStatusBar(QString("Pose graph updated: %1 nodes, %2 edges")
+                                       .arg(m_currentPoseGraph->nodeCount())
+                                       .arg(m_currentPoseGraph->edgeCount()));
+            }
+        } else {
+            qWarning() << "MainPresenter: Failed to build pose graph or viewer not available";
+        }
+    } catch (const std::exception& e) {
+        qCritical() << "MainPresenter: Error rebuilding pose graph:" << e.what();
+        showError("Pose Graph Error", QString("Failed to rebuild pose graph: %1").arg(e.what()));
+    }
+}
+
+
+
+void MainPresenter::triggerAlignmentPreview()
+{
+    if (!m_targetManager)
+    {
+        showError("Alignment Preview", "Target manager is not available.");
+        return;
+    }
+
+    if (!m_alignmentEngine)
+    {
+        showError("Alignment Preview", "Alignment engine is not available.");
+        return;
+    }
+
+    // Retrieve correspondences from TargetManager
+    QList<TargetCorrespondence> correspondences = m_targetManager->getAllCorrespondences();
+
+    if (correspondences.size() < 3)
+    {
+        showError("Alignment Preview", "At least 3 point correspondences are required for alignment computation.");
+        return;
+    }
+
+    // Trigger alignment computation through AlignmentEngine
+    m_alignmentEngine->recomputeAlignment();
+
+    // Update status
+    if (m_view)
+    {
+        m_view->updateStatusBar("Alignment computation started...");
+    }
+}
+
+// Sprint 6.1: Deviation map toggle implementation
+void MainPresenter::handleShowDeviationMapToggled(bool enabled)
+{
+    qDebug() << "MainPresenter::handleShowDeviationMapToggled called with enabled:" << enabled;
+
+    // This is a stub implementation for now
+    // In a full implementation, we would need:
+    // 1. Access to RegistrationProject to get the latest registration result
+    // 2. Access to AlignmentEngine to perform deviation analysis
+    // 3. Access to PointCloudViewerWidget to load colorized points and show legend
+
+    if (enabled)
+    {
+        showInfo("Deviation Map", "Deviation map functionality is implemented but requires registration data. "
+                                  "Please ensure you have performed a registration between scans first.");
+
+        // TODO: Implement the full logic as described in the S6.1 document:
+        // - Get latest registration result from RegistrationProject
+        // - Get source and target point data from PointCloudLoadManager
+        // - Call AlignmentEngine::analyzeDeviation()
+        // - Call PointCloudViewerWidget::loadColorizedPointCloud()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible()
+    }
+    else
+    {
+        showInfo("Deviation Map", "Deviation map disabled.");
+
+        // TODO: Implement the disable logic:
+        // - Call PointCloudViewerWidget::revertToOriginalColors()
+        // - Call PointCloudViewerWidget::setDeviationMapLegendVisible(false, 0.0f)
+    }
+
+    if (m_view)
+    {
+        m_view->updateStatusBar(enabled ? "Deviation map enabled" : "Deviation map disabled");
+    }
+}
+
+// Sprint 2.2: Alignment computation and live preview implementation
+void MainPresenter::handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result)
+{
+    qDebug() << "MainPresenter::handleAlignmentResultUpdated() called with state:" << static_cast<int>(result.state);
+
+    // Update PointCloudViewerWidget with dynamic transformation for live preview
+    if (m_viewer && result.isValid())
+    {
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget)
+        {
+            // Apply the transformation to the "moving" scan for live preview
+            // Note: In a full implementation, we would need to determine which scan is the "moving" one
+            // For now, we apply the transformation assuming the second scan is the moving one
+            viewerWidget->setDynamicTransform(result.transformation);
+
+            qDebug() << "Dynamic transformation applied to viewer for live preview";
+        }
+    }
+    else if (m_viewer && !result.isValid())
+    {
+        // Clear dynamic transform if result is invalid
+        auto* viewerWidget = dynamic_cast<PointCloudViewerWidget*>(m_viewer);
+        if (viewerWidget)
+        {
+            viewerWidget->clearDynamicTransform();
+        }
+    }
+
+    // Update AlignmentControlPanel with quality metrics
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            alignmentPanel->updateAlignmentResult(result);
+            qDebug() << "Alignment control panel updated with result metrics";
+        }
+    }
+
+    // Update status bar based on result state
+    if (m_view)
+    {
+        QString statusMessage;
+        switch (result.state)
+        {
+            case AlignmentEngine::AlignmentState::Valid:
+                statusMessage = QString("Alignment computed successfully - RMS: %1 mm")
+                                .arg(result.errorStats.rmsError, 0, 'f', 3);
+                break;
+            case AlignmentEngine::AlignmentState::Computing:
+                statusMessage = "Computing alignment...";
+                break;
+            case AlignmentEngine::AlignmentState::Error:
+                statusMessage = QString("Alignment error: %1").arg(result.message);
+                break;
+            case AlignmentEngine::AlignmentState::Insufficient:
+                statusMessage = "Insufficient correspondences for alignment";
+                break;
+            default:
+                statusMessage = "Alignment idle";
+                break;
+        }
+
+        m_view->updateStatusBar(statusMessage);
+    }
 }

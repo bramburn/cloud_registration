@@ -8,8 +8,10 @@
 #include <QVector3D>
 
 #include <memory>
+#include <vector>
 
 #include "ErrorAnalysis.h"
+#include "core/octree.h"
 
 // Forward declarations
 class ICPRegistration;
@@ -125,6 +127,28 @@ public:
     const AlignmentResult& getCurrentResult() const
     {
         return m_currentResult;
+    }
+
+    // --- Sprint 6.1: Deviation Analysis ---
+
+    /**
+     * @brief Analyze deviation between source and target point clouds
+     * @param source Source point cloud
+     * @param target Target point cloud
+     * @param transform Transformation to apply to source points
+     * @return Colorized point cloud with deviation colors
+     */
+    std::vector<PointFullData> analyzeDeviation(const std::vector<PointFullData>& source,
+                                                const std::vector<PointFullData>& target,
+                                                const QMatrix4x4& transform);
+
+    /**
+     * @brief Get the maximum deviation distance from the last analysis
+     * @return Maximum deviation distance used for color mapping
+     */
+    float getLastDeviationMaxDistance() const
+    {
+        return m_lastDeviationMaxDistance;
     }
 
     /**
@@ -264,6 +288,9 @@ private:
     std::unique_ptr<ICPRegistration> m_icpAlgorithm;  ///< Current ICP algorithm instance
     QString m_currentSourceScanId;                    ///< Current source scan ID for ICP
     QString m_currentTargetScanId;                    ///< Current target scan ID for ICP
+
+    // Sprint 6.1: Deviation analysis
+    float m_lastDeviationMaxDistance = 0.05f;  ///< Last max deviation distance used
 
     // Constants
     static constexpr int COMPUTATION_DELAY_MS = 100;  ///< Delay before computation (ms)

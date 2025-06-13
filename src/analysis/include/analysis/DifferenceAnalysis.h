@@ -3,6 +3,7 @@
 #include <QMatrix4x4>
 #include <QObject>
 #include <QVector>
+#include <QColor>
 
 #include <memory>
 
@@ -87,6 +88,14 @@ public:
      * @return Vector of normalized values [0,1] for color mapping
      */
     QVector<float> generateColorMapValues(const QVector<float>& distances, float maxDistance = -1.0f) const;
+
+    /**
+     * @brief Generate color map colors for visualization (Sprint 6.1)
+     * @param distances Vector of distances
+     * @param maxDistance Maximum distance for color mapping
+     * @return Vector of QColor values for deviation visualization
+     */
+    QVector<QColor> generateColorMapColors(const QVector<float>& distances, float maxDistance = -1.0f) const;
 
     /**
      * @brief Assess registration quality based on distance analysis

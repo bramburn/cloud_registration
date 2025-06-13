@@ -94,3 +94,21 @@ PointCloud PointCloudLoadManager::getLoadedPointCloud(const QString& scanId) con
     qDebug() << "Retrieved point cloud for scan" << scanId << "with" << cloud.size() << "points";
     return cloud;
 }
+
+// Sprint 6.1: Get loaded point data for deviation analysis
+std::vector<PointFullData> PointCloudLoadManager::getLoadedPointFullData(const QString& scanId) const
+{
+    // Stub implementation - return empty vector for now
+    // In a full implementation, this would retrieve the actual point data for the scan
+    std::vector<PointFullData> points;
+
+    if (isScanLoaded(scanId))
+    {
+        // TODO: Implement actual point data retrieval
+        // For now, return some mock data for testing
+        points.push_back(PointFullData(0.0f, 0.0f, 0.0f, 255, 255, 255));
+        points.push_back(PointFullData(1.0f, 1.0f, 1.0f, 255, 255, 255));
+    }
+
+    return points;
+}

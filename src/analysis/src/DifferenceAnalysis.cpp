@@ -235,6 +235,50 @@ QVector<float> DifferenceAnalysis::generateColorMapValues(const QVector<float>& 
     return colorValues;
 }
 
+QVector<QColor> DifferenceAnalysis::generateColorMapColors(const QVector<float>& distances, float maxDistance) const
+{
+    QVector<QColor> colors;
+    colors.reserve(distances.size());
+
+    // Determine maximum distance for normalization
+    if (maxDistance < 0.0f)
+    {
+        maxDistance = *std::max_element(distances.begin(), distances.end());
+    }
+
+    if (maxDistance <= 0.0f)
+    {
+        // All distances are zero or invalid - return green for all points
+        colors.fill(QColor(0, 255, 0), distances.size());
+        return colors;
+    }
+
+    // Generate colors based on distance (green = low deviation, red = high deviation)
+    for (float distance : distances)
+    {
+        float normalizedValue = std::max(0.0f, std::min(1.0f, distance / maxDistance));
+
+        // Create color gradient: green (0) -> yellow (0.5) -> red (1)
+        QColor color;
+        if (normalizedValue <= 0.5f)
+        {
+            // Green to yellow
+            float t = normalizedValue * 2.0f;
+            color = QColor(static_cast<int>(t * 255), 255, 0);
+        }
+        else
+        {
+            // Yellow to red
+            float t = (normalizedValue - 0.5f) * 2.0f;
+            color = QColor(255, static_cast<int>((1.0f - t) * 255), 0);
+        }
+
+        colors.append(color);
+    }
+
+    return colors;
+}
+
 float DifferenceAnalysis::assessRegistrationQuality(const Statistics& statistics, const Parameters& params) const
 {
     if (statistics.validDistances == 0)
