@@ -74,4 +74,42 @@ target_include_directories(OpenGLInitTest PRIVATE
 )
 add_test(NAME OpenGLInitTest COMMAND OpenGLInitTest)
 
+# PointCloudViewer Decoupling Tests
+add_executable(PointCloudViewerDecouplingTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_pointcloudviewer_decoupling.cpp
+)
+target_link_libraries(PointCloudViewerDecouplingTests PRIVATE
+    Rendering
+    Core
+    GTest::gtest_main
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+    Qt6::OpenGLWidgets
+)
+target_include_directories(PointCloudViewerDecouplingTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/rendering/include/rendering
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core
+)
+add_test(NAME PointCloudViewerDecouplingTests COMMAND PointCloudViewerDecouplingTests)
+
+# PointCloudViewerWidget Rendering R4 Tests
+add_executable(PointCloudViewerRenderingR4Tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_pointcloudviewerwidget_rendering_r4.cpp
+)
+target_link_libraries(PointCloudViewerRenderingR4Tests PRIVATE
+    Rendering
+    Core
+    GTest::gtest_main
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+    Qt6::OpenGLWidgets
+)
+target_include_directories(PointCloudViewerRenderingR4Tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/rendering/include/rendering
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core
+)
+add_test(NAME PointCloudViewerRenderingR4Tests COMMAND PointCloudViewerRenderingR4Tests)
+
 message(STATUS "Configuring rendering tests...")

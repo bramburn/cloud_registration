@@ -1,4 +1,4 @@
-#include "RegistrationProject.h"
+#include "registration/RegistrationProject.h"
 
 #include <QDateTime>
 #include <QDebug>

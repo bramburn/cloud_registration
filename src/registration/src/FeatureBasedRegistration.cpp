@@ -1,4 +1,4 @@
-#include "FeatureBasedRegistration.h"
+#include "registration/FeatureBasedRegistration.h"
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -378,7 +378,10 @@ QMatrix3x3 FeatureBasedRegistration::svdRotation(const QMatrix3x3& matrix) const
     result.setToIdentity();
 
     // Basic approach: if the matrix is already close to orthogonal, use it directly
-    float det = matrix.determinant();
+    // Calculate determinant manually for 3x3 matrix
+    float det = matrix(0,0) * (matrix(1,1) * matrix(2,2) - matrix(1,2) * matrix(2,1)) -
+                matrix(0,1) * (matrix(1,0) * matrix(2,2) - matrix(1,2) * matrix(2,0)) +
+                matrix(0,2) * (matrix(1,0) * matrix(2,1) - matrix(1,1) * matrix(2,0));
     if (std::abs(det - 1.0f) < 0.1f)
     {
         // Matrix is close to orthogonal, use it as rotation

@@ -10,7 +10,7 @@
 #include <QTemporaryFile>
 #include <QTimer>
 
-#include "e57parserlib.h"
+#include "parsers/e57parserlib.h"
 
 #include <gtest/gtest.h>
 

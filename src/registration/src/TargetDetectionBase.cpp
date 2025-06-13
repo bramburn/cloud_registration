@@ -1,4 +1,4 @@
-#include "TargetDetectionBase.h"
+#include "registration/TargetDetectionBase.h"
 
 #include <QDateTime>
 #include <QDebug>

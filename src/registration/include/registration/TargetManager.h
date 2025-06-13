@@ -60,6 +60,7 @@ public:
     QList<TargetCorrespondence> getCorrespondencesForScan(const QString& scanId) const;
     QList<TargetCorrespondence> getCorrespondencesBetweenScans(const QString& scanId1, const QString& scanId2) const;
     TargetCorrespondence* getCorrespondence(const QString& targetId1, const QString& targetId2);
+    const TargetCorrespondence* getCorrespondence(const QString& targetId1, const QString& targetId2) const;
 
     // Correspondence queries
     int getCorrespondenceCount() const;
@@ -133,7 +134,7 @@ private:
     void validateCorrespondenceConsistency();
 
     // Internal state
-    int nextTargetId_;
+    mutable int nextTargetId_;
 };
 
 #endif  // TARGETMANAGER_H

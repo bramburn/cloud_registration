@@ -1,4 +1,4 @@
-#include "PoseGraph.h"
+#include "registration/PoseGraph.h"
 
 #include <QDebug>
 

@@ -4,8 +4,8 @@
 #include <fstream>
 #include <memory>
 
-#include "../src/IE57Parser.h"
-#include "../src/e57parserlib.h"
+#include "parsers/IE57Parser.h"
+#include "parsers/e57parserlib.h"
 
 #include <gtest/gtest.h>
 

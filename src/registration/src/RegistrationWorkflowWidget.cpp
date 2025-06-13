@@ -1,11 +1,11 @@
-#include "RegistrationWorkflowWidget.h"
+#include "registration/RegistrationWorkflowWidget.h"
 
 #include <QDebug>
 #include <QGroupBox>
 #include <QMessageBox>
 #include <QTextEdit>
 
-#include "TargetManager.h"
+#include "registration/TargetManager.h"
 
 RegistrationWorkflowWidget::RegistrationWorkflowWidget(QWidget* parent)
     : QWidget(parent),

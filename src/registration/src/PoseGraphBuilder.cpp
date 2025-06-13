@@ -1,4 +1,5 @@
-#include "PoseGraphBuilder.h"
+#include "registration/PoseGraphBuilder.h"
+#include "registration/RegistrationProject.h"
 
 #include <QDebug>
 #include <QSet>
@@ -9,7 +10,7 @@ namespace Registration
 {
 PoseGraphBuilder::PoseGraphBuilder(QObject* parent) : QObject(parent) {}
 
-std::unique_ptr<PoseGraph> PoseGraphBuilder::build(const Project& project)
+std::unique_ptr<PoseGraph> PoseGraphBuilder::build(const RegistrationProject& project)
 {
     emit buildProgress(0);
 
@@ -18,7 +19,7 @@ std::unique_ptr<PoseGraph> PoseGraphBuilder::build(const Project& project)
     try
     {
         // Get all scans from project
-        QStringList scanIds = project.getScans();
+        QStringList scanIds = project.getScanIds();
         if (scanIds.isEmpty())
         {
             qWarning() << "No scans found in project";
@@ -164,16 +165,28 @@ PoseGraphBuilder::ValidationResult PoseGraphBuilder::validateGraph(const PoseGra
     return result;
 }
 
-QList<PoseGraphBuilder::RegistrationData> PoseGraphBuilder::extractRegistrations(const Project& project) const
+QList<PoseGraphBuilder::RegistrationData> PoseGraphBuilder::extractRegistrations(const RegistrationProject& project) const
 {
     QList<RegistrationData> registrations;
 
-    // TODO: Extract actual registration data from project
-    // This is a placeholder implementation
-    // In a real implementation, this would read saved registration results
-    // from the project's metadata or database
+    // Extract registration results from the project
+    QList<RegistrationProject::RegistrationResult> results = project.getRegistrationResults();
 
-    qDebug() << "Extracting registrations from project (placeholder implementation)";
+    for (const auto& result : results)
+    {
+        if (result.isValid)
+        {
+            RegistrationData regData;
+            regData.sourceScanId = result.sourceScanId;
+            regData.targetScanId = result.targetScanId;
+            regData.transform = result.transformation;
+            regData.rmsError = result.rmsError;
+
+            registrations.append(regData);
+        }
+    }
+
+    qDebug() << "Extracted" << registrations.size() << "valid registration results from project";
 
     return registrations;
 }

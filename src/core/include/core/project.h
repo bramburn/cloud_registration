@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QObject>
 #include <QString>
+#include <QVariantMap>
 
 struct ProjectInfo
 {
@@ -26,6 +27,8 @@ class Project : public QObject
 
 public:
     explicit Project(const ProjectInfo& info, QObject* parent = nullptr);
+    explicit Project(QObject* parent = nullptr);
+    explicit Project(const QString& name, const QString& path, QObject* parent = nullptr);
 
     // Getters
     QString projectId() const
@@ -61,8 +64,23 @@ public:
         return m_info;
     }
 
+    // Project state management
+    virtual void markAsModified();
+    bool isModified() const { return m_isModified; }
+
+    // Serialization
+    virtual QVariantMap serialize() const;
+    virtual bool deserialize(const QVariantMap& data);
+
+    // Validation
+    virtual bool validate() const;
+
+signals:
+    void projectModified();
+
 private:
     ProjectInfo m_info;
+    bool m_isModified;
 };
 
 #endif  // PROJECT_H

@@ -35,4 +35,22 @@ target_include_directories(PerformanceProfilerTests PRIVATE
 )
 add_test(NAME PerformanceProfilerTests COMMAND PerformanceProfilerTests)
 
+# ProjectManager Tests
+add_executable(ProjectManagerTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_projectmanager.cpp
+)
+target_link_libraries(ProjectManagerTests PRIVATE
+    Core                # Link against the Core library
+    GTest::gtest_main   # Google Test framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Sql            # For database operations
+)
+target_include_directories(ProjectManagerTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core # Core headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src # For temporary includes from root src/ (if any)
+)
+add_test(NAME ProjectManagerTests COMMAND ProjectManagerTests)
+
 message(STATUS "Configuring Core tests...")

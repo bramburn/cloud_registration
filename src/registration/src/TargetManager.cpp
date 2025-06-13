@@ -359,6 +359,19 @@ TargetCorrespondence* TargetManager::getCorrespondence(const QString& targetId1,
     return (it != correspondences_.end()) ? &(*it) : nullptr;
 }
 
+const TargetCorrespondence* TargetManager::getCorrespondence(const QString& targetId1, const QString& targetId2) const
+{
+    auto it = std::find_if(correspondences_.begin(),
+                           correspondences_.end(),
+                           [&](const TargetCorrespondence& c)
+                           {
+                               return (c.targetId1() == targetId1 && c.targetId2() == targetId2) ||
+                                      (c.targetId1() == targetId2 && c.targetId2() == targetId1);
+                           });
+
+    return (it != correspondences_.end()) ? &(*it) : nullptr;
+}
+
 int TargetManager::getCorrespondenceCount() const
 {
     return correspondences_.size();

@@ -5,15 +5,15 @@
 
 #include <memory>
 
-#include "../src/IE57Parser.h"
-#include "../src/MainPresenter.h"
-#include "../src/mainwindow.h"
-#include "../src/pointcloudviewerwidget.h"
-#include "../src/projectmanager.h"
-#include "mocks/MockE57Parser.h"
-#include "mocks/MockE57Writer.h"
-#include "mocks/MockMainView.h"
-#include "mocks/MockPointCloudViewer.h"
+#include "parsers/IE57Parser.h"
+#include "app/MainPresenter.h"
+#include "app/mainwindow.h"
+#include "rendering/pointcloudviewerwidget.h"
+#include "core/projectmanager.h"
+#include "../mocks/MockE57Parser.h"
+#include "../mocks/MockE57Writer.h"
+#include "../mocks/MockMainView.h"
+#include "../mocks/MockPointCloudViewer.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

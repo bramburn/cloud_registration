@@ -5,10 +5,10 @@
 #include <memory>
 
 #include "PoseGraph.h"
-#include "core/project.h"
 
 namespace Registration
 {
+class RegistrationProject;
 /**
  * @brief Builds pose graphs from registration project data
  */
@@ -24,7 +24,7 @@ public:
      * @param project The project containing scan data and registrations
      * @return Constructed pose graph
      */
-    std::unique_ptr<PoseGraph> build(const Project& project);
+    std::unique_ptr<PoseGraph> build(const RegistrationProject& project);
 
     /**
      * @brief Build pose graph from scan list with identity transforms
@@ -83,7 +83,7 @@ private:
         float rmsError;
     };
 
-    QList<RegistrationData> extractRegistrations(const Project& project) const;
+    QList<RegistrationData> extractRegistrations(const RegistrationProject& project) const;
 
     /**
      * @brief Find connected components in the pose graph

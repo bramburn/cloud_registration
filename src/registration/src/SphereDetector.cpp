@@ -1,4 +1,4 @@
-#include "SphereDetector.h"
+#include "registration/SphereDetector.h"
 
 #include <QDebug>
 #include <QThread>
@@ -7,7 +7,7 @@
 #include <chrono>
 #include <cmath>
 
-#include "../registration/Target.h"
+#include "registration/Target.h"
 
 SphereDetector::SphereDetector(QObject* parent)
     : TargetDetectionBase(parent), m_randomGenerator(std::chrono::steady_clock::now().time_since_epoch().count())

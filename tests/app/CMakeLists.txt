@@ -12,7 +12,7 @@ target_link_libraries(MainPresenterTests PRIVATE
     Parsers             # For parser interfaces
     Rendering           # For rendering components
     GTest::gtest_main   # Google Test framework
-    GMock::gmock        # Google Mock framework
+    GTest::gmock        # Google Mock framework
     Qt6::Test           # Qt Test module
     Qt6::Core           # For QObject, QString
     Qt6::Gui            # For QVector3D, QMatrix4x4

@@ -37,4 +37,25 @@ target_include_directories(UIEnhancementTests PRIVATE
 )
 add_test(NAME UIEnhancementTests COMMAND UIEnhancementTests)
 
+# Export Dialog Tests
+add_executable(ExportDialogTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_export_dialog.cpp
+)
+target_link_libraries(ExportDialogTests PRIVATE
+    UI                  # Link against the UI library
+    Core                # Indirect dependency through UI
+    Export              # For export functionality
+    GTest::gtest_main   # Google Test framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(ExportDialogTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui       # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core   # Core headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/export/include/export # Export headers
+)
+add_test(NAME ExportDialogTests COMMAND ExportDialogTests)
+
 message(STATUS "Configuring UI tests...")

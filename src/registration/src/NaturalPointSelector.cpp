@@ -1,4 +1,4 @@
-#include "NaturalPointSelector.h"
+#include "registration/NaturalPointSelector.h"
 
 #include <QDebug>
 
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <limits>
 
-#include "../registration/Target.h"
+#include "registration/Target.h"
 
 NaturalPointSelector::NaturalPointSelector(QObject* parent)
     : TargetDetectionBase(parent),

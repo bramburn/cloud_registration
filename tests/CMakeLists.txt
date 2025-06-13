@@ -20,6 +20,7 @@ add_subdirectory(quality)
 add_subdirectory(registration)
 add_subdirectory(rendering)
 add_subdirectory(ui)
+add_subdirectory(integration)  # Integration tests
 add_subdirectory(mocks)  # If mocks have tests or common CMake definitions
 
 # Define a custom target to run all tests
@@ -27,59 +28,74 @@ add_subdirectory(mocks)  # If mocks have tests or common CMake definitions
 # module's tests/<module_name>/CMakeLists.txt
 set(ALL_TESTS
     # Core Tests
-    VoxelGridFilterTests  # Example, assuming tests/core/CMakeLists.txt defines this
+    VoxelGridFilterTests
     PerformanceProfilerTests
+    ProjectManagerTests
 
     # Algorithms Tests
     LeastSquaresAlignmentTests
     ICPRegistrationTests
-    PointToPlaneICPTests  # If PointToPlaneICP is included
+    PointToPlaneICPTests
 
     # Parsers Tests
     E57LinkageTest
     LasParserTests
     E57ParserTests
     E57ParserCoreTests
+    E57ParserLibTests
     E57ComprehensiveTests
 
     # Rendering Tests
     CameraControllerTests
     OpenGLInitTest
     GpuCullerTests
-    OpenGLRendererTests  # If included
+    OpenGLRendererTests
+    PointCloudViewerDecouplingTests
+    PointCloudViewerRenderingR4Tests
 
     # UI Tests
     RecentProjectsManagerTests
     UIEnhancementTests
-    # Add other UI tests when their implementations are stable
+    ExportDialogTests
 
-    # Application & Integration Tests
-    EndToEndIntegrationTests
-    PerformanceValidationTests
+    # Application Tests
     MainPresenterTests
-    PointCloudViewerDecouplingTests
-    PointCloudViewerRenderingR4Tests  # If this test is used
 
-    # Registration Tests (Sprint 6)
+    # Integration Tests
+    IntegrationTests
+    EndToEndIntegrationTests
+
+    # Performance Tests
+    PerformanceOptimizationTests
+    PerformanceValidationTests
+
+    # Registration Tests
     TargetTests
     TargetManagerTests
     NaturalPointSelectorTests
     SphereDetectorTests
     RegistrationWorkflowTests
-    PoseGraphTests
     AlignmentEngineTests
     ErrorAnalysisTests
 
-    # Quality Tests (Sprint 6)
+    # Quality Tests
     QualityReportingTests
+    QualityFunctionalityTests
 
-    # New Modules' Tests (placeholders for now)
-    DifferenceAnalysisTests  # Assuming tests/analysis defines this
-    CoordinateSystemManagerTests  # Assuming tests/crs defines this
-    ExportWriterTests  # Consolidate E57Writer, LASWriter, PLYWriter, XYZWriter tests
-    FeatureBasedRegistrationTests
-    BundleAdjustmentTests
-    # Add other new tests as they are defined and implemented
+    # Export Tests
+    ExportFunctionalityTests
+
+    # CRS Tests
+    CoordinateSystemManagerTests
+
+    # Analysis Tests (placeholders)
+    # DifferenceAnalysisTests
+
+    # Features Tests (placeholders)
+    # FeatureBasedRegistrationTests
+
+    # Optimization Tests (placeholders)
+    # BundleAdjustmentTests
 )
 
 add_custom_target(run_all_tests
