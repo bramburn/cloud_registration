@@ -1,14 +1,16 @@
 #ifndef REGISTRATIONWORKFLOWWIDGET_H
 #define REGISTRATIONWORKFLOWWIDGET_H
 
-#include <QWidget>
-#include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QStackedWidget>
-#include <QPushButton>
 #include <QLabel>
+#include <QPushButton>
 #include <QSplitter>
+#include <QStackedWidget>
+#include <QVBoxLayout>
+#include <QWidget>
+
 #include <memory>
+
 #include "WorkflowStateMachine.h"
 #include "ui/WorkflowProgressWidget.h"
 
@@ -37,7 +39,10 @@ public:
 
     // Project management
     void setProject(RegistrationProject* project);
-    RegistrationProject* project() const { return project_; }
+    RegistrationProject* project() const
+    {
+        return project_;
+    }
 
     // Workflow control
     void startWorkflow();
@@ -139,4 +144,4 @@ private:
     QMap<RegistrationStep, bool> stepCompletionStatus_;
 };
 
-#endif // REGISTRATIONWORKFLOWWIDGET_H
+#endif  // REGISTRATIONWORKFLOWWIDGET_H

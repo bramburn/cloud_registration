@@ -1,36 +1,33 @@
 #include "ExportDialog.h"
-#include <QMessageBox>
-#include <QFileInfo>
-#include <QStandardPaths>
+
 #include <QDebug>
+#include <QFileInfo>
+#include <QMessageBox>
+#include <QStandardPaths>
 
 const ExportOptions ExportDialog::DEFAULT_OPTIONS = ExportOptions();
 
-ExportDialog::ExportDialog(QWidget* parent)
-    : QDialog(parent)
-    , m_exporter(std::make_unique<PointCloudExporter>(this))
+ExportDialog::ExportDialog(QWidget* parent) : QDialog(parent), m_exporter(std::make_unique<PointCloudExporter>(this))
 {
     setWindowTitle("Export Point Cloud");
     setModal(true);
     resize(600, 700);
-    
+
     setupUI();
-    
+
     // Connect exporter signals
-    connect(m_exporter.get(), &PointCloudExporter::progressUpdated,
-            this, &ExportDialog::onExportProgress);
-    connect(m_exporter.get(), &PointCloudExporter::exportCompleted,
-            this, &ExportDialog::onExportCompleted);
-    connect(m_exporter.get(), &PointCloudExporter::errorOccurred,
-            this, &ExportDialog::onExportError);
-    
+    connect(m_exporter.get(), &PointCloudExporter::progressUpdated, this, &ExportDialog::onExportProgress);
+    connect(m_exporter.get(), &PointCloudExporter::exportCompleted, this, &ExportDialog::onExportCompleted);
+    connect(m_exporter.get(), &PointCloudExporter::errorOccurred, this, &ExportDialog::onExportError);
+
     // Set default options
     setDefaultOptions(DEFAULT_OPTIONS);
 }
 
 ExportDialog::~ExportDialog()
 {
-    if (m_exportInProgress) {
+    if (m_exportInProgress)
+    {
         m_exporter->cancelExport();
     }
 }
@@ -38,10 +35,11 @@ ExportDialog::~ExportDialog()
 void ExportDialog::setPointCloudData(const std::vector<Point>& points)
 {
     m_pointCloudData = points;
-    
+
     // Update UI with point count
     QString pointCountText = QString("Points to export: %1").arg(points.size());
-    if (m_progressLabel) {
+    if (m_progressLabel)
+    {
         m_progressLabel->setText(pointCountText);
     }
 }
@@ -49,34 +47,34 @@ void ExportDialog::setPointCloudData(const std::vector<Point>& points)
 ExportOptions ExportDialog::getExportOptions() const
 {
     ExportOptions options;
-    
+
     // Format
     int formatIndex = m_formatCombo->currentIndex();
     options.format = static_cast<ExportFormat>(formatIndex);
-    
+
     // Output
     options.outputPath = m_outputPathEdit->text();
     options.projectName = m_projectNameEdit->text();
     options.description = m_descriptionEdit->text();
-    
+
     // Attributes
     options.includeColor = m_includeColorCheck->isChecked();
     options.includeIntensity = m_includeIntensityCheck->isChecked();
-    
+
     // Coordinate systems
     options.sourceCRS = m_sourceCRSCombo->currentText();
     options.targetCRS = m_targetCRSCombo->currentText();
-    
+
     // Format-specific
     options.compressE57 = m_compressE57Check->isChecked();
     options.asciiPLY = m_asciiPLYCheck->isChecked();
     options.precision = m_precisionSpin->value();
     options.xyzSeparator = m_xyzSeparatorEdit->text();
-    
+
     // Processing
     options.validateOutput = m_validateOutputCheck->isChecked();
     options.batchSize = static_cast<size_t>(m_batchSizeSpin->value());
-    
+
     return options;
 }
 
@@ -84,66 +82,69 @@ void ExportDialog::setDefaultOptions(const ExportOptions& options)
 {
     // Format
     m_formatCombo->setCurrentIndex(static_cast<int>(options.format));
-    
+
     // Output
     m_outputPathEdit->setText(options.outputPath);
     m_projectNameEdit->setText(options.projectName);
     m_descriptionEdit->setText(options.description);
-    
+
     // Attributes
     m_includeColorCheck->setChecked(options.includeColor);
     m_includeIntensityCheck->setChecked(options.includeIntensity);
-    
+
     // Coordinate systems
     int sourceCRSIndex = m_sourceCRSCombo->findText(options.sourceCRS);
-    if (sourceCRSIndex >= 0) {
+    if (sourceCRSIndex >= 0)
+    {
         m_sourceCRSCombo->setCurrentIndex(sourceCRSIndex);
     }
-    
+
     int targetCRSIndex = m_targetCRSCombo->findText(options.targetCRS);
-    if (targetCRSIndex >= 0) {
+    if (targetCRSIndex >= 0)
+    {
         m_targetCRSCombo->setCurrentIndex(targetCRSIndex);
     }
-    
+
     // Format-specific
     m_compressE57Check->setChecked(options.compressE57);
     m_asciiPLYCheck->setChecked(options.asciiPLY);
     m_precisionSpin->setValue(options.precision);
     m_xyzSeparatorEdit->setText(options.xyzSeparator);
-    
+
     // Processing
     m_validateOutputCheck->setChecked(options.validateOutput);
     m_batchSizeSpin->setValue(static_cast<int>(options.batchSize));
-    
+
     updateFormatSpecificOptions();
 }
 
 void ExportDialog::accept()
 {
-    if (m_exportInProgress) {
+    if (m_exportInProgress)
+    {
         return;
     }
-    
+
     // Validate inputs
     validateInputs();
-    if (!isValidOutputPath()) {
-        QMessageBox::warning(this, "Invalid Output Path", 
-                           "Please specify a valid output file path.");
+    if (!isValidOutputPath())
+    {
+        QMessageBox::warning(this, "Invalid Output Path", "Please specify a valid output file path.");
         return;
     }
-    
-    if (m_pointCloudData.empty()) {
-        QMessageBox::warning(this, "No Data", 
-                           "No point cloud data available for export.");
+
+    if (m_pointCloudData.empty())
+    {
+        QMessageBox::warning(this, "No Data", "No point cloud data available for export.");
         return;
     }
-    
+
     // Start export
     m_exportInProgress = true;
     m_exportButton->setEnabled(false);
     m_progressBar->setVisible(true);
     m_progressLabel->setText("Starting export...");
-    
+
     ExportOptions options = getExportOptions();
     m_exporter->exportPointCloudAsync(m_pointCloudData, options);
 }
@@ -151,16 +152,18 @@ void ExportDialog::accept()
 void ExportDialog::onBrowseOutputPath()
 {
     QString currentPath = m_outputPathEdit->text();
-    if (currentPath.isEmpty()) {
+    if (currentPath.isEmpty())
+    {
         currentPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
-    
+
     // Get file extension for current format
     ExportFormat format = static_cast<ExportFormat>(m_formatCombo->currentIndex());
     QString extension = PointCloudExporter::getFileExtension(format);
-    
+
     QString filter;
-    switch (format) {
+    switch (format)
+    {
         case ExportFormat::E57:
             filter = "E57 Files (*.e57);;All Files (*.*)";
             break;
@@ -174,9 +177,10 @@ void ExportDialog::onBrowseOutputPath()
             filter = "XYZ Files (*.xyz);;Text Files (*.txt);;All Files (*.*)";
             break;
     }
-    
+
     QString fileName = QFileDialog::getSaveFileName(this, "Export Point Cloud", currentPath, filter);
-    if (!fileName.isEmpty()) {
+    if (!fileName.isEmpty())
+    {
         m_outputPathEdit->setText(fileName);
         updateFileExtension();
     }
@@ -199,21 +203,23 @@ void ExportDialog::onExportCompleted(const ExportResult& result)
     m_exportInProgress = false;
     m_exportButton->setEnabled(true);
     m_progressBar->setVisible(false);
-    
-    if (result.success) {
+
+    if (result.success)
+    {
         QString message = QString("Export completed successfully!\n\n"
-                                "Points exported: %1\n"
-                                "File size: %2 bytes\n"
-                                "Export time: %3 seconds")
-                         .arg(result.pointsExported)
-                         .arg(result.fileSizeBytes)
-                         .arg(result.exportTimeSeconds, 0, 'f', 2);
-        
+                                  "Points exported: %1\n"
+                                  "File size: %2 bytes\n"
+                                  "Export time: %3 seconds")
+                              .arg(result.pointsExported)
+                              .arg(result.fileSizeBytes)
+                              .arg(result.exportTimeSeconds, 0, 'f', 2);
+
         QMessageBox::information(this, "Export Successful", message);
-        QDialog::accept(); // Close dialog
-    } else {
-        QMessageBox::critical(this, "Export Failed", 
-                            QString("Export failed: %1").arg(result.errorMessage));
+        QDialog::accept();  // Close dialog
+    }
+    else
+    {
+        QMessageBox::critical(this, "Export Failed", QString("Export failed: %1").arg(result.errorMessage));
         m_progressLabel->setText("Export failed");
     }
 }
@@ -223,7 +229,7 @@ void ExportDialog::onExportError(const QString& errorMessage)
     m_exportInProgress = false;
     m_exportButton->setEnabled(true);
     m_progressBar->setVisible(false);
-    
+
     QMessageBox::critical(this, "Export Error", errorMessage);
     m_progressLabel->setText("Export error occurred");
 }
@@ -231,23 +237,23 @@ void ExportDialog::onExportError(const QString& errorMessage)
 void ExportDialog::onPreviewSettings()
 {
     ExportOptions options = getExportOptions();
-    
+
     QString preview = QString("Export Preview:\n\n"
-                            "Format: %1\n"
-                            "Output: %2\n"
-                            "Points: %3\n"
-                            "Include Color: %4\n"
-                            "Include Intensity: %5\n"
-                            "Source CRS: %6\n"
-                            "Target CRS: %7")
-                     .arg(m_formatCombo->currentText())
-                     .arg(options.outputPath)
-                     .arg(m_pointCloudData.size())
-                     .arg(options.includeColor ? "Yes" : "No")
-                     .arg(options.includeIntensity ? "Yes" : "No")
-                     .arg(options.sourceCRS)
-                     .arg(options.targetCRS);
-    
+                              "Format: %1\n"
+                              "Output: %2\n"
+                              "Points: %3\n"
+                              "Include Color: %4\n"
+                              "Include Intensity: %5\n"
+                              "Source CRS: %6\n"
+                              "Target CRS: %7")
+                          .arg(m_formatCombo->currentText())
+                          .arg(options.outputPath)
+                          .arg(m_pointCloudData.size())
+                          .arg(options.includeColor ? "Yes" : "No")
+                          .arg(options.includeIntensity ? "Yes" : "No")
+                          .arg(options.sourceCRS)
+                          .arg(options.targetCRS);
+
     QMessageBox::information(this, "Export Preview", preview);
 }
 
@@ -259,7 +265,7 @@ void ExportDialog::onResetToDefaults()
 void ExportDialog::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    
+
     setupFormatGroup();
     setupOutputGroup();
     setupAttributeGroup();
@@ -267,7 +273,7 @@ void ExportDialog::setupUI()
     setupFormatSpecificGroup();
     setupProgressGroup();
     setupButtonBox();
-    
+
     m_mainLayout->addStretch();
 }
 
@@ -275,21 +281,20 @@ void ExportDialog::setupFormatGroup()
 {
     m_formatGroup = new QGroupBox("Export Format", this);
     QHBoxLayout* layout = new QHBoxLayout(m_formatGroup);
-    
+
     m_formatCombo = new QComboBox();
     m_formatCombo->addItems(PointCloudExporter::getSupportedFormats());
-    connect(m_formatCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &ExportDialog::onFormatChanged);
-    
+    connect(m_formatCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ExportDialog::onFormatChanged);
+
     m_formatHelpButton = new QPushButton("?");
     m_formatHelpButton->setMaximumWidth(30);
     connect(m_formatHelpButton, &QPushButton::clicked, this, &ExportDialog::showFormatHelp);
-    
+
     layout->addWidget(new QLabel("Format:"));
     layout->addWidget(m_formatCombo);
     layout->addWidget(m_formatHelpButton);
     layout->addStretch();
-    
+
     m_mainLayout->addWidget(m_formatGroup);
 }
 
@@ -297,7 +302,7 @@ void ExportDialog::setupOutputGroup()
 {
     m_outputGroup = new QGroupBox("Output Settings", this);
     QGridLayout* layout = new QGridLayout(m_outputGroup);
-    
+
     // Output path
     layout->addWidget(new QLabel("Output File:"), 0, 0);
     m_outputPathEdit = new QLineEdit();
@@ -305,17 +310,17 @@ void ExportDialog::setupOutputGroup()
     m_browseButton = new QPushButton("Browse...");
     connect(m_browseButton, &QPushButton::clicked, this, &ExportDialog::onBrowseOutputPath);
     layout->addWidget(m_browseButton, 0, 2);
-    
+
     // Project name
     layout->addWidget(new QLabel("Project Name:"), 1, 0);
     m_projectNameEdit = new QLineEdit();
     layout->addWidget(m_projectNameEdit, 1, 1, 1, 2);
-    
+
     // Description
     layout->addWidget(new QLabel("Description:"), 2, 0);
     m_descriptionEdit = new QLineEdit();
     layout->addWidget(m_descriptionEdit, 2, 1, 1, 2);
-    
+
     m_mainLayout->addWidget(m_outputGroup);
 }
 
@@ -323,13 +328,13 @@ void ExportDialog::setupAttributeGroup()
 {
     m_attributeGroup = new QGroupBox("Point Attributes", this);
     QVBoxLayout* layout = new QVBoxLayout(m_attributeGroup);
-    
+
     m_includeColorCheck = new QCheckBox("Include Color (RGB)");
     m_includeIntensityCheck = new QCheckBox("Include Intensity");
-    
+
     layout->addWidget(m_includeColorCheck);
     layout->addWidget(m_includeIntensityCheck);
-    
+
     m_mainLayout->addWidget(m_attributeGroup);
 }
 
@@ -450,11 +455,15 @@ void ExportDialog::updateFormatSpecificOptions()
 
     // Find XYZ separator widgets and show/hide them
     QGridLayout* layout = qobject_cast<QGridLayout*>(m_formatSpecificGroup->layout());
-    if (layout) {
-        for (int i = 0; i < layout->count(); ++i) {
+    if (layout)
+    {
+        for (int i = 0; i < layout->count(); ++i)
+        {
             QLayoutItem* item = layout->itemAt(i);
-            if (QLabel* label = qobject_cast<QLabel*>(item->widget())) {
-                if (label->text().contains("XYZ Field Separator")) {
+            if (QLabel* label = qobject_cast<QLabel*>(item->widget()))
+            {
+                if (label->text().contains("XYZ Field Separator"))
+                {
                     label->setVisible(format == ExportFormat::XYZ);
                 }
             }
@@ -466,7 +475,8 @@ void ExportDialog::updateFormatSpecificOptions()
 void ExportDialog::updateFileExtension()
 {
     QString currentPath = m_outputPathEdit->text();
-    if (currentPath.isEmpty()) {
+    if (currentPath.isEmpty())
+    {
         return;
     }
 
@@ -491,7 +501,8 @@ void ExportDialog::validateInputs()
 bool ExportDialog::isValidOutputPath() const
 {
     QString path = m_outputPathEdit->text();
-    if (path.isEmpty()) {
+    if (path.isEmpty())
+    {
         return false;
     }
 
@@ -502,10 +513,10 @@ bool ExportDialog::isValidOutputPath() const
 void ExportDialog::showFormatHelp()
 {
     QString help = "Export Format Information:\n\n"
-                  "E57: Industry standard format with compression and metadata support\n"
-                  "LAS: Laser scanning format with header and point classification\n"
-                  "PLY: Simple polygon format, good for research and visualization\n"
-                  "XYZ: Plain text format with coordinates only, widely compatible";
+                   "E57: Industry standard format with compression and metadata support\n"
+                   "LAS: Laser scanning format with header and point classification\n"
+                   "PLY: Simple polygon format, good for research and visualization\n"
+                   "XYZ: Plain text format with coordinates only, widely compatible";
 
     QMessageBox::information(this, "Format Help", help);
 }

@@ -1,29 +1,35 @@
-#include <gtest/gtest.h>
-#include "../src/E57ParserCore.h"
 #include <fstream>
 #include <memory>
 
+#include "../src/E57ParserCore.h"
+
+#include <gtest/gtest.h>
+
 /**
  * @brief Sprint 2 Unit Tests for E57ParserCore
- * 
+ *
  * These tests verify that the E57ParserCore class works correctly in isolation
  * without any Qt dependencies. This ensures the core parsing logic is properly
  * decoupled from the Qt wrapper.
  */
 
-class E57ParserCoreTest : public ::testing::Test {
+class E57ParserCoreTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         parser = std::make_unique<E57ParserCore>();
-        
+
         // Create a simple test file path (will be mocked in actual tests)
         testFilePath = "test_sample.e57";
         invalidFilePath = "nonexistent.e57";
         emptyFilePath = "empty.txt";
     }
 
-    void TearDown() override {
-        if (parser) {
+    void TearDown() override
+    {
+        if (parser)
+        {
             parser->closeFile();
         }
     }
@@ -32,9 +38,10 @@ protected:
     std::string testFilePath;
     std::string invalidFilePath;
     std::string emptyFilePath;
-    
+
     // Helper method to create a minimal test file
-    void createEmptyTestFile(const std::string& path) {
+    void createEmptyTestFile(const std::string& path)
+    {
         std::ofstream file(path);
         file << "empty";
         file.close();
@@ -42,32 +49,35 @@ protected:
 };
 
 // Test 1: Basic Construction and Destruction
-TEST_F(E57ParserCoreTest, ConstructionAndDestruction) {
+TEST_F(E57ParserCoreTest, ConstructionAndDestruction)
+{
     EXPECT_TRUE(parser != nullptr);
     EXPECT_FALSE(parser->isOpen());
     EXPECT_TRUE(parser->getLastError().empty());
 }
 
 // Test 2: File Validation
-TEST_F(E57ParserCoreTest, FileValidation) {
+TEST_F(E57ParserCoreTest, FileValidation)
+{
     // Test with non-existent file
     EXPECT_FALSE(E57ParserCore::isValidE57File(invalidFilePath));
-    
+
     // Test with empty file
     createEmptyTestFile(emptyFilePath);
     EXPECT_FALSE(E57ParserCore::isValidE57File(emptyFilePath));
-    
+
     // Clean up
     std::remove(emptyFilePath.c_str());
 }
 
 // Test 3: File Operations Without Valid File
-TEST_F(E57ParserCoreTest, FileOperationsWithoutValidFile) {
+TEST_F(E57ParserCoreTest, FileOperationsWithoutValidFile)
+{
     // Test opening non-existent file
     EXPECT_FALSE(parser->openFile(invalidFilePath));
     EXPECT_FALSE(parser->getLastError().empty());
     EXPECT_FALSE(parser->isOpen());
-    
+
     // Test operations on closed file
     EXPECT_EQ(parser->getScanCount(), 0);
     EXPECT_EQ(parser->getPointCount(), 0);
@@ -77,46 +87,51 @@ TEST_F(E57ParserCoreTest, FileOperationsWithoutValidFile) {
 }
 
 // Test 4: Error Handling
-TEST_F(E57ParserCoreTest, ErrorHandling) {
+TEST_F(E57ParserCoreTest, ErrorHandling)
+{
     // Test error setting and clearing
     parser->clearError();
     EXPECT_TRUE(parser->getLastError().empty());
-    
+
     // Trigger an error by trying to open invalid file
     parser->openFile(invalidFilePath);
     EXPECT_FALSE(parser->getLastError().empty());
-    
+
     // Clear error
     parser->clearError();
     EXPECT_TRUE(parser->getLastError().empty());
 }
 
 // Test 5: Progress Callback
-TEST_F(E57ParserCoreTest, ProgressCallback) {
+TEST_F(E57ParserCoreTest, ProgressCallback)
+{
     bool callbackCalled = false;
     int lastPercentage = -1;
     std::string lastStage;
-    
+
     // Set progress callback
-    parser->setProgressCallback([&](int percentage, const std::string& stage) {
-        callbackCalled = true;
-        lastPercentage = percentage;
-        lastStage = stage;
-    });
-    
+    parser->setProgressCallback(
+        [&](int percentage, const std::string& stage)
+        {
+            callbackCalled = true;
+            lastPercentage = percentage;
+            lastStage = stage;
+        });
+
     // Trigger an operation that would call progress (even if it fails)
     parser->openFile(invalidFilePath);
-    
+
     // Clear callback
     parser->clearProgressCallback();
-    
+
     // Note: Callback might not be called for failed operations,
     // so we just test that the callback mechanism works
-    EXPECT_TRUE(true); // Test passes if no exceptions thrown
+    EXPECT_TRUE(true);  // Test passes if no exceptions thrown
 }
 
 // Test 6: Data Structure Validation
-TEST_F(E57ParserCoreTest, DataStructures) {
+TEST_F(E57ParserCoreTest, DataStructures)
+{
     // Test CorePointData structure
     CorePointData point;
     point.x = 1.0f;
@@ -128,7 +143,7 @@ TEST_F(E57ParserCoreTest, DataStructures) {
     point.green = 128;
     point.blue = 64;
     point.hasColor = true;
-    
+
     EXPECT_EQ(point.x, 1.0f);
     EXPECT_EQ(point.y, 2.0f);
     EXPECT_EQ(point.z, 3.0f);
@@ -141,7 +156,8 @@ TEST_F(E57ParserCoreTest, DataStructures) {
 }
 
 // Test 7: CoreScanMetadata Structure
-TEST_F(E57ParserCoreTest, ScanMetadataStructure) {
+TEST_F(E57ParserCoreTest, ScanMetadataStructure)
+{
     CoreScanMetadata metadata;
     metadata.name = "Test Scan";
     metadata.guid = "test-guid-123";
@@ -152,7 +168,7 @@ TEST_F(E57ParserCoreTest, ScanMetadataStructure) {
     metadata.maxY = 5.0;
     metadata.minZ = 0.0;
     metadata.maxZ = 20.0;
-    
+
     EXPECT_TRUE(metadata.isValid());
     EXPECT_EQ(metadata.name, "Test Scan");
     EXPECT_EQ(metadata.guid, "test-guid-123");
@@ -160,7 +176,8 @@ TEST_F(E57ParserCoreTest, ScanMetadataStructure) {
 }
 
 // Test 8: CoreLoadingSettings Structure
-TEST_F(E57ParserCoreTest, LoadingSettingsStructure) {
+TEST_F(E57ParserCoreTest, LoadingSettingsStructure)
+{
     CoreLoadingSettings settings;
     settings.maxPoints = 500000;
     settings.loadIntensity = true;
@@ -173,7 +190,7 @@ TEST_F(E57ParserCoreTest, LoadingSettingsStructure) {
     settings.filterMaxY = 100.0;
     settings.filterMinZ = -10.0;
     settings.filterMaxZ = 50.0;
-    
+
     EXPECT_EQ(settings.maxPoints, 500000);
     EXPECT_TRUE(settings.loadIntensity);
     EXPECT_FALSE(settings.loadColor);
@@ -182,27 +199,37 @@ TEST_F(E57ParserCoreTest, LoadingSettingsStructure) {
 }
 
 // Test 9: Exception Types
-TEST_F(E57ParserCoreTest, ExceptionTypes) {
+TEST_F(E57ParserCoreTest, ExceptionTypes)
+{
     // Test E57CoreException
-    try {
+    try
+    {
         throw E57CoreException("Test core exception");
-    } catch (const E57CoreException& ex) {
+    }
+    catch (const E57CoreException& ex)
+    {
         EXPECT_STREQ(ex.what(), "Test core exception");
     }
-    
+
     // Test E57FileNotFoundException
-    try {
+    try
+    {
         throw E57FileNotFoundException("/path/to/missing/file.e57");
-    } catch (const E57FileNotFoundException& ex) {
+    }
+    catch (const E57FileNotFoundException& ex)
+    {
         std::string message = ex.what();
         EXPECT_TRUE(message.find("E57 file not found") != std::string::npos);
         EXPECT_TRUE(message.find("/path/to/missing/file.e57") != std::string::npos);
     }
-    
+
     // Test E57InvalidFormatException
-    try {
+    try
+    {
         throw E57InvalidFormatException("Invalid header format");
-    } catch (const E57InvalidFormatException& ex) {
+    }
+    catch (const E57InvalidFormatException& ex)
+    {
         std::string message = ex.what();
         EXPECT_TRUE(message.find("Invalid E57 format") != std::string::npos);
         EXPECT_TRUE(message.find("Invalid header format") != std::string::npos);
@@ -210,25 +237,27 @@ TEST_F(E57ParserCoreTest, ExceptionTypes) {
 }
 
 // Test 10: Point Data Extraction with Empty Results
-TEST_F(E57ParserCoreTest, PointDataExtractionEmpty) {
+TEST_F(E57ParserCoreTest, PointDataExtractionEmpty)
+{
     // Test extracting from non-open file
     std::vector<float> xyzData = parser->extractXYZData();
     EXPECT_TRUE(xyzData.empty());
     EXPECT_FALSE(parser->getLastError().empty());
-    
+
     parser->clearError();
-    
+
     std::vector<CorePointData> pointData = parser->extractPointData();
     EXPECT_TRUE(pointData.empty());
     EXPECT_FALSE(parser->getLastError().empty());
 }
 
 // Test 11: File Close Operations
-TEST_F(E57ParserCoreTest, FileCloseOperations) {
+TEST_F(E57ParserCoreTest, FileCloseOperations)
+{
     // Test closing when no file is open
     parser->closeFile();
     EXPECT_FALSE(parser->isOpen());
-    
+
     // Test multiple closes
     parser->closeFile();
     parser->closeFile();
@@ -236,7 +265,8 @@ TEST_F(E57ParserCoreTest, FileCloseOperations) {
 }
 
 // Test 12: Metadata Extraction from Closed File
-TEST_F(E57ParserCoreTest, MetadataExtractionFromClosedFile) {
+TEST_F(E57ParserCoreTest, MetadataExtractionFromClosedFile)
+{
     CoreScanMetadata metadata = parser->getScanMetadata(0);
     EXPECT_FALSE(metadata.isValid());
     EXPECT_TRUE(metadata.name.empty());

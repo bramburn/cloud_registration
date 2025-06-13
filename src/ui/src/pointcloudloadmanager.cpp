@@ -1,15 +1,12 @@
 #include "ui/pointcloudloadmanager.h"
 
-PointCloudLoadManager::PointCloudLoadManager(QObject *parent)
-    : QObject(parent)
-{
-}
+PointCloudLoadManager::PointCloudLoadManager(QObject* parent) : QObject(parent) {}
 
 void PointCloudLoadManager::loadPointCloud(const QString& filePath)
 {
     m_isLoading = true;
     emit loadingStarted(filePath);
-    
+
     // Stub implementation - actual loading logic will be added in future sprints
     emit loadingProgress(100, "Complete");
     emit loadingFinished(true, "Loaded successfully", std::vector<float>());
@@ -18,7 +15,8 @@ void PointCloudLoadManager::loadPointCloud(const QString& filePath)
 
 void PointCloudLoadManager::cancelLoading()
 {
-    if (m_isLoading) {
+    if (m_isLoading)
+    {
         m_isLoading = false;
         emit loadingCancelled();
     }
@@ -27,12 +25,14 @@ void PointCloudLoadManager::cancelLoading()
 // Sprint 4: Sidebar integration methods
 bool PointCloudLoadManager::loadScan(const QString& scanId)
 {
-    if (scanId.isEmpty()) {
+    if (scanId.isEmpty())
+    {
         return false;
     }
 
-    if (m_loadedScans.contains(scanId)) {
-        return true; // Already loaded
+    if (m_loadedScans.contains(scanId))
+    {
+        return true;  // Already loaded
     }
 
     // Stub implementation - actual loading logic will be added in future sprints
@@ -42,12 +42,14 @@ bool PointCloudLoadManager::loadScan(const QString& scanId)
 
 bool PointCloudLoadManager::unloadScan(const QString& scanId)
 {
-    if (scanId.isEmpty()) {
+    if (scanId.isEmpty())
+    {
         return false;
     }
 
-    if (!m_loadedScans.contains(scanId)) {
-        return true; // Already unloaded
+    if (!m_loadedScans.contains(scanId))
+    {
+        return true;  // Already unloaded
     }
 
     // Stub implementation - actual unloading logic will be added in future sprints

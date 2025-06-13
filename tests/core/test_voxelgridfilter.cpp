@@ -1,15 +1,20 @@
-#include <gtest/gtest.h>
-#include "core/voxelgridfilter.h"
-#include "core/loadingsettings.h"
 #include <chrono>
 
-class VoxelGridFilterTest : public ::testing::Test {
+#include "core/loadingsettings.h"
+#include "core/voxelgridfilter.h"
+
+#include <gtest/gtest.h>
+
+class VoxelGridFilterTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         filter = std::make_unique<VoxelGridFilter>();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         filter.reset();
     }
 
@@ -17,7 +22,8 @@ protected:
 };
 
 // Test Case 1: Empty input vector
-TEST_F(VoxelGridFilterTest, EmptyInput) {
+TEST_F(VoxelGridFilterTest, EmptyInput)
+{
     std::vector<float> input;
     LoadingSettings settings;
     settings.method = LoadingMethod::VoxelGrid;
@@ -30,7 +36,8 @@ TEST_F(VoxelGridFilterTest, EmptyInput) {
 }
 
 // Test Case 2: Single point input
-TEST_F(VoxelGridFilterTest, SinglePoint) {
+TEST_F(VoxelGridFilterTest, SinglePoint)
+{
     std::vector<float> input = {1.0f, 2.0f, 3.0f};
     LoadingSettings settings;
     settings.method = LoadingMethod::VoxelGrid;
@@ -46,12 +53,19 @@ TEST_F(VoxelGridFilterTest, SinglePoint) {
 }
 
 // Test Case 3: Points in same voxel should be merged
-TEST_F(VoxelGridFilterTest, PointsInSameVoxel) {
+TEST_F(VoxelGridFilterTest, PointsInSameVoxel)
+{
     // Three points very close together (within same voxel)
     std::vector<float> input = {
-        0.0f, 0.0f, 0.0f,    // Point 1
-        0.01f, 0.01f, 0.01f, // Point 2 (very close)
-        0.02f, 0.02f, 0.02f  // Point 3 (very close)
+        0.0f,
+        0.0f,
+        0.0f,  // Point 1
+        0.01f,
+        0.01f,
+        0.01f,  // Point 2 (very close)
+        0.02f,
+        0.02f,
+        0.02f  // Point 3 (very close)
     };
 
     LoadingSettings settings;
@@ -71,10 +85,15 @@ TEST_F(VoxelGridFilterTest, PointsInSameVoxel) {
 }
 
 // Test Case 4: Points in different voxels
-TEST_F(VoxelGridFilterTest, PointsInDifferentVoxels) {
+TEST_F(VoxelGridFilterTest, PointsInDifferentVoxels)
+{
     std::vector<float> input = {
-        0.0f, 0.0f, 0.0f,    // Point 1 in voxel (0,0,0)
-        1.0f, 1.0f, 1.0f     // Point 2 in different voxel
+        0.0f,
+        0.0f,
+        0.0f,  // Point 1 in voxel (0,0,0)
+        1.0f,
+        1.0f,
+        1.0f  // Point 2 in different voxel
     };
 
     LoadingSettings settings;
@@ -89,16 +108,23 @@ TEST_F(VoxelGridFilterTest, PointsInDifferentVoxels) {
 }
 
 // Test Case 5: Min points per voxel filtering
-TEST_F(VoxelGridFilterTest, MinPointsPerVoxelFiltering) {
-    std::vector<float> input = {
-        // Voxel 1: 3 points
-        0.0f, 0.0f, 0.0f,
-        0.01f, 0.01f, 0.01f,
-        0.02f, 0.02f, 0.02f,
+TEST_F(VoxelGridFilterTest, MinPointsPerVoxelFiltering)
+{
+    std::vector<float> input = {// Voxel 1: 3 points
+                                0.0f,
+                                0.0f,
+                                0.0f,
+                                0.01f,
+                                0.01f,
+                                0.01f,
+                                0.02f,
+                                0.02f,
+                                0.02f,
 
-        // Voxel 2: 1 point (should be filtered out)
-        2.0f, 2.0f, 2.0f
-    };
+                                // Voxel 2: 1 point (should be filtered out)
+                                2.0f,
+                                2.0f,
+                                2.0f};
 
     LoadingSettings settings;
     settings.method = LoadingMethod::VoxelGrid;
@@ -112,7 +138,8 @@ TEST_F(VoxelGridFilterTest, MinPointsPerVoxelFiltering) {
 }
 
 // Test Case 6: Invalid leaf size handling
-TEST_F(VoxelGridFilterTest, InvalidLeafSize) {
+TEST_F(VoxelGridFilterTest, InvalidLeafSize)
+{
     std::vector<float> input = {1.0f, 2.0f, 3.0f};
     LoadingSettings settings;
     settings.method = LoadingMethod::VoxelGrid;
@@ -126,7 +153,8 @@ TEST_F(VoxelGridFilterTest, InvalidLeafSize) {
 }
 
 // Test Case 7: Invalid input size (not divisible by 3)
-TEST_F(VoxelGridFilterTest, InvalidInputSize) {
+TEST_F(VoxelGridFilterTest, InvalidInputSize)
+{
     std::vector<float> input = {1.0f, 2.0f};  // Only 2 elements, not divisible by 3
     LoadingSettings settings;
     settings.method = LoadingMethod::VoxelGrid;
@@ -139,16 +167,18 @@ TEST_F(VoxelGridFilterTest, InvalidInputSize) {
 }
 
 // Test Case 8: Large point cloud performance test
-TEST_F(VoxelGridFilterTest, LargePointCloudPerformance) {
+TEST_F(VoxelGridFilterTest, LargePointCloudPerformance)
+{
     // Create a larger point cloud for performance testing
     std::vector<float> input;
     const int numPoints = 10000;
     input.reserve(numPoints * 3);
 
-    for (int i = 0; i < numPoints; ++i) {
-        input.push_back(static_cast<float>(i % 100));      // X
-        input.push_back(static_cast<float>((i / 100) % 100)); // Y
-        input.push_back(static_cast<float>(i / 10000));    // Z
+    for (int i = 0; i < numPoints; ++i)
+    {
+        input.push_back(static_cast<float>(i % 100));          // X
+        input.push_back(static_cast<float>((i / 100) % 100));  // Y
+        input.push_back(static_cast<float>(i / 10000));        // Z
     }
 
     LoadingSettings settings;

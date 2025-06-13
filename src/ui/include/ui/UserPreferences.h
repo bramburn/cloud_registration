@@ -1,38 +1,40 @@
 #ifndef USERPREFERENCES_H
 #define USERPREFERENCES_H
 
-#include <QObject>
-#include <QSettings>
-#include <QVariant>
-#include <QSize>
-#include <QPoint>
 #include <QByteArray>
-#include <QStringList>
 #include <QMap>
+#include <QObject>
+#include <QPoint>
+#include <QSettings>
+#include <QSize>
+#include <QStringList>
+#include <QVariant>
 
 /**
  * @brief User preferences and settings management system
- * 
+ *
  * This class manages user-specific settings and preferences including:
  * - Window layout and geometry persistence
  * - Application settings and defaults
  * - User customizations and preferences
  * - Settings validation and migration
- * 
+ *
  * Sprint 7 Requirements:
  * - Save/restore window layouts using QMainWindow state
  * - Persist user preferences between sessions
  * - Provide smart defaults for new users
  * - Settings validation and error handling
  */
-class UserPreferences : public QObject {
+class UserPreferences : public QObject
+{
     Q_OBJECT
 
 public:
     /**
      * @brief Preference categories for organization
      */
-    enum class Category {
+    enum class Category
+    {
         General,
         Interface,
         Performance,
@@ -45,7 +47,8 @@ public:
     /**
      * @brief Preference data types
      */
-    enum class PreferenceType {
+    enum class PreferenceType
+    {
         Boolean,
         Integer,
         Double,
@@ -61,7 +64,8 @@ public:
     /**
      * @brief Preference definition structure
      */
-    struct PreferenceDefinition {
+    struct PreferenceDefinition
+    {
         QString key;
         QString displayName;
         QString description;
@@ -78,7 +82,8 @@ public:
     /**
      * @brief Window layout information
      */
-    struct WindowLayout {
+    struct WindowLayout
+    {
         QString name;
         QByteArray geometry;
         QByteArray windowState;
@@ -125,8 +130,10 @@ public:
     void setByteArray(const QString& key, const QByteArray& value);
 
     // Window layout management
-    void saveWindowLayout(const QString& name, const QByteArray& geometry, 
-                         const QByteArray& windowState, const QMap<QString, QVariant>& customData = QMap<QString, QVariant>());
+    void saveWindowLayout(const QString& name,
+                          const QByteArray& geometry,
+                          const QByteArray& windowState,
+                          const QMap<QString, QVariant>& customData = QMap<QString, QVariant>());
     WindowLayout loadWindowLayout(const QString& name) const;
     QStringList getAvailableLayouts() const;
     void deleteWindowLayout(const QString& name);
@@ -175,7 +182,7 @@ private:
     bool m_cacheEnabled;
     QString m_organizationName;
     QString m_applicationName;
-    
+
     void initializeDefaultPreferences();
     void initializeGeneralPreferences();
     void initializeInterfacePreferences();
@@ -184,23 +191,23 @@ private:
     void initializeRegistrationPreferences();
     void initializeExportPreferences();
     void initializeAdvancedPreferences();
-    
+
     QVariant convertValue(const QVariant& value, PreferenceType targetType) const;
     bool validateValueRange(const QVariant& value, const QVariant& minValue, const QVariant& maxValue) const;
     bool validateValueList(const QVariant& value, const QStringList& validValues) const;
-    
+
     QString categoryToString(Category category) const;
     Category stringToCategory(const QString& categoryStr) const;
     QString typeToString(PreferenceType type) const;
     PreferenceType stringToType(const QString& typeStr) const;
-    
+
     void updateCache(const QString& key, const QVariant& value);
     void clearCache();
-    
+
     // Migration helpers
     void migrateFromVersion1To2();
     void migrateFromVersion2To3();
-    
+
     // Default values
     static constexpr int CURRENT_SETTINGS_VERSION = 3;
     static constexpr const char* SETTINGS_VERSION_KEY = "SettingsVersion";
@@ -208,4 +215,4 @@ private:
     static constexpr const char* DEFAULT_LAYOUT_KEY = "DefaultLayout";
 };
 
-#endif // USERPREFERENCES_H
+#endif  // USERPREFERENCES_H

@@ -1,5 +1,7 @@
 #include "rendering/CameraController.h"
+
 #include <QDebug>
+
 #include <cmath>
 
 #ifndef M_PI
@@ -7,21 +9,21 @@
 #endif
 
 CameraController::CameraController(QObject* parent)
-    : QObject(parent)
-    , m_position(0.0f, 0.0f, 5.0f)
-    , m_target(0.0f, 0.0f, 0.0f)
-    , m_up(0.0f, 1.0f, 0.0f)
-    , m_distance(5.0f)
-    , m_fov(45.0f)
-    , m_azimuth(0.0f)
-    , m_elevation(0.0f)
-    , m_minDistance(0.1f)
-    , m_maxDistance(1000.0f)
-    , m_minElevation(-89.0f)
-    , m_maxElevation(89.0f)
-    , m_panSensitivity(0.01f)
-    , m_orbitSensitivity(0.5f)
-    , m_zoomSensitivity(0.1f)
+    : QObject(parent),
+      m_position(0.0f, 0.0f, 5.0f),
+      m_target(0.0f, 0.0f, 0.0f),
+      m_up(0.0f, 1.0f, 0.0f),
+      m_distance(5.0f),
+      m_fov(45.0f),
+      m_azimuth(0.0f),
+      m_elevation(0.0f),
+      m_minDistance(0.1f),
+      m_maxDistance(1000.0f),
+      m_minElevation(-89.0f),
+      m_maxElevation(89.0f),
+      m_panSensitivity(0.01f),
+      m_orbitSensitivity(0.5f),
+      m_zoomSensitivity(0.1f)
 {
     updateCameraPosition();
 }
@@ -32,8 +34,10 @@ void CameraController::orbit(float deltaX, float deltaY)
     m_elevation += deltaY * m_orbitSensitivity;
 
     // Normalize azimuth to [0, 360)
-    while (m_azimuth >= 360.0f) m_azimuth -= 360.0f;
-    while (m_azimuth < 0.0f) m_azimuth += 360.0f;
+    while (m_azimuth >= 360.0f)
+        m_azimuth -= 360.0f;
+    while (m_azimuth < 0.0f)
+        m_azimuth += 360.0f;
 
     constrainElevation();
     updateCameraPosition();
@@ -75,7 +79,7 @@ void CameraController::fitToView(const QVector3D& minBounds, const QVector3D& ma
 
     // Calculate appropriate distance based on field of view
     float distance = maxDimension / (2.0f * tan(m_fov * M_PI / 360.0f));
-    m_distance = qMax(distance * 1.2f, m_minDistance); // Add 20% margin
+    m_distance = qMax(distance * 1.2f, m_minDistance);  // Add 20% margin
 
     // Reset to isometric view
     m_azimuth = 45.0f;

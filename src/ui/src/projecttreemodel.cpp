@@ -1,11 +1,8 @@
 #include "ui/projecttreemodel.h"
 
-ProjectTreeModel::ProjectTreeModel(QObject *parent)
-    : QAbstractItemModel(parent)
-{
-}
+ProjectTreeModel::ProjectTreeModel(QObject* parent) : QAbstractItemModel(parent) {}
 
-QModelIndex ProjectTreeModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex ProjectTreeModel::index(int row, int column, const QModelIndex& parent) const
 {
     Q_UNUSED(row)
     Q_UNUSED(column)
@@ -13,25 +10,25 @@ QModelIndex ProjectTreeModel::index(int row, int column, const QModelIndex &pare
     return QModelIndex();
 }
 
-QModelIndex ProjectTreeModel::parent(const QModelIndex &index) const
+QModelIndex ProjectTreeModel::parent(const QModelIndex& index) const
 {
     Q_UNUSED(index)
     return QModelIndex();
 }
 
-int ProjectTreeModel::rowCount(const QModelIndex &parent) const
+int ProjectTreeModel::rowCount(const QModelIndex& parent) const
 {
     Q_UNUSED(parent)
     return 0;
 }
 
-int ProjectTreeModel::columnCount(const QModelIndex &parent) const
+int ProjectTreeModel::columnCount(const QModelIndex& parent) const
 {
     Q_UNUSED(parent)
     return 1;
 }
 
-QVariant ProjectTreeModel::data(const QModelIndex &index, int role) const
+QVariant ProjectTreeModel::data(const QModelIndex& index, int role) const
 {
     Q_UNUSED(index)
     Q_UNUSED(role)

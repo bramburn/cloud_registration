@@ -1,14 +1,16 @@
 #ifndef XYZWRITER_H
 #define XYZWRITER_H
 
-#include "../IFormatWriter.h"
 #include <QFile>
 #include <QTextStream>
+
 #include <memory>
+
+#include "../IFormatWriter.h"
 
 /**
  * @brief XYZ format writer implementation
- * 
+ *
  * Sprint 6 User Story 1: Multi-Format Point Cloud Export
  * This class implements simple XYZ format export functionality.
  */
@@ -23,14 +25,29 @@ public:
     bool writeHeader(const HeaderInfo& info) override;
     bool writePoint(const Point& point) override;
     bool close() override;
-    
-    QString getFileExtension() const override { return "xyz"; }
-    QString getFormatDescription() const override { return "XYZ Point Cloud Format"; }
-    bool supportsColor() const override { return false; }
-    bool supportsIntensity() const override { return false; }
-    
+
+    QString getFileExtension() const override
+    {
+        return "xyz";
+    }
+    QString getFormatDescription() const override
+    {
+        return "XYZ Point Cloud Format";
+    }
+    bool supportsColor() const override
+    {
+        return false;
+    }
+    bool supportsIntensity() const override
+    {
+        return false;
+    }
+
     // Error handling
-    QString getLastError() const { return lastError_; }
+    QString getLastError() const
+    {
+        return lastError_;
+    }
 
 private:
     std::unique_ptr<QFile> file_;
@@ -39,9 +56,9 @@ private:
     HeaderInfo headerInfo_;
     size_t pointsWritten_;
     bool isOpen_;
-    
+
     void setError(const QString& error);
     void clearError();
 };
 
-#endif // XYZWRITER_H
+#endif  // XYZWRITER_H

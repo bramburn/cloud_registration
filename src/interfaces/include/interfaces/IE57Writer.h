@@ -1,15 +1,17 @@
 #ifndef IE57WRITER_H
 #define IE57WRITER_H
 
-#include <QString>
 #include <QObject>
-#include <vector>
+#include <QString>
+
 #include <memory>
+#include <vector>
 
 /**
  * @brief Point3D - Basic 3D point structure for E57 writing
  */
-struct Point3D {
+struct Point3D
+{
     double x, y, z;
 
     Point3D() : x(0.0), y(0.0), z(0.0) {}
@@ -19,15 +21,17 @@ struct Point3D {
 /**
  * @brief ScanPose - Pose information for a scan
  */
-struct ScanPose {
+struct ScanPose
+{
     double translation[3] = {0.0, 0.0, 0.0};
-    double rotation[4] = {1.0, 0.0, 0.0, 0.0}; // quaternion (w, x, y, z)
+    double rotation[4] = {1.0, 0.0, 0.0, 0.0};  // quaternion (w, x, y, z)
 };
 
 /**
  * @brief ScanMetadata - Metadata for a scan
  */
-struct ScanMetadata {
+struct ScanMetadata
+{
     QString name;
     QString description;
     ScanPose pose;
@@ -44,22 +48,24 @@ struct ScanMetadata {
 /**
  * @brief ExportOptions - Options for E57 export
  */
-struct ExportOptions {
+struct ExportOptions
+{
     bool includeIntensity = false;
     bool includeColor = false;
     bool compressData = true;
-    double coordinateScaleFactor = 0.0001; // 0.1mm precision
+    double coordinateScaleFactor = 0.0001;  // 0.1mm precision
     QString coordinateSystem = "CARTESIAN";
 };
 
 /**
  * @brief ScanData - Complete scan data structure
  */
-struct ScanData {
+struct ScanData
+{
     ScanMetadata metadata;
     std::vector<Point3D> points;
     std::vector<float> intensities;
-    std::vector<uint8_t> colors; // RGB interleaved
+    std::vector<uint8_t> colors;  // RGB interleaved
 };
 
 /**
@@ -76,11 +82,12 @@ struct ScanData {
  * - Supports unit testing with mock implementations
  * - Maintains compatibility with existing application interface
  */
-class IE57Writer : public QObject {
+class IE57Writer : public QObject
+{
     Q_OBJECT
 
 public:
-    explicit IE57Writer(QObject *parent = nullptr) : QObject(parent) {}
+    explicit IE57Writer(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IE57Writer() = default;
 
     /**
@@ -150,8 +157,8 @@ public:
      * @return true if metadata set successfully, false otherwise
      */
     virtual bool setFileMetadata(const QString& guid = QString(),
-                                const QString& description = QString(),
-                                const QString& creationDateTime = QString()) = 0;
+                                 const QString& description = QString(),
+                                 const QString& creationDateTime = QString()) = 0;
 
 signals:
     /**
@@ -188,4 +195,4 @@ signals:
     void errorOccurred(const QString& errorMessage);
 };
 
-#endif // IE57WRITER_H
+#endif  // IE57WRITER_H

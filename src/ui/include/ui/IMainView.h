@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+
 #include <vector>
 
 // Forward declarations
@@ -23,11 +24,12 @@ class IPointCloudViewer;
  * - Supports unit testing with mock implementations
  * - Separates presentation logic from UI implementation
  */
-class IMainView : public QObject {
+class IMainView : public QObject
+{
     Q_OBJECT
 
 public:
-    explicit IMainView(QObject *parent = nullptr) : QObject(parent) {}
+    explicit IMainView(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IMainView() = default;
 
     /**
@@ -81,7 +83,8 @@ public:
      * @param title Progress dialog title
      * @param message Progress message
      */
-    virtual void showProgressDialog(bool show, const QString& title = QString(), const QString& message = QString()) = 0;
+    virtual void
+    showProgressDialog(bool show, const QString& title = QString(), const QString& message = QString()) = 0;
 
     /**
      * @brief Update progress dialog
@@ -152,7 +155,8 @@ public:
      * @param defaultName Default file name
      * @return Selected file path, empty if cancelled
      */
-    virtual QString askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) = 0;
+    virtual QString
+    askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) = 0;
 
     /**
      * @brief Ask user for confirmation
@@ -266,4 +270,4 @@ signals:
     void exitRequested();
 };
 
-#endif // IMAINVIEW_H
+#endif  // IMAINVIEW_H

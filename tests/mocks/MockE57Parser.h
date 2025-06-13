@@ -1,30 +1,33 @@
 #ifndef MOCKE57PARSER_H
 #define MOCKE57PARSER_H
 
-#include <gmock/gmock.h>
-#include "../../src/IE57Parser.h"
-#include <vector>
 #include <string>
+#include <vector>
+
+#include "../../src/IE57Parser.h"
+
+#include <gmock/gmock.h>
 
 /**
  * @brief MockE57Parser - Mock implementation of IE57Parser for testing
- * 
+ *
  * This mock class implements the IE57Parser interface using Google Mock's
  * MOCK_METHOD macro. It allows tests to simulate file loading success/failure,
  * return predefined point cloud data, and verify that methods are called
  * with correct parameters.
- * 
+ *
  * Sprint 5 Testing Requirements:
  * - Enables unit testing of MainPresenter without file system dependencies
  * - Allows simulation of various parsing scenarios (success, failure, errors)
  * - Provides controllable test data for consistent test results
  * - Verifies correct interaction patterns between components
  */
-class MockE57Parser : public IE57Parser {
+class MockE57Parser : public IE57Parser
+{
     Q_OBJECT
 
 public:
-    explicit MockE57Parser(QObject *parent = nullptr) : IE57Parser(parent) {}
+    explicit MockE57Parser(QObject* parent = nullptr) : IE57Parser(parent) {}
     virtual ~MockE57Parser() = default;
 
     // Main entry point for MainWindow integration
@@ -53,109 +56,101 @@ public:
     MOCK_METHOD(int64_t, getPointCount, (int scanIndex), (const, override));
 
     // Helper methods for tests to emit signals
-    void emitProgressUpdated(int percentage, const QString& stage) {
+    void emitProgressUpdated(int percentage, const QString& stage)
+    {
         emit progressUpdated(percentage, stage);
     }
 
-    void emitParsingFinished(bool success, const QString& message, const std::vector<float>& points) {
+    void emitParsingFinished(bool success, const QString& message, const std::vector<float>& points)
+    {
         emit parsingFinished(success, message, points);
     }
 
-    void emitScanMetadataAvailable(int scanCount, const QStringList& scanNames) {
+    void emitScanMetadataAvailable(int scanCount, const QStringList& scanNames)
+    {
         emit scanMetadataAvailable(scanCount, scanNames);
     }
 
-    void emitIntensityDataExtracted(const std::vector<float>& intensityValues) {
+    void emitIntensityDataExtracted(const std::vector<float>& intensityValues)
+    {
         emit intensityDataExtracted(intensityValues);
     }
 
-    void emitColorDataExtracted(const std::vector<uint8_t>& colorValues) {
+    void emitColorDataExtracted(const std::vector<uint8_t>& colorValues)
+    {
         emit colorDataExtracted(colorValues);
     }
 
     // Test helper methods to set up common scenarios
-    void setupSuccessfulParsing(const std::vector<float>& testPoints = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}) {
+    void setupSuccessfulParsing(const std::vector<float>& testPoints = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f})
+    {
         using ::testing::_;
-        using ::testing::Return;
         using ::testing::DoAll;
         using ::testing::InvokeWithoutArgs;
+        using ::testing::Return;
 
-        ON_CALL(*this, openFile(_))
-            .WillByDefault(Return(true));
-        
-        ON_CALL(*this, isOpen())
-            .WillByDefault(Return(true));
-        
-        ON_CALL(*this, extractPointData(_))
-            .WillByDefault(Return(testPoints));
-        
-        ON_CALL(*this, getLastError())
-            .WillByDefault(Return(QString()));
-        
-        ON_CALL(*this, getScanCount())
-            .WillByDefault(Return(1));
-        
-        ON_CALL(*this, getPointCount(_))
-            .WillByDefault(Return(testPoints.size() / 3));
+        ON_CALL(*this, openFile(_)).WillByDefault(Return(true));
+
+        ON_CALL(*this, isOpen()).WillByDefault(Return(true));
+
+        ON_CALL(*this, extractPointData(_)).WillByDefault(Return(testPoints));
+
+        ON_CALL(*this, getLastError()).WillByDefault(Return(QString()));
+
+        ON_CALL(*this, getScanCount()).WillByDefault(Return(1));
+
+        ON_CALL(*this, getPointCount(_)).WillByDefault(Return(testPoints.size() / 3));
     }
 
-    void setupFailedParsing(const QString& errorMessage = "Mock parsing error") {
+    void setupFailedParsing(const QString& errorMessage = "Mock parsing error")
+    {
         using ::testing::_;
         using ::testing::Return;
 
-        ON_CALL(*this, openFile(_))
-            .WillByDefault(Return(false));
-        
-        ON_CALL(*this, isOpen())
-            .WillByDefault(Return(false));
-        
-        ON_CALL(*this, extractPointData(_))
-            .WillByDefault(Return(std::vector<float>()));
-        
-        ON_CALL(*this, getLastError())
-            .WillByDefault(Return(errorMessage));
-        
-        ON_CALL(*this, getScanCount())
-            .WillByDefault(Return(0));
-        
-        ON_CALL(*this, getPointCount(_))
-            .WillByDefault(Return(0));
+        ON_CALL(*this, openFile(_)).WillByDefault(Return(false));
+
+        ON_CALL(*this, isOpen()).WillByDefault(Return(false));
+
+        ON_CALL(*this, extractPointData(_)).WillByDefault(Return(std::vector<float>()));
+
+        ON_CALL(*this, getLastError()).WillByDefault(Return(errorMessage));
+
+        ON_CALL(*this, getScanCount()).WillByDefault(Return(0));
+
+        ON_CALL(*this, getPointCount(_)).WillByDefault(Return(0));
     }
 
-    void setupValidFile(const QString& filePath, bool isValid = true) {
+    void setupValidFile(const QString& filePath, bool isValid = true)
+    {
         using ::testing::_;
         using ::testing::Return;
 
-        ON_CALL(*this, isValidE57File(filePath))
-            .WillByDefault(Return(isValid));
+        ON_CALL(*this, isValidE57File(filePath)).WillByDefault(Return(isValid));
     }
 
-    void setupMetadata(const std::string& guid = "test-guid", 
-                      const std::pair<int, int>& version = {1, 0},
-                      int scanCount = 1) {
+    void
+    setupMetadata(const std::string& guid = "test-guid", const std::pair<int, int>& version = {1, 0}, int scanCount = 1)
+    {
         using ::testing::Return;
 
-        ON_CALL(*this, getGuid())
-            .WillByDefault(Return(guid));
-        
-        ON_CALL(*this, getVersion())
-            .WillByDefault(Return(version));
-        
-        ON_CALL(*this, getScanCount())
-            .WillByDefault(Return(scanCount));
+        ON_CALL(*this, getGuid()).WillByDefault(Return(guid));
+
+        ON_CALL(*this, getVersion()).WillByDefault(Return(version));
+
+        ON_CALL(*this, getScanCount()).WillByDefault(Return(scanCount));
     }
 
-    void setupScanMetadata(int scanIndex, const ScanMetadata& metadata) {
+    void setupScanMetadata(int scanIndex, const ScanMetadata& metadata)
+    {
         using ::testing::Return;
 
-        ON_CALL(*this, getScanMetadata(scanIndex))
-            .WillByDefault(Return(metadata));
+        ON_CALL(*this, getScanMetadata(scanIndex)).WillByDefault(Return(metadata));
     }
 
     // Create test scan metadata
-    static ScanMetadata createTestScanMetadata(int index = 0, 
-                                             const QString& name = "Test Scan",
-                                             int64_t pointCount = 100) {
+    static ScanMetadata
+    createTestScanMetadata(int index = 0, const QString& name = "Test Scan", int64_t pointCount = 100)
+    {
         ScanMetadata metadata;
         metadata.index = index;
         metadata.name = name;
@@ -165,25 +160,29 @@ public:
     }
 
     // Create test point data
-    static std::vector<float> createTestPointData(int numPoints = 10) {
+    static std::vector<float> createTestPointData(int numPoints = 10)
+    {
         std::vector<float> points;
         points.reserve(numPoints * 3);
-        
-        for (int i = 0; i < numPoints; ++i) {
+
+        for (int i = 0; i < numPoints; ++i)
+        {
             points.push_back(static_cast<float>(i));      // x
             points.push_back(static_cast<float>(i + 1));  // y
             points.push_back(static_cast<float>(i + 2));  // z
         }
-        
+
         return points;
     }
 
     // Create test enhanced point data
-    static std::vector<PointData> createTestEnhancedPointData(int numPoints = 10) {
+    static std::vector<PointData> createTestEnhancedPointData(int numPoints = 10)
+    {
         std::vector<PointData> points;
         points.reserve(numPoints);
-        
-        for (int i = 0; i < numPoints; ++i) {
+
+        for (int i = 0; i < numPoints; ++i)
+        {
             PointData point;
             point.x = static_cast<float>(i);
             point.y = static_cast<float>(i + 1);
@@ -194,9 +193,9 @@ public:
             point.colorBlue = static_cast<uint8_t>((i + 2) % 256);
             points.push_back(point);
         }
-        
+
         return points;
     }
 };
 
-#endif // MOCKE57PARSER_H
+#endif  // MOCKE57PARSER_H

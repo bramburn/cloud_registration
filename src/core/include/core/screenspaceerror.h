@@ -10,7 +10,8 @@ struct ViewportInfo;
 /**
  * @brief ViewportInfo - Information about the current viewport
  */
-struct ViewportInfo {
+struct ViewportInfo
+{
     int width = 1920;
     int height = 1080;
     float fov = 45.0f;
@@ -24,7 +25,8 @@ struct ViewportInfo {
  * Provides methods for calculating screen space error for octree nodes and determining
  * when to cull or stop recursion based on error thresholds.
  */
-class ScreenSpaceErrorCalculator {
+class ScreenSpaceErrorCalculator
+{
 public:
     /**
      * @brief Calculate screen space error for an AABB
@@ -33,10 +35,9 @@ public:
      * @param viewport Viewport information
      * @return Screen space error value
      */
-    static float calculateAABBScreenSpaceError(
-        const AxisAlignedBoundingBox& bounds,
-        const QMatrix4x4& mvpMatrix,
-        const ViewportInfo& viewport);
+    static float calculateAABBScreenSpaceError(const AxisAlignedBoundingBox& bounds,
+                                               const QMatrix4x4& mvpMatrix,
+                                               const ViewportInfo& viewport);
 
     /**
      * @brief Determine if a node should be culled based on error threshold
@@ -61,4 +62,4 @@ private:
 // Legacy compatibility
 using ScreenSpaceError = ScreenSpaceErrorCalculator;
 
-#endif // SCREENSPACEERROR_H
+#endif  // SCREENSPACEERROR_H

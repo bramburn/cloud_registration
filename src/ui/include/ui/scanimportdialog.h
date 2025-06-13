@@ -1,23 +1,23 @@
 #ifndef SCANIMPORTDIALOG_H
 #define SCANIMPORTDIALOG_H
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
-#include <QVBoxLayout>
+#include <QFileDialog>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPushButton>
-#include <QFileDialog>
 #include <QListWidget>
 #include <QProgressBar>
-#include <QCheckBox>
-#include <QGroupBox>
+#include <QPushButton>
 #include <QSpinBox>
-#include <QComboBox>
+#include <QVBoxLayout>
 
 /**
  * @brief Dialog for importing scans into a project
- * 
+ *
  * This dialog allows users to:
  * - Select scan files (E57, LAS, etc.)
  * - Configure import settings
@@ -29,7 +29,7 @@ class ScanImportDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit ScanImportDialog(QWidget *parent = nullptr);
+    explicit ScanImportDialog(QWidget* parent = nullptr);
     ~ScanImportDialog();
 
     /**
@@ -42,7 +42,8 @@ public:
      * @brief Get import settings configured by user
      * @return Import configuration
      */
-    struct ImportSettings {
+    struct ImportSettings
+    {
         bool enableLOD = true;
         float lodThreshold = 0.1f;
         bool preserveColors = true;
@@ -50,7 +51,7 @@ public:
         int maxPointsPerScan = 1000000;
         QString targetCoordinateSystem;
     };
-    
+
     ImportSettings getImportSettings() const;
 
     /**
@@ -105,14 +106,14 @@ private:
 
     // UI Components
     QVBoxLayout* m_mainLayout;
-    
+
     // File selection area
     QGroupBox* m_fileSelectionGroup;
     QListWidget* m_fileList;
     QPushButton* m_addFilesButton;
     QPushButton* m_removeFileButton;
     QPushButton* m_clearAllButton;
-    
+
     // Import settings area
     QGroupBox* m_settingsGroup;
     QCheckBox* m_enableLODCheckbox;
@@ -121,18 +122,18 @@ private:
     QCheckBox* m_preserveIntensityCheckbox;
     QSpinBox* m_maxPointsSpinBox;
     QComboBox* m_coordinateSystemCombo;
-    
+
     // Progress area
     QGroupBox* m_progressGroup;
     QProgressBar* m_progressBar;
     QLabel* m_progressLabel;
     QLabel* m_currentFileLabel;
-    
+
     // Dialog buttons
     QHBoxLayout* m_buttonLayout;
     QPushButton* m_importButton;
     QPushButton* m_cancelButton;
-    
+
     // State
     QString m_projectPath;
     QStringList m_selectedFiles;
@@ -140,4 +141,4 @@ private:
     bool m_importInProgress;
 };
 
-#endif // SCANIMPORTDIALOG_H
+#endif  // SCANIMPORTDIALOG_H

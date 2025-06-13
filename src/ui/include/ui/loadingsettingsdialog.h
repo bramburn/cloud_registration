@@ -1,17 +1,18 @@
 #ifndef LOADINGSETTINGSDIALOG_H
 #define LOADINGSETTINGSDIALOG_H
 
-#include <QDialog>
+#include <QCheckBox>
 #include <QComboBox>
-#include <QPushButton>
-#include <QVBoxLayout>
+#include <QDialog>
+#include <QDoubleSpinBox>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QSettings>
-#include <QDoubleSpinBox>
 #include <QSpinBox>
-#include <QGroupBox>
-#include <QCheckBox>
+#include <QVBoxLayout>
+
 #include "core/loadingsettings.h"
 
 class LoadingSettingsDialog : public QDialog
@@ -19,7 +20,7 @@ class LoadingSettingsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit LoadingSettingsDialog(QWidget *parent = nullptr);
+    explicit LoadingSettingsDialog(QWidget* parent = nullptr);
     ~LoadingSettingsDialog();
 
     // Public method to retrieve the currently configured loading settings
@@ -45,34 +46,34 @@ private:
     void setupUI();
 
     // UI Components
-    QComboBox *m_methodComboBox;
-    QPushButton *m_applyButton;
-    QPushButton *m_okButton;
-    QPushButton *m_cancelButton;
-    QVBoxLayout *m_mainLayout;
-    QHBoxLayout *m_buttonLayout;
-    QLabel *m_methodLabel;
+    QComboBox* m_methodComboBox;
+    QPushButton* m_applyButton;
+    QPushButton* m_okButton;
+    QPushButton* m_cancelButton;
+    QVBoxLayout* m_mainLayout;
+    QHBoxLayout* m_buttonLayout;
+    QLabel* m_methodLabel;
 
     // Voxel Grid specific controls
-    QGroupBox *m_voxelParametersGroup;
-    QVBoxLayout *m_voxelParametersLayout;
-    QLabel *m_leafSizeLabel;
-    QDoubleSpinBox *m_leafSizeSpinBox;
-    QLabel *m_minPointsLabel;
-    QSpinBox *m_minPointsSpinBox;
+    QGroupBox* m_voxelParametersGroup;
+    QVBoxLayout* m_voxelParametersLayout;
+    QLabel* m_leafSizeLabel;
+    QDoubleSpinBox* m_leafSizeSpinBox;
+    QLabel* m_minPointsLabel;
+    QSpinBox* m_minPointsSpinBox;
 
     // File type specific controls (Sprint 1.4)
-    QGroupBox *m_e57Group;
-    QGroupBox *m_lasGroup;
-    QCheckBox *m_e57TransformCheck;
-    QCheckBox *m_e57LoadColorsCheck;
-    QCheckBox *m_lasValidateCheck;
-    QCheckBox *m_lasLoadIntensityCheck;
-    QCheckBox *m_lasLoadColorsCheck;
+    QGroupBox* m_e57Group;
+    QGroupBox* m_lasGroup;
+    QCheckBox* m_e57TransformCheck;
+    QCheckBox* m_e57LoadColorsCheck;
+    QCheckBox* m_lasValidateCheck;
+    QCheckBox* m_lasLoadIntensityCheck;
+    QCheckBox* m_lasLoadColorsCheck;
 
     // Internal state
     LoadingSettings m_currentSettings;
     QSettings m_qSettings;
 };
 
-#endif // LOADINGSETTINGSDIALOG_H
+#endif  // LOADINGSETTINGSDIALOG_H

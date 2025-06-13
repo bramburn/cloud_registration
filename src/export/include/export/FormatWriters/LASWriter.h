@@ -1,14 +1,16 @@
 #ifndef LASWRITER_H
 #define LASWRITER_H
 
-#include "../IFormatWriter.h"
-#include <QFile>
 #include <QDataStream>
+#include <QFile>
+
 #include <memory>
+
+#include "../IFormatWriter.h"
 
 /**
  * @brief LAS format writer implementation
- * 
+ *
  * Sprint 6 User Story 1: Multi-Format Point Cloud Export
  * This class implements LAS format export functionality.
  * For Sprint 7, this is a simplified implementation.
@@ -24,14 +26,29 @@ public:
     bool writeHeader(const HeaderInfo& info) override;
     bool writePoint(const Point& point) override;
     bool close() override;
-    
-    QString getFileExtension() const override { return "las"; }
-    QString getFormatDescription() const override { return "LAS Point Cloud Format"; }
-    bool supportsColor() const override { return true; }
-    bool supportsIntensity() const override { return true; }
-    
+
+    QString getFileExtension() const override
+    {
+        return "las";
+    }
+    QString getFormatDescription() const override
+    {
+        return "LAS Point Cloud Format";
+    }
+    bool supportsColor() const override
+    {
+        return true;
+    }
+    bool supportsIntensity() const override
+    {
+        return true;
+    }
+
     // Error handling
-    QString getLastError() const { return lastError_; }
+    QString getLastError() const
+    {
+        return lastError_;
+    }
 
 private:
     std::unique_ptr<QFile> file_;
@@ -40,11 +57,11 @@ private:
     HeaderInfo headerInfo_;
     size_t pointsWritten_;
     bool isOpen_;
-    
+
     void setError(const QString& error);
     void clearError();
     bool writeLASHeader();
     void updateHeaderPointCount();
 };
 
-#endif // LASWRITER_H
+#endif  // LASWRITER_H

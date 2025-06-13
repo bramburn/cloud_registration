@@ -1,20 +1,21 @@
 #pragma once
 
-#include <QObject>
-#include <QMatrix4x4>
-#include <QVector3D>
 #include <QList>
+#include <QMatrix4x4>
+#include <QObject>
 #include <QPair>
 #include <QTimer>
+#include <QVector3D>
+
 #include "ErrorAnalysis.h"
 
 /**
  * @brief AlignmentEngine - High-level coordination for manual alignment workflow
- * 
+ *
  * This class orchestrates the manual alignment process by managing correspondence
  * points, computing transformations, and providing real-time feedback. It serves
  * as the central coordinator between the UI, algorithms, and visualization components.
- * 
+ *
  * Sprint 4 Requirements:
  * - Manages correspondence point pairs for alignment
  * - Provides real-time transformation computation and preview
@@ -31,29 +32,34 @@ public:
     /**
      * @brief Alignment state enumeration
      */
-    enum class AlignmentState {
-        Idle,           ///< No correspondences defined
-        Insufficient,   ///< Less than 3 correspondences
-        Computing,      ///< Transformation computation in progress
-        Valid,          ///< Valid transformation computed
-        Error           ///< Error in computation
+    enum class AlignmentState
+    {
+        Idle,          ///< No correspondences defined
+        Insufficient,  ///< Less than 3 correspondences
+        Computing,     ///< Transformation computation in progress
+        Valid,         ///< Valid transformation computed
+        Error          ///< Error in computation
     };
 
     /**
      * @brief Alignment result structure
      */
-    struct AlignmentResult {
+    struct AlignmentResult
+    {
         QMatrix4x4 transformation;                    ///< Computed transformation matrix
-        ErrorAnalysis::ErrorStatistics errorStats;   ///< Comprehensive error analysis
+        ErrorAnalysis::ErrorStatistics errorStats;    ///< Comprehensive error analysis
         AlignmentState state = AlignmentState::Idle;  ///< Current alignment state
         QString message;                              ///< Status or error message
         qint64 computationTimeMs = 0;                 ///< Computation time in milliseconds
-        
+
         /**
          * @brief Check if alignment result is valid for application
          * @return true if transformation can be safely applied
          */
-        bool isValid() const { return state == AlignmentState::Valid; }
+        bool isValid() const
+        {
+            return state == AlignmentState::Valid;
+        }
     };
 
 public:
@@ -90,13 +96,16 @@ public:
      * @brief Get current correspondence list
      * @return List of correspondence pairs
      */
-    const QList<QPair<QVector3D, QVector3D>>& getCorrespondences() const { return m_correspondences; }
+    const QList<QPair<QVector3D, QVector3D>>& getCorrespondences() const
+    {
+        return m_correspondences;
+    }
 
     // --- Alignment Computation ---
 
     /**
      * @brief Trigger alignment computation with current correspondences
-     * 
+     *
      * Computes transformation and emits signals for real-time update.
      * Computation is performed asynchronously to maintain UI responsiveness.
      */
@@ -106,19 +115,28 @@ public:
      * @brief Get the most recent alignment result
      * @return Current alignment result with transformation and quality metrics
      */
-    const AlignmentResult& getCurrentResult() const { return m_currentResult; }
+    const AlignmentResult& getCurrentResult() const
+    {
+        return m_currentResult;
+    }
 
     /**
      * @brief Get current transformation matrix
      * @return 4x4 transformation matrix (identity if no valid alignment)
      */
-    QMatrix4x4 getCurrentTransformation() const { return m_currentResult.transformation; }
+    QMatrix4x4 getCurrentTransformation() const
+    {
+        return m_currentResult.transformation;
+    }
 
     /**
      * @brief Get current RMS error
      * @return RMS error in mm (0 if no valid alignment)
      */
-    float getCurrentRMSError() const { return m_currentResult.errorStats.rmsError; }
+    float getCurrentRMSError() const
+    {
+        return m_currentResult.errorStats.rmsError;
+    }
 
     // --- Configuration ---
 
@@ -126,13 +144,19 @@ public:
      * @brief Enable/disable automatic recomputation on correspondence changes
      * @param enabled If true, alignment recomputes automatically when correspondences change
      */
-    void setAutoRecompute(bool enabled) { m_autoRecompute = enabled; }
+    void setAutoRecompute(bool enabled)
+    {
+        m_autoRecompute = enabled;
+    }
 
     /**
      * @brief Check if auto-recomputation is enabled
      * @return true if automatic recomputation is enabled
      */
-    bool isAutoRecompute() const { return m_autoRecompute; }
+    bool isAutoRecompute() const
+    {
+        return m_autoRecompute;
+    }
 
     /**
      * @brief Set quality thresholds for validation
@@ -204,15 +228,15 @@ private:
     AlignmentResult m_currentResult;                       ///< Most recent alignment result
 
     // Configuration
-    bool m_autoRecompute = true;                          ///< Auto-recompute on changes
-    float m_rmsThreshold = 5.0f;                          ///< RMS error threshold (mm)
-    float m_maxErrorThreshold = 10.0f;                    ///< Max individual error threshold (mm)
+    bool m_autoRecompute = true;        ///< Auto-recompute on changes
+    float m_rmsThreshold = 5.0f;        ///< RMS error threshold (mm)
+    float m_maxErrorThreshold = 10.0f;  ///< Max individual error threshold (mm)
 
     // Async computation
-    QTimer* m_computationTimer;                           ///< Timer for async computation
-    bool m_computationPending = false;                    ///< Computation request pending
+    QTimer* m_computationTimer;         ///< Timer for async computation
+    bool m_computationPending = false;  ///< Computation request pending
 
     // Constants
-    static constexpr int COMPUTATION_DELAY_MS = 100;      ///< Delay before computation (ms)
-    static constexpr int MIN_CORRESPONDENCES = 3;         ///< Minimum correspondences required
+    static constexpr int COMPUTATION_DELAY_MS = 100;  ///< Delay before computation (ms)
+    static constexpr int MIN_CORRESPONDENCES = 3;     ///< Minimum correspondences required
 };

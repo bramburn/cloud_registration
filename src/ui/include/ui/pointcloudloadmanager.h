@@ -3,25 +3,30 @@
 
 #include <QObject>
 #include <QString>
+
 #include <vector>
 
 /**
  * @brief PointCloudLoadManager - Manages point cloud loading operations
- * 
+ *
  * This is a stub implementation for Sprint 1 to resolve compilation issues.
  * Full implementation will be added in future sprints.
  */
-class PointCloudLoadManager : public QObject {
+class PointCloudLoadManager : public QObject
+{
     Q_OBJECT
 
 public:
-    explicit PointCloudLoadManager(QObject *parent = nullptr);
+    explicit PointCloudLoadManager(QObject* parent = nullptr);
     virtual ~PointCloudLoadManager() = default;
 
     // Basic loading methods
     void loadPointCloud(const QString& filePath);
     void cancelLoading();
-    bool isLoading() const { return m_isLoading; }
+    bool isLoading() const
+    {
+        return m_isLoading;
+    }
 
     // Sprint 4: Sidebar integration methods
     bool loadScan(const QString& scanId);
@@ -36,7 +41,7 @@ signals:
 
 private:
     bool m_isLoading = false;
-    QStringList m_loadedScans; // Track loaded scans
+    QStringList m_loadedScans;  // Track loaded scans
 };
 
-#endif // POINTCLOUDLOADMANAGER_H
+#endif  // POINTCLOUDLOADMANAGER_H

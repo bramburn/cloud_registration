@@ -1,14 +1,16 @@
 #ifndef E57WRITER_H
 #define E57WRITER_H
 
-#include "../IFormatWriter.h"
 #include <QFile>
 #include <QTextStream>
+
 #include <memory>
+
+#include "../IFormatWriter.h"
 
 /**
  * @brief E57 format writer implementation
- * 
+ *
  * Sprint 6 User Story 1: Multi-Format Point Cloud Export
  * This class implements E57 format export functionality.
  * For Sprint 7, this is a stub implementation that will be enhanced
@@ -25,14 +27,29 @@ public:
     bool writeHeader(const HeaderInfo& info) override;
     bool writePoint(const Point& point) override;
     bool close() override;
-    
-    QString getFileExtension() const override { return "e57"; }
-    QString getFormatDescription() const override { return "E57 Point Cloud Format"; }
-    bool supportsColor() const override { return true; }
-    bool supportsIntensity() const override { return true; }
-    
+
+    QString getFileExtension() const override
+    {
+        return "e57";
+    }
+    QString getFormatDescription() const override
+    {
+        return "E57 Point Cloud Format";
+    }
+    bool supportsColor() const override
+    {
+        return true;
+    }
+    bool supportsIntensity() const override
+    {
+        return true;
+    }
+
     // Error handling
-    QString getLastError() const { return lastError_; }
+    QString getLastError() const
+    {
+        return lastError_;
+    }
 
 private:
     std::unique_ptr<QFile> file_;
@@ -41,9 +58,9 @@ private:
     HeaderInfo headerInfo_;
     size_t pointsWritten_;
     bool isOpen_;
-    
+
     void setError(const QString& error);
     void clearError();
 };
 
-#endif // E57WRITER_H
+#endif  // E57WRITER_H

@@ -1,14 +1,15 @@
 #ifndef MAINVIEWADAPTER_H
 #define MAINVIEWADAPTER_H
 
-#include "IMainView.h"
 #include <QObject>
+
+#include "IMainView.h"
 
 class MainWindow;
 
 /**
  * @brief Adapter class that implements IMainView interface and delegates to MainWindow
- * 
+ *
  * This adapter solves the multiple inheritance problem by using composition instead.
  * It implements the IMainView interface and forwards all calls to the actual MainWindow.
  * This allows MainWindow to remain a pure QMainWindow while still providing the
@@ -40,7 +41,8 @@ public:
     void updateMemoryUsage(size_t totalBytes) override;
     void updateRenderingStats(float fps, int visiblePoints) override;
     QString askForOpenFilePath(const QString& title, const QString& filter) override;
-    QString askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
+    QString
+    askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
     bool askForConfirmation(const QString& title, const QString& message) override;
 
 signals:
@@ -57,4 +59,4 @@ private:
     MainWindow* m_mainWindow;  // Not owned by this class
 };
 
-#endif // MAINVIEWADAPTER_H
+#endif  // MAINVIEWADAPTER_H

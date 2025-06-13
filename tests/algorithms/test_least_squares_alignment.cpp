@@ -1,8 +1,9 @@
-#include <QtTest/QtTest>
-#include <QVector3D>
-#include <QMatrix4x4>
 #include <QList>
+#include <QMatrix4x4>
 #include <QPair>
+#include <QVector3D>
+#include <QtTest/QtTest>
+
 #include <cmath>
 
 // Include the class under test
@@ -10,7 +11,7 @@
 
 /**
  * @brief Unit tests for LeastSquaresAlignment class
- * 
+ *
  * Tests the core least-squares transformation computation algorithm
  * with various scenarios including perfect alignment, noisy data,
  * and edge cases.
@@ -43,14 +44,13 @@ private slots:
 
 private:
     // Helper methods
-    QList<QPair<QVector3D, QVector3D>> createTestCorrespondences(
-        const QList<QVector3D>& sourcePoints,
-        const QMatrix4x4& knownTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> createTestCorrespondences(const QList<QVector3D>& sourcePoints,
+                                                                 const QMatrix4x4& knownTransform);
+
     bool isTransformationClose(const QMatrix4x4& computed, const QMatrix4x4& expected, float tolerance = 1e-3f);
     QMatrix4x4 createRotationMatrix(float angleX, float angleY, float angleZ);
     QMatrix4x4 createTranslationMatrix(float x, float y, float z);
-    
+
     // Test data
     QList<QVector3D> m_testPoints;
     static constexpr float TOLERANCE = 1e-3f;
@@ -59,15 +59,13 @@ private:
 void TestLeastSquaresAlignment::initTestCase()
 {
     qDebug() << "Starting LeastSquaresAlignment tests";
-    
+
     // Create a set of test points that are not collinear
-    m_testPoints = {
-        QVector3D(0.0f, 0.0f, 0.0f),
-        QVector3D(1.0f, 0.0f, 0.0f),
-        QVector3D(0.0f, 1.0f, 0.0f),
-        QVector3D(0.0f, 0.0f, 1.0f),
-        QVector3D(1.0f, 1.0f, 1.0f)
-    };
+    m_testPoints = {QVector3D(0.0f, 0.0f, 0.0f),
+                    QVector3D(1.0f, 0.0f, 0.0f),
+                    QVector3D(0.0f, 1.0f, 0.0f),
+                    QVector3D(0.0f, 0.0f, 1.0f),
+                    QVector3D(1.0f, 1.0f, 1.0f)};
 }
 
 void TestLeastSquaresAlignment::cleanupTestCase()
@@ -78,143 +76,132 @@ void TestLeastSquaresAlignment::cleanupTestCase()
 void TestLeastSquaresAlignment::testPerfectAlignment()
 {
     qDebug() << "Testing perfect alignment (identity transformation)";
-    
+
     // Create correspondences with identical points
     QList<QPair<QVector3D, QVector3D>> correspondences;
-    for (const QVector3D& point : m_testPoints) {
+    for (const QVector3D& point : m_testPoints)
+    {
         correspondences.append(qMakePair(point, point));
     }
-    
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
+
     // Should be identity matrix
     QMatrix4x4 identity;
     identity.setToIdentity();
-    
-    QVERIFY2(isTransformationClose(result, identity), 
-             "Perfect alignment should produce identity transformation");
+
+    QVERIFY2(isTransformationClose(result, identity), "Perfect alignment should produce identity transformation");
 }
 
 void TestLeastSquaresAlignment::testTranslationOnly()
 {
     qDebug() << "Testing translation-only transformation";
-    
+
     QVector3D translation(5.0f, -3.0f, 2.0f);
     QMatrix4x4 expectedTransform = createTranslationMatrix(translation.x(), translation.y(), translation.z());
-    
+
     // Create correspondences with known translation
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(m_testPoints, expectedTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
-    QVERIFY2(isTransformationClose(result, expectedTransform), 
+
+    QVERIFY2(isTransformationClose(result, expectedTransform),
              "Translation-only transformation should be computed accurately");
 }
 
 void TestLeastSquaresAlignment::testRotationOnly()
 {
     qDebug() << "Testing rotation-only transformation";
-    
+
     // 45-degree rotation around Z-axis
     QMatrix4x4 expectedTransform = createRotationMatrix(0.0f, 0.0f, 45.0f);
-    
+
     // Create correspondences with known rotation
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(m_testPoints, expectedTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
-    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f), 
+
+    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f),
              "Rotation-only transformation should be computed accurately");
 }
 
 void TestLeastSquaresAlignment::testCombinedTransformation()
 {
     qDebug() << "Testing combined rotation and translation";
-    
+
     // Create combined transformation
     QMatrix4x4 rotation = createRotationMatrix(30.0f, 45.0f, 60.0f);
     QMatrix4x4 translation = createTranslationMatrix(2.0f, -1.5f, 3.0f);
     QMatrix4x4 expectedTransform = translation * rotation;
-    
+
     // Create correspondences
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(m_testPoints, expectedTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
-    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f), 
+
+    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f),
              "Combined transformation should be computed accurately");
 }
 
 void TestLeastSquaresAlignment::testNoisyData()
 {
     qDebug() << "Testing alignment with noisy data";
-    
+
     QMatrix4x4 expectedTransform = createTranslationMatrix(1.0f, 2.0f, 3.0f);
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(m_testPoints, expectedTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
+
     // Add small amount of noise to target points
-    for (auto& pair : correspondences) {
-        pair.second += QVector3D(0.01f, -0.01f, 0.005f); // 1cm noise
+    for (auto& pair : correspondences)
+    {
+        pair.second += QVector3D(0.01f, -0.01f, 0.005f);  // 1cm noise
     }
-    
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
+
     // Should be close to expected (within noise tolerance)
-    QVERIFY2(isTransformationClose(result, expectedTransform, 0.1f), 
+    QVERIFY2(isTransformationClose(result, expectedTransform, 0.1f),
              "Noisy data should still produce reasonable transformation");
 }
 
 void TestLeastSquaresAlignment::testMinimumCorrespondences()
 {
     qDebug() << "Testing with minimum number of correspondences (3 points)";
-    
+
     QList<QVector3D> minPoints = {
-        QVector3D(0.0f, 0.0f, 0.0f),
-        QVector3D(1.0f, 0.0f, 0.0f),
-        QVector3D(0.0f, 1.0f, 0.0f)
-    };
-    
+        QVector3D(0.0f, 0.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f)};
+
     QMatrix4x4 expectedTransform = createTranslationMatrix(2.0f, 3.0f, 4.0f);
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(minPoints, expectedTransform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(minPoints, expectedTransform);
+
     // Compute transformation
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
-    QVERIFY2(isTransformationClose(result, expectedTransform), 
+
+    QVERIFY2(isTransformationClose(result, expectedTransform),
              "Minimum correspondences should produce exact transformation");
 }
 
 void TestLeastSquaresAlignment::testCollinearPoints()
 {
     qDebug() << "Testing with collinear points (degenerate case)";
-    
-    QList<QVector3D> collinearPoints = {
-        QVector3D(0.0f, 0.0f, 0.0f),
-        QVector3D(1.0f, 0.0f, 0.0f),
-        QVector3D(2.0f, 0.0f, 0.0f),
-        QVector3D(3.0f, 0.0f, 0.0f)
-    };
-    
+
+    QList<QVector3D> collinearPoints = {QVector3D(0.0f, 0.0f, 0.0f),
+                                        QVector3D(1.0f, 0.0f, 0.0f),
+                                        QVector3D(2.0f, 0.0f, 0.0f),
+                                        QVector3D(3.0f, 0.0f, 0.0f)};
+
     QMatrix4x4 transform = createTranslationMatrix(1.0f, 1.0f, 1.0f);
-    QList<QPair<QVector3D, QVector3D>> correspondences = 
-        createTestCorrespondences(collinearPoints, transform);
-    
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(collinearPoints, transform);
+
     // Should handle gracefully (may not be perfectly accurate due to degeneracy)
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
-    
+
     // Just verify it doesn't crash and produces a valid matrix
-    QVERIFY2(!result.isIdentity() || transform.isIdentity(), 
-             "Collinear points should be handled gracefully");
+    QVERIFY2(!result.isIdentity() || transform.isIdentity(), "Collinear points should be handled gracefully");
 }
 
 void TestLeastSquaresAlignment::testEmptyCorrespondences()
@@ -229,8 +216,7 @@ void TestLeastSquaresAlignment::testEmptyCorrespondences()
     QMatrix4x4 identity;
     identity.setToIdentity();
 
-    QVERIFY2(isTransformationClose(result, identity),
-             "Empty correspondences should return identity matrix");
+    QVERIFY2(isTransformationClose(result, identity), "Empty correspondences should return identity matrix");
 }
 
 void TestLeastSquaresAlignment::testDuplicatePoints()
@@ -242,7 +228,7 @@ void TestLeastSquaresAlignment::testDuplicatePoints()
 
     // Add duplicate source points
     duplicateCorrespondences.append(qMakePair(duplicate, QVector3D(1, 0, 0)));
-    duplicateCorrespondences.append(qMakePair(duplicate, QVector3D(2, 0, 0))); // Duplicate source
+    duplicateCorrespondences.append(qMakePair(duplicate, QVector3D(2, 0, 0)));  // Duplicate source
     duplicateCorrespondences.append(qMakePair(QVector3D(1, 0, 0), QVector3D(3, 0, 0)));
 
     // Should handle gracefully (return identity or valid transformation)
@@ -256,11 +242,11 @@ void TestLeastSquaresAlignment::testLargeTranslations()
 {
     qDebug() << "Testing with large translations";
 
-    QVector3D largeTranslation(1000.0f, -500.0f, 2000.0f); // Large translation
-    QMatrix4x4 expectedTransform = createTranslationMatrix(largeTranslation.x(), largeTranslation.y(), largeTranslation.z());
+    QVector3D largeTranslation(1000.0f, -500.0f, 2000.0f);  // Large translation
+    QMatrix4x4 expectedTransform =
+        createTranslationMatrix(largeTranslation.x(), largeTranslation.y(), largeTranslation.z());
 
-    QList<QPair<QVector3D, QVector3D>> correspondences =
-        createTestCorrespondences(m_testPoints, expectedTransform);
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
 
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
 
@@ -275,37 +261,31 @@ void TestLeastSquaresAlignment::testSmallRotations()
     // Very small rotation (0.1 degrees around Z-axis)
     QMatrix4x4 expectedTransform = createRotationMatrix(0.0f, 0.0f, 0.1f);
 
-    QList<QPair<QVector3D, QVector3D>> correspondences =
-        createTestCorrespondences(m_testPoints, expectedTransform);
+    QList<QPair<QVector3D, QVector3D>> correspondences = createTestCorrespondences(m_testPoints, expectedTransform);
 
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
 
-    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f),
-             "Small rotations should be computed accurately");
+    QVERIFY2(isTransformationClose(result, expectedTransform, 1e-2f), "Small rotations should be computed accurately");
 }
 
 void TestLeastSquaresAlignment::testReflectionCorrection()
 {
     qDebug() << "Testing reflection correction in SVD";
-    
+
     // Create a case that might produce reflection
     QList<QVector3D> sourcePoints = {
-        QVector3D(1.0f, 0.0f, 0.0f),
-        QVector3D(0.0f, 1.0f, 0.0f),
-        QVector3D(0.0f, 0.0f, 1.0f)
-    };
-    
-    QList<QVector3D> targetPoints = {
-        QVector3D(-1.0f, 0.0f, 0.0f),  // Mirrored
-        QVector3D(0.0f, 1.0f, 0.0f),
-        QVector3D(0.0f, 0.0f, 1.0f)
-    };
-    
+        QVector3D(1.0f, 0.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f), QVector3D(0.0f, 0.0f, 1.0f)};
+
+    QList<QVector3D> targetPoints = {QVector3D(-1.0f, 0.0f, 0.0f),  // Mirrored
+                                     QVector3D(0.0f, 1.0f, 0.0f),
+                                     QVector3D(0.0f, 0.0f, 1.0f)};
+
     QList<QPair<QVector3D, QVector3D>> correspondences;
-    for (int i = 0; i < sourcePoints.size(); ++i) {
+    for (int i = 0; i < sourcePoints.size(); ++i)
+    {
         correspondences.append(qMakePair(sourcePoints[i], targetPoints[i]));
     }
-    
+
     QMatrix4x4 result = LeastSquaresAlignment::computeTransformation(correspondences);
 
     // Check that determinant of rotation part is positive (proper rotation, not reflection)
@@ -315,38 +295,38 @@ void TestLeastSquaresAlignment::testReflectionCorrection()
     float r20 = result(2, 0), r21 = result(2, 1), r22 = result(2, 2);
 
     // Calculate determinant manually
-    float determinant = r00 * (r11 * r22 - r12 * r21) -
-                       r01 * (r10 * r22 - r12 * r20) +
-                       r02 * (r10 * r21 - r11 * r20);
+    float determinant = r00 * (r11 * r22 - r12 * r21) - r01 * (r10 * r22 - r12 * r20) + r02 * (r10 * r21 - r11 * r20);
     QVERIFY2(determinant > 0.5f, "Rotation matrix should have positive determinant (no reflection)");
 }
 
 // Helper method implementations
-QList<QPair<QVector3D, QVector3D>> TestLeastSquaresAlignment::createTestCorrespondences(
-    const QList<QVector3D>& sourcePoints,
-    const QMatrix4x4& knownTransform)
+QList<QPair<QVector3D, QVector3D>>
+TestLeastSquaresAlignment::createTestCorrespondences(const QList<QVector3D>& sourcePoints,
+                                                     const QMatrix4x4& knownTransform)
 {
     QList<QPair<QVector3D, QVector3D>> correspondences;
-    
-    for (const QVector3D& sourcePoint : sourcePoints) {
+
+    for (const QVector3D& sourcePoint : sourcePoints)
+    {
         QVector3D targetPoint = knownTransform.map(sourcePoint);
         correspondences.append(qMakePair(sourcePoint, targetPoint));
     }
-    
+
     return correspondences;
 }
 
-bool TestLeastSquaresAlignment::isTransformationClose(
-    const QMatrix4x4& computed, 
-    const QMatrix4x4& expected, 
-    float tolerance)
+bool TestLeastSquaresAlignment::isTransformationClose(const QMatrix4x4& computed,
+                                                      const QMatrix4x4& expected,
+                                                      float tolerance)
 {
-    for (int row = 0; row < 4; ++row) {
-        for (int col = 0; col < 4; ++col) {
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int col = 0; col < 4; ++col)
+        {
             float diff = std::abs(computed(row, col) - expected(row, col));
-            if (diff > tolerance) {
-                qDebug() << "Matrix difference at (" << row << "," << col << "):" 
-                         << diff << ">" << tolerance;
+            if (diff > tolerance)
+            {
+                qDebug() << "Matrix difference at (" << row << "," << col << "):" << diff << ">" << tolerance;
                 qDebug() << "Computed:" << computed;
                 qDebug() << "Expected:" << expected;
                 return false;

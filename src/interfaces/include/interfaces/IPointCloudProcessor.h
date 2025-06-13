@@ -1,13 +1,14 @@
 #ifndef IPOINTCLOUDPROCESSOR_H
 #define IPOINTCLOUDPROCESSOR_H
 
-#include <vector>
-#include <memory>
 #include <QString>
+
+#include <memory>
+#include <vector>
 
 /**
  * @brief Modern C++ interface for point cloud processing operations
- * 
+ *
  * This interface demonstrates the modern C++ interface pattern recommended
  * in the cmarkguide.md document. It follows best practices:
  * - Pure virtual functions only
@@ -15,25 +16,30 @@
  * - Clear contract definition
  * - Enables dependency injection and testing
  */
-class IPointCloudProcessor {
+class IPointCloudProcessor
+{
 public:
     /**
      * @brief Point data structure for processing
      */
-    struct Point3D {
+    struct Point3D
+    {
         float x, y, z;
         float intensity = 0.0f;
         bool hasIntensity = false;
-        
+
         Point3D(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
-        Point3D(float x_, float y_, float z_, float intensity_) 
-            : x(x_), y(y_), z(z_), intensity(intensity_), hasIntensity(true) {}
+        Point3D(float x_, float y_, float z_, float intensity_)
+            : x(x_), y(y_), z(z_), intensity(intensity_), hasIntensity(true)
+        {
+        }
     };
 
     /**
      * @brief Processing result structure
      */
-    struct ProcessingResult {
+    struct ProcessingResult
+    {
         std::vector<Point3D> processedPoints;
         size_t originalPointCount = 0;
         size_t processedPointCount = 0;
@@ -54,9 +60,8 @@ public:
      * @param parameters Algorithm-specific parameters
      * @return Processing result with output data and metrics
      */
-    virtual ProcessingResult processPointCloud(
-        const std::vector<Point3D>& points,
-        const QString& parameters = QString()) = 0;
+    virtual ProcessingResult processPointCloud(const std::vector<Point3D>& points,
+                                               const QString& parameters = QString()) = 0;
 
     /**
      * @brief Get the name/type of this processor
@@ -93,10 +98,11 @@ public:
 
 /**
  * @brief Factory interface for creating point cloud processors
- * 
+ *
  * This demonstrates the Factory pattern combined with modern interfaces
  */
-class IPointCloudProcessorFactory {
+class IPointCloudProcessorFactory
+{
 public:
     virtual ~IPointCloudProcessorFactory() = default;
 
@@ -105,8 +111,7 @@ public:
      * @param processorType Type of processor to create
      * @return Unique pointer to the processor, or nullptr if type not supported
      */
-    virtual std::unique_ptr<IPointCloudProcessor> createProcessor(
-        const QString& processorType) = 0;
+    virtual std::unique_ptr<IPointCloudProcessor> createProcessor(const QString& processorType) = 0;
 
     /**
      * @brief Get list of supported processor types
@@ -115,4 +120,4 @@ public:
     virtual std::vector<QString> getSupportedProcessorTypes() const = 0;
 };
 
-#endif // IPOINTCLOUDPROCESSOR_H
+#endif  // IPOINTCLOUDPROCESSOR_H

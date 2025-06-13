@@ -7,22 +7,26 @@
 
 /**
  * @brief SQLiteManager - Manages SQLite database operations
- * 
+ *
  * This is a stub implementation for Sprint 1 to resolve compilation issues.
  * Full implementation will be added in future sprints.
  */
-class SQLiteManager : public QObject {
+class SQLiteManager : public QObject
+{
     Q_OBJECT
 
 public:
-    explicit SQLiteManager(QObject *parent = nullptr);
+    explicit SQLiteManager(QObject* parent = nullptr);
     virtual ~SQLiteManager() = default;
 
     // Basic database operations
     bool openDatabase(const QString& databasePath);
     void closeDatabase();
-    bool isOpen() const { return m_isOpen; }
-    
+    bool isOpen() const
+    {
+        return m_isOpen;
+    }
+
     // Project operations
     bool createProject(const QString& projectName, const QString& projectPath);
     bool loadProject(const QString& projectPath);
@@ -39,4 +43,4 @@ private:
     QString m_currentDatabasePath;
 };
 
-#endif // SQLITEMANAGER_H
+#endif  // SQLITEMANAGER_H

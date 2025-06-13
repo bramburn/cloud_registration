@@ -1,14 +1,16 @@
 #ifndef PLYWRITER_H
 #define PLYWRITER_H
 
-#include "../IFormatWriter.h"
 #include <QFile>
 #include <QTextStream>
+
 #include <memory>
+
+#include "../IFormatWriter.h"
 
 /**
  * @brief PLY format writer implementation
- * 
+ *
  * Sprint 6 User Story 1: Multi-Format Point Cloud Export
  * This class implements PLY format export functionality.
  */
@@ -23,14 +25,29 @@ public:
     bool writeHeader(const HeaderInfo& info) override;
     bool writePoint(const Point& point) override;
     bool close() override;
-    
-    QString getFileExtension() const override { return "ply"; }
-    QString getFormatDescription() const override { return "PLY Polygon File Format"; }
-    bool supportsColor() const override { return true; }
-    bool supportsIntensity() const override { return true; }
-    
+
+    QString getFileExtension() const override
+    {
+        return "ply";
+    }
+    QString getFormatDescription() const override
+    {
+        return "PLY Polygon File Format";
+    }
+    bool supportsColor() const override
+    {
+        return true;
+    }
+    bool supportsIntensity() const override
+    {
+        return true;
+    }
+
     // Error handling
-    QString getLastError() const { return lastError_; }
+    QString getLastError() const
+    {
+        return lastError_;
+    }
 
 private:
     std::unique_ptr<QFile> file_;
@@ -40,9 +57,9 @@ private:
     size_t pointsWritten_;
     bool isOpen_;
     bool headerWritten_;
-    
+
     void setError(const QString& error);
     void clearError();
 };
 
-#endif // PLYWRITER_H
+#endif  // PLYWRITER_H

@@ -1,27 +1,28 @@
 #ifndef ICPPROGRESSWIDGET_H
 #define ICPPROGRESSWIDGET_H
 
-#include <QWidget>
-#include <QProgressBar>
-#include <QLabel>
-#include <QPushButton>
-#include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QTimer>
+#include <QLabel>
 #include <QMatrix4x4>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QTimer>
+#include <QVBoxLayout>
+#include <QWidget>
 
 class ICPRegistration;
 
 /**
  * @brief Progress monitoring widget for ICP computation
- * 
+ *
  * Provides real-time feedback during ICP algorithm execution including:
  * - Iteration progress
  * - Current RMS error
  * - Convergence visualization
  * - Cancel functionality
  */
-class ICPProgressWidget : public QWidget {
+class ICPProgressWidget : public QWidget
+{
     Q_OBJECT
 
 public:
@@ -43,7 +44,10 @@ public:
     /**
      * @brief Check if monitoring is currently active
      */
-    bool isMonitoring() const { return m_isMonitoring; }
+    bool isMonitoring() const
+    {
+        return m_isMonitoring;
+    }
 
 public slots:
     /**
@@ -61,8 +65,8 @@ public slots:
      * @param finalRMSError Final RMS error
      * @param iterations Total number of iterations performed
      */
-    void onComputationFinished(bool success, const QMatrix4x4& finalTransformation,
-                              float finalRMSError, int iterations);
+    void
+    onComputationFinished(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
 
 signals:
     /**
@@ -91,34 +95,34 @@ private:
     // UI Components
     QVBoxLayout* m_mainLayout;
     QHBoxLayout* m_buttonLayout;
-    
+
     QLabel* m_titleLabel;
     QLabel* m_statusLabel;
     QLabel* m_iterationLabel;
     QLabel* m_errorLabel;
     QLabel* m_timeLabel;
-    
+
     QProgressBar* m_progressBar;
     QPushButton* m_cancelButton;
     QPushButton* m_closeButton;
-    
+
     // State
     bool m_isMonitoring;
     int m_maxIterations;
     int m_currentIteration;
     float m_currentError;
     float m_initialError;
-    
+
     // Timing
     QTimer* m_elapsedTimer;
     int m_elapsedSeconds;
-    
+
     // Connected ICP algorithm
     ICPRegistration* m_icpAlgorithm;
-    
+
     // Error history for convergence visualization
     QList<float> m_errorHistory;
     static const int MAX_ERROR_HISTORY = 50;
 };
 
-#endif // ICPPROGRESSWIDGET_H
+#endif  // ICPPROGRESSWIDGET_H

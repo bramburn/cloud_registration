@@ -1,26 +1,27 @@
 #pragma once
 
-#include <QWidget>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
 #include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QProgressBar>
 #include <QTextEdit>
-#include <QGroupBox>
-#include <QCheckBox>
+#include <QVBoxLayout>
+#include <QWidget>
+
 #include "registration/AlignmentEngine.h"
 
 /**
  * @brief AlignmentControlPanel - UI controls for manual alignment workflow
- * 
+ *
  * This widget provides comprehensive controls for the manual alignment process,
  * including correspondence management, quality monitoring, and alignment execution.
  * It integrates with AlignmentEngine to provide real-time feedback and control.
- * 
+ *
  * Sprint 4 Requirements:
  * - Display real-time RMS error and quality metrics
  * - Provide controls for alignment parameters and execution
@@ -47,7 +48,10 @@ public:
      * @brief Get current alignment engine
      * @return Pointer to current alignment engine (may be nullptr)
      */
-    AlignmentEngine* getAlignmentEngine() const { return m_alignmentEngine; }
+    AlignmentEngine* getAlignmentEngine() const
+    {
+        return m_alignmentEngine;
+    }
 
 public slots:
     /**

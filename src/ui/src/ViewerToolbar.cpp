@@ -1,31 +1,32 @@
 #include "ViewerToolbar.h"
+
 #include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QWidget>
 #include <QIcon>
 #include <QStyle>
+#include <QVBoxLayout>
+#include <QWidget>
 
 ViewerToolbar::ViewerToolbar(QWidget* parent)
-    : QToolBar(parent)
-    , m_fitToViewAction(nullptr)
-    , m_resetViewAction(nullptr)
-    , m_viewActionGroup(nullptr)
-    , m_topViewAction(nullptr)
-    , m_frontViewAction(nullptr)
-    , m_sideViewAction(nullptr)
-    , m_isometricViewAction(nullptr)
-    , m_pointSizeLabel(nullptr)
-    , m_pointSizeSpinBox(nullptr)
-    , m_lodCheckBox(nullptr)
-    , m_lodQualityLabel(nullptr)
-    , m_lodQualitySlider(nullptr)
-    , m_wireframeCheckBox(nullptr)
-    , m_boundingBoxCheckBox(nullptr)
-    , m_performanceStatsCheckBox(nullptr)
+    : QToolBar(parent),
+      m_fitToViewAction(nullptr),
+      m_resetViewAction(nullptr),
+      m_viewActionGroup(nullptr),
+      m_topViewAction(nullptr),
+      m_frontViewAction(nullptr),
+      m_sideViewAction(nullptr),
+      m_isometricViewAction(nullptr),
+      m_pointSizeLabel(nullptr),
+      m_pointSizeSpinBox(nullptr),
+      m_lodCheckBox(nullptr),
+      m_lodQualityLabel(nullptr),
+      m_lodQualitySlider(nullptr),
+      m_wireframeCheckBox(nullptr),
+      m_boundingBoxCheckBox(nullptr),
+      m_performanceStatsCheckBox(nullptr)
 {
     setObjectName("ViewerToolbar");
     setWindowTitle("3D Viewer Controls");
-    
+
     setupCameraActions();
     addSeparatorWithSpacing();
     setupRenderingControls();
@@ -51,7 +52,7 @@ void ViewerToolbar::setupCameraActions()
 
     // View preset actions
     m_viewActionGroup = new QActionGroup(this);
-    
+
     m_topViewAction = addAction("Top");
     m_topViewAction->setToolTip("Set camera to top view");
     m_topViewAction->setCheckable(true);
@@ -73,7 +74,7 @@ void ViewerToolbar::setupCameraActions()
     m_isometricViewAction = addAction("Isometric");
     m_isometricViewAction->setToolTip("Set camera to isometric view");
     m_isometricViewAction->setCheckable(true);
-    m_isometricViewAction->setChecked(true); // Default view
+    m_isometricViewAction->setChecked(true);  // Default view
     m_viewActionGroup->addAction(m_isometricViewAction);
     connect(m_isometricViewAction, &QAction::triggered, this, &ViewerToolbar::onIsometricView);
 }
@@ -83,14 +84,13 @@ void ViewerToolbar::setupRenderingControls()
     // Point size control
     m_pointSizeLabel = new QLabel("Point Size:");
     addWidget(m_pointSizeLabel);
-    
+
     m_pointSizeSpinBox = new QSpinBox();
     m_pointSizeSpinBox->setRange(1, 20);
     m_pointSizeSpinBox->setValue(2);
     m_pointSizeSpinBox->setToolTip("Adjust point rendering size");
     addWidget(m_pointSizeSpinBox);
-    connect(m_pointSizeSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &ViewerToolbar::onPointSizeChanged);
+    connect(m_pointSizeSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ViewerToolbar::onPointSizeChanged);
 
     addSeparator();
 
@@ -103,7 +103,7 @@ void ViewerToolbar::setupRenderingControls()
 
     m_lodQualityLabel = new QLabel("Quality:");
     addWidget(m_lodQualityLabel);
-    
+
     m_lodQualitySlider = new QSlider(Qt::Horizontal);
     m_lodQualitySlider->setRange(10, 100);
     m_lodQualitySlider->setValue(100);
@@ -134,8 +134,7 @@ void ViewerToolbar::setupPerformanceControls()
     m_performanceStatsCheckBox = new QCheckBox("Performance Stats");
     m_performanceStatsCheckBox->setToolTip("Show performance statistics overlay");
     addWidget(m_performanceStatsCheckBox);
-    connect(m_performanceStatsCheckBox, &QCheckBox::toggled, 
-            this, &ViewerToolbar::onPerformanceStatsToggled);
+    connect(m_performanceStatsCheckBox, &QCheckBox::toggled, this, &ViewerToolbar::onPerformanceStatsToggled);
 }
 
 void ViewerToolbar::setLODControlsEnabled(bool enabled)

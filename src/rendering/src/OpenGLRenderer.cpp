@@ -1,18 +1,19 @@
 #include "rendering/OpenGLRenderer.h"
+
 #include <QDebug>
 #include <QFile>
-#include <QTextStream>
-#include <QOpenGLShader>
 #include <QOpenGLContext>
+#include <QOpenGLShader>
+#include <QTextStream>
 
 OpenGLRenderer::OpenGLRenderer()
-    : m_vertexBuffer(QOpenGLBuffer::VertexBuffer)
-    , m_mvpMatrixLocation(-1)
-    , m_colorLocation(-1)
-    , m_pointSizeLocation(-1)
-    , m_initialized(false)
-    , m_shadersReady(false)
-    , m_pointCount(0)
+    : m_vertexBuffer(QOpenGLBuffer::VertexBuffer),
+      m_mvpMatrixLocation(-1),
+      m_colorLocation(-1),
+      m_pointSizeLocation(-1),
+      m_initialized(false),
+      m_shadersReady(false),
+      m_pointCount(0)
 {
 }
 
@@ -23,7 +24,8 @@ OpenGLRenderer::~OpenGLRenderer()
 
 bool OpenGLRenderer::initialize()
 {
-    if (m_initialized) {
+    if (m_initialized)
+    {
         return true;
     }
 
@@ -31,21 +33,24 @@ bool OpenGLRenderer::initialize()
     initializeOpenGLFunctions();
 
     // Check if OpenGL context is valid
-    if (!QOpenGLContext::currentContext()) {
+    if (!QOpenGLContext::currentContext())
+    {
         m_lastError = "No valid OpenGL context available";
         qCritical() << m_lastError;
         return false;
     }
 
     // Create vertex buffer
-    if (!m_vertexBuffer.create()) {
+    if (!m_vertexBuffer.create())
+    {
         m_lastError = "Failed to create vertex buffer";
         qCritical() << m_lastError;
         return false;
     }
 
     // Create vertex array object
-    if (!m_vertexArrayObject.create()) {
+    if (!m_vertexArrayObject.create())
+    {
         m_lastError = "Failed to create vertex array object";
         qCritical() << m_lastError;
         return false;
@@ -58,7 +63,8 @@ bool OpenGLRenderer::initialize()
 
 bool OpenGLRenderer::loadShaders(const QString& vertexShaderPath, const QString& fragmentShaderPath)
 {
-    if (!m_initialized) {
+    if (!m_initialized)
+    {
         m_lastError = "Renderer not initialized";
         return false;
     }
@@ -67,17 +73,20 @@ bool OpenGLRenderer::loadShaders(const QString& vertexShaderPath, const QString&
     m_shaderProgram = std::make_unique<QOpenGLShaderProgram>();
 
     // Compile vertex shader
-    if (!compileShaderFromFile(QOpenGLShader::Vertex, vertexShaderPath)) {
+    if (!compileShaderFromFile(QOpenGLShader::Vertex, vertexShaderPath))
+    {
         return false;
     }
 
     // Compile fragment shader
-    if (!compileShaderFromFile(QOpenGLShader::Fragment, fragmentShaderPath)) {
+    if (!compileShaderFromFile(QOpenGLShader::Fragment, fragmentShaderPath))
+    {
         return false;
     }
 
     // Link shader program
-    if (!m_shaderProgram->link()) {
+    if (!m_shaderProgram->link())
+    {
         m_lastError = QString("Failed to link shader program: %1").arg(m_shaderProgram->log());
         qCritical() << m_lastError;
         return false;
@@ -88,7 +97,8 @@ bool OpenGLRenderer::loadShaders(const QString& vertexShaderPath, const QString&
     m_colorLocation = m_shaderProgram->uniformLocation("color");
     m_pointSizeLocation = m_shaderProgram->uniformLocation("pointSize");
 
-    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1 || m_pointSizeLocation == -1) {
+    if (m_mvpMatrixLocation == -1 || m_colorLocation == -1 || m_pointSizeLocation == -1)
+    {
         m_lastError = "Failed to get uniform locations";
         qWarning() << m_lastError;
         qDebug() << "MVP location:" << m_mvpMatrixLocation;
@@ -104,17 +114,20 @@ bool OpenGLRenderer::loadShaders(const QString& vertexShaderPath, const QString&
 
 bool OpenGLRenderer::uploadPointData(const std::vector<float>& points)
 {
-    if (!m_initialized || !m_shadersReady) {
+    if (!m_initialized || !m_shadersReady)
+    {
         m_lastError = "Renderer not ready for data upload";
         return false;
     }
 
-    if (points.empty()) {
+    if (points.empty())
+    {
         m_lastError = "No point data provided";
         return false;
     }
 
-    if (points.size() % 3 != 0) {
+    if (points.size() % 3 != 0)
+    {
         m_lastError = "Point data size must be multiple of 3 (x,y,z coordinates)";
         return false;
     }
@@ -132,12 +145,14 @@ bool OpenGLRenderer::uploadPointData(const std::vector<float>& points)
 
 void OpenGLRenderer::render(const QMatrix4x4& mvpMatrix, const QVector3D& pointColor, float pointSize)
 {
-    if (!m_initialized || !m_shadersReady || m_pointCount == 0) {
+    if (!m_initialized || !m_shadersReady || m_pointCount == 0)
+    {
         return;
     }
 
     // Bind shader program
-    if (!m_shaderProgram->bind()) {
+    if (!m_shaderProgram->bind())
+    {
         qWarning() << "Failed to bind shader program for rendering";
         return;
     }
@@ -151,7 +166,7 @@ void OpenGLRenderer::render(const QMatrix4x4& mvpMatrix, const QVector3D& pointC
     m_vertexArrayObject.bind();
     glDrawArrays(GL_POINTS, 0, m_pointCount);
     logOpenGLError("glDrawArrays");
-    
+
     m_vertexArrayObject.release();
     m_shaderProgram->release();
 }
@@ -159,7 +174,8 @@ void OpenGLRenderer::render(const QMatrix4x4& mvpMatrix, const QVector3D& pointC
 void OpenGLRenderer::clearData()
 {
     m_pointCount = 0;
-    if (m_vertexBuffer.isCreated()) {
+    if (m_vertexBuffer.isCreated())
+    {
         m_vertexBuffer.release();
     }
 }
@@ -167,12 +183,14 @@ void OpenGLRenderer::clearData()
 bool OpenGLRenderer::compileShaderFromFile(QOpenGLShader::ShaderType type, const QString& filePath)
 {
     QString shaderSource = readShaderFile(filePath);
-    if (shaderSource.isEmpty()) {
+    if (shaderSource.isEmpty())
+    {
         m_lastError = QString("Failed to read shader file: %1").arg(filePath);
         return false;
     }
 
-    if (!m_shaderProgram->addShaderFromSourceCode(type, shaderSource)) {
+    if (!m_shaderProgram->addShaderFromSourceCode(type, shaderSource))
+    {
         m_lastError = QString("Failed to compile shader %1: %2").arg(filePath, m_shaderProgram->log());
         qCritical() << m_lastError;
         return false;
@@ -198,7 +216,8 @@ void OpenGLRenderer::setupVertexArrayObject()
 void OpenGLRenderer::logOpenGLError(const QString& operation)
 {
     GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
+    if (error != GL_NO_ERROR)
+    {
         QString errorMsg = QString("OpenGL error in %1: 0x%2").arg(operation).arg(error, 0, 16);
         qWarning() << errorMsg;
         m_lastError = errorMsg;
@@ -208,7 +227,8 @@ void OpenGLRenderer::logOpenGLError(const QString& operation)
 QString OpenGLRenderer::readShaderFile(const QString& filePath)
 {
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
         qCritical() << "Cannot open shader file:" << filePath;
         return QString();
     }

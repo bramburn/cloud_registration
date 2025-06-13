@@ -1,25 +1,24 @@
 #include "ui/sidebarwidget.h"
-#include "ui/projecttreemodel.h"
-#include "core/sqlitemanager.h"
-#include "core/projectmanager.h"
-#include "ui/confirmationdialog.h"
-#include <QStandardItem>
-#include <QHeaderView>
+
+#include <QApplication>
 #include <QContextMenuEvent>
+#include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
-#include <QDrag>
-#include <QMimeData>
+#include <QHeaderView>
 #include <QInputDialog>
 #include <QMessageBox>
-#include <QApplication>
+#include <QMimeData>
+#include <QStandardItem>
 
-SidebarWidget::SidebarWidget(QWidget *parent)
-    : QTreeView(parent)
-    , m_model(nullptr)
-    , m_contextMenu(nullptr)
-    , m_contextItem(nullptr)
+#include "core/projectmanager.h"
+#include "core/sqlitemanager.h"
+#include "ui/confirmationdialog.h"
+#include "ui/projecttreemodel.h"
+
+SidebarWidget::SidebarWidget(QWidget* parent)
+    : QTreeView(parent), m_model(nullptr), m_contextMenu(nullptr), m_contextItem(nullptr)
 {
     setupUI();
     setupDragDrop();
@@ -33,7 +32,7 @@ void SidebarWidget::setupUI()
     setHeaderHidden(true);
     setMinimumWidth(200);
     setMaximumWidth(400);
-    
+
     // Styling similar to modern IDEs
     setStyleSheet(R"(
         QTreeView {
@@ -69,13 +68,13 @@ void SidebarWidget::setupUI()
             image: url(:/icons/branch-open.png);
         }
     )");
-    
+
     // Set selection behavior
     setSelectionBehavior(QAbstractItemView::SelectRows);
-    setSelectionMode(QAbstractItemView::ExtendedSelection); // Allow multiple selection for drag-drop
+    setSelectionMode(QAbstractItemView::ExtendedSelection);  // Allow multiple selection for drag-drop
 }
 
-void SidebarWidget::setProject(const QString &projectName, const QString &projectPath)
+void SidebarWidget::setProject(const QString& projectName, const QString& projectPath)
 {
     m_currentProjectPath = projectPath;
     m_model->setProject(projectName, projectPath);
@@ -88,7 +87,7 @@ void SidebarWidget::clearProject()
     m_model->clear();
 }
 
-void SidebarWidget::setSQLiteManager(SQLiteManager *manager)
+void SidebarWidget::setSQLiteManager(SQLiteManager* manager)
 {
     m_model->setSQLiteManager(manager);
 }
@@ -99,39 +98,44 @@ void SidebarWidget::setSQLiteManager(SQLiteManager *manager)
 
 void SidebarWidget::refreshFromDatabase()
 {
-    if (m_model) {
+    if (m_model)
+    {
         m_model->refreshScans();
         expandAll();
     }
 }
 
-void SidebarWidget::addScan(const ScanInfo &scan)
+void SidebarWidget::addScan(const ScanInfo& scan)
 {
-    if (m_model) {
+    if (m_model)
+    {
         m_model->addScan(scan);
         expandAll();
     }
 }
 
 // New methods for Sprint 1.3
-void SidebarWidget::addCluster(const ClusterInfo &cluster)
+void SidebarWidget::addCluster(const ClusterInfo& cluster)
 {
-    if (m_model) {
+    if (m_model)
+    {
         m_model->addCluster(cluster);
         expandAll();
     }
 }
 
-void SidebarWidget::removeCluster(const QString &clusterId)
+void SidebarWidget::removeCluster(const QString& clusterId)
 {
-    if (m_model) {
+    if (m_model)
+    {
         m_model->removeCluster(clusterId);
     }
 }
 
-void SidebarWidget::updateCluster(const ClusterInfo &cluster)
+void SidebarWidget::updateCluster(const ClusterInfo& cluster)
 {
-    if (m_model) {
+    if (m_model)
+    {
         m_model->updateCluster(cluster);
     }
 }
@@ -215,23 +219,28 @@ void SidebarWidget::createContextMenu()
     connect(m_deleteClusterRecursiveAction, &QAction::triggered, this, &SidebarWidget::onDeleteClusterRecursive);
 }
 
-void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
+void SidebarWidget::contextMenuEvent(QContextMenuEvent* event)
 {
-    if (!m_contextMenu) {
+    if (!m_contextMenu)
+    {
         return;
     }
 
     m_contextItem = getItemAt(event->pos());
     m_contextMenu->clear();
 
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         // Right-clicked on empty space
         m_contextMenu->addAction(m_createClusterAction);
-    } else {
+    }
+    else
+    {
         QString itemType = m_model->getItemType(m_contextItem);
         QString itemId = m_model->getItemId(m_contextItem);
 
-        if (itemType == "scan") {
+        if (itemType == "scan")
+        {
             // Sprint 4: Simplified scan context menu - no manager dependencies
             m_contextMenu->addAction(m_loadScanAction);
             m_contextMenu->addAction(m_unloadScanAction);
@@ -242,11 +251,14 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
             m_contextMenu->addAction(m_viewPointCloudAction);
             m_contextMenu->addSeparator();
             m_contextMenu->addAction(m_deleteScanAction);
-        } else if (itemType == "project_root" || itemType == "cluster") {
+        }
+        else if (itemType == "project_root" || itemType == "cluster")
+        {
             // Right-clicked on project root or cluster
             m_contextMenu->addAction(m_createClusterAction);
 
-            if (itemType == "cluster") {
+            if (itemType == "cluster")
+            {
                 m_contextMenu->addAction(m_createSubClusterAction);
                 m_contextMenu->addSeparator();
 
@@ -275,34 +287,41 @@ void SidebarWidget::contextMenuEvent(QContextMenuEvent *event)
     }
 
     // Sprint 2.1: Always available memory optimization
-    if (!m_contextMenu->isEmpty()) {
+    if (!m_contextMenu->isEmpty())
+    {
         m_contextMenu->addSeparator();
         m_contextMenu->addAction(m_memoryOptimizeAction);
     }
 
-    if (!m_contextMenu->isEmpty()) {
+    if (!m_contextMenu->isEmpty())
+    {
         m_contextMenu->exec(event->globalPos());
     }
 }
 
-void SidebarWidget::dragEnterEvent(QDragEnterEvent *event)
+void SidebarWidget::dragEnterEvent(QDragEnterEvent* event)
 {
     if (event->mimeData()->hasFormat("application/x-scan-ids") ||
-        event->mimeData()->hasFormat("application/x-cluster-ids")) {
+        event->mimeData()->hasFormat("application/x-cluster-ids"))
+    {
         event->acceptProposedAction();
-    } else {
+    }
+    else
+    {
         event->ignore();
     }
 }
 
-void SidebarWidget::dragMoveEvent(QDragMoveEvent *event)
+void SidebarWidget::dragMoveEvent(QDragMoveEvent* event)
 {
-    QStandardItem *item = getItemAt(event->position().toPoint());
-    if (item) {
+    QStandardItem* item = getItemAt(event->position().toPoint());
+    if (item)
+    {
         QString itemType = m_model->getItemType(item);
         QString draggedType = event->mimeData()->hasFormat("application/x-scan-ids") ? "scan" : "cluster";
 
-        if (canDropOn(item, draggedType)) {
+        if (canDropOn(item, draggedType))
+        {
             event->acceptProposedAction();
             return;
         }
@@ -310,10 +329,11 @@ void SidebarWidget::dragMoveEvent(QDragMoveEvent *event)
     event->ignore();
 }
 
-void SidebarWidget::dropEvent(QDropEvent *event)
+void SidebarWidget::dropEvent(QDropEvent* event)
 {
-    QStandardItem *targetItem = getItemAt(event->position().toPoint());
-    if (!targetItem) {
+    QStandardItem* targetItem = getItemAt(event->position().toPoint());
+    if (!targetItem)
+    {
         event->ignore();
         return;
     }
@@ -322,12 +342,14 @@ void SidebarWidget::dropEvent(QDropEvent *event)
     QString targetId = m_model->getItemId(targetItem);
 
     // Only allow dropping on project root or clusters
-    if (targetType != "project_root" && targetType != "cluster") {
+    if (targetType != "project_root" && targetType != "cluster")
+    {
         event->ignore();
         return;
     }
 
-    if (event->mimeData()->hasFormat("application/x-scan-ids")) {
+    if (event->mimeData()->hasFormat("application/x-scan-ids"))
+    {
         // Handle scan drop
         QByteArray mimeData = event->mimeData()->data("application/x-scan-ids");
         QStringList scanIds = QString::fromUtf8(mimeData).split(',', Qt::SkipEmptyParts);
@@ -335,7 +357,9 @@ void SidebarWidget::dropEvent(QDropEvent *event)
         // Sprint 4: Emit signal instead of executing business logic
         emit dragDropOperationRequested(scanIds, "scan", targetId, targetType);
         event->acceptProposedAction();
-    } else {
+    }
+    else
+    {
         event->ignore();
     }
 }
@@ -343,38 +367,47 @@ void SidebarWidget::dropEvent(QDropEvent *event)
 void SidebarWidget::startDrag(Qt::DropActions supportedActions)
 {
     QModelIndexList indexes = selectedIndexes();
-    if (indexes.isEmpty()) {
+    if (indexes.isEmpty())
+    {
         return;
     }
 
     QStringList scanIds;
     QStringList clusterIds;
 
-    for (const QModelIndex &index : indexes) {
-        QStandardItem *item = m_model->itemFromIndex(index);
-        if (item) {
+    for (const QModelIndex& index : indexes)
+    {
+        QStandardItem* item = m_model->itemFromIndex(index);
+        if (item)
+        {
             QString itemType = m_model->getItemType(item);
             QString itemId = m_model->getItemId(item);
 
-            if (itemType == "scan") {
+            if (itemType == "scan")
+            {
                 scanIds << itemId;
-            } else if (itemType == "cluster") {
+            }
+            else if (itemType == "cluster")
+            {
                 clusterIds << itemId;
             }
         }
     }
 
-    if (scanIds.isEmpty() && clusterIds.isEmpty()) {
+    if (scanIds.isEmpty() && clusterIds.isEmpty())
+    {
         return;
     }
 
-    QDrag *drag = new QDrag(this);
-    QMimeData *mimeData = new QMimeData;
+    QDrag* drag = new QDrag(this);
+    QMimeData* mimeData = new QMimeData;
 
-    if (!scanIds.isEmpty()) {
+    if (!scanIds.isEmpty())
+    {
         mimeData->setData("application/x-scan-ids", scanIds.join(',').toUtf8());
     }
-    if (!clusterIds.isEmpty()) {
+    if (!clusterIds.isEmpty())
+    {
         mimeData->setData("application/x-cluster-ids", clusterIds.join(',').toUtf8());
     }
 
@@ -386,14 +419,17 @@ void SidebarWidget::startDrag(Qt::DropActions supportedActions)
 void SidebarWidget::onCreateCluster()
 {
     QString clusterName = promptForClusterName("Create New Cluster");
-    if (clusterName.isEmpty()) {
+    if (clusterName.isEmpty())
+    {
         return;
     }
 
     QString parentClusterId;
-    if (m_contextItem) {
+    if (m_contextItem)
+    {
         QString itemType = m_model->getItemType(m_contextItem);
-        if (itemType == "cluster") {
+        if (itemType == "cluster")
+        {
             parentClusterId = m_model->getItemId(m_contextItem);
         }
     }
@@ -404,33 +440,38 @@ void SidebarWidget::onCreateCluster()
 
 void SidebarWidget::onCreateSubCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
     QString parentClusterId = m_model->getItemId(m_contextItem);
     QString clusterName = promptForClusterName("Create New Sub-Cluster");
-    if (clusterName.isEmpty()) {
+    if (clusterName.isEmpty())
+    {
         return;
     }
-    
+
     // Sprint 4: Emit signal instead of executing business logic
     emit clusterCreationRequested(clusterName, parentClusterId);
 }
 
 void SidebarWidget::onRenameCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -438,7 +479,8 @@ void SidebarWidget::onRenameCluster()
     QString currentName = m_contextItem->text();
 
     QString newName = promptForClusterName("Rename Cluster", currentName);
-    if (newName.isEmpty() || newName == currentName) {
+    if (newName.isEmpty() || newName == currentName)
+    {
         return;
     }
 
@@ -448,12 +490,14 @@ void SidebarWidget::onRenameCluster()
 
 void SidebarWidget::onDeleteCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -465,37 +509,41 @@ void SidebarWidget::onDeleteCluster()
 }
 
 // Helper methods
-QStandardItem* SidebarWidget::getItemAt(const QPoint &position)
+QStandardItem* SidebarWidget::getItemAt(const QPoint& position)
 {
     QModelIndex index = indexAt(position);
-    if (index.isValid()) {
+    if (index.isValid())
+    {
         return m_model->itemFromIndex(index);
     }
     return nullptr;
 }
 
-QString SidebarWidget::promptForClusterName(const QString &title, const QString &defaultName)
+QString SidebarWidget::promptForClusterName(const QString& title, const QString& defaultName)
 {
     bool ok;
     QString name = QInputDialog::getText(this, title, "Cluster name:", QLineEdit::Normal, defaultName, &ok);
 
-    if (ok && !name.trimmed().isEmpty()) {
+    if (ok && !name.trimmed().isEmpty())
+    {
         return name.trimmed();
     }
 
     return QString();
 }
 
-bool SidebarWidget::canDropOn(QStandardItem *item, const QString &draggedType)
+bool SidebarWidget::canDropOn(QStandardItem* item, const QString& draggedType)
 {
-    if (!item) {
+    if (!item)
+    {
         return false;
     }
 
     QString itemType = m_model->getItemType(item);
 
     // Can drop scans on project root or clusters
-    if (draggedType == "scan") {
+    if (draggedType == "scan")
+    {
         return (itemType == "project_root" || itemType == "cluster");
     }
 
@@ -506,12 +554,14 @@ bool SidebarWidget::canDropOn(QStandardItem *item, const QString &draggedType)
 // New slot implementations for Sprint 2.1
 void SidebarWidget::onLoadScan()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -521,12 +571,14 @@ void SidebarWidget::onLoadScan()
 
 void SidebarWidget::onUnloadScan()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -536,12 +588,14 @@ void SidebarWidget::onUnloadScan()
 
 void SidebarWidget::onLoadCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -551,12 +605,14 @@ void SidebarWidget::onLoadCluster()
 
 void SidebarWidget::onUnloadCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -566,14 +622,16 @@ void SidebarWidget::onUnloadCluster()
 
 void SidebarWidget::onViewPointCloud()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
     QString itemId = m_model->getItemId(m_contextItem);
 
-    if (itemType == "scan" || itemType == "cluster") {
+    if (itemType == "scan" || itemType == "cluster")
+    {
         emit viewPointCloudRequested(itemId, itemType);
     }
 }
@@ -581,12 +639,14 @@ void SidebarWidget::onViewPointCloud()
 // Sprint 2.3 - New slot implementations
 void SidebarWidget::onLockCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -596,12 +656,14 @@ void SidebarWidget::onLockCluster()
 
 void SidebarWidget::onUnlockCluster()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -611,12 +673,14 @@ void SidebarWidget::onUnlockCluster()
 
 void SidebarWidget::onDeleteScan()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -624,17 +688,19 @@ void SidebarWidget::onDeleteScan()
 
     // Sprint 4: Emit signal instead of executing business logic
     // The confirmation dialog and scan info retrieval will be handled by MainPresenter
-    emit deleteScanRequested(scanId, false); // Default to not deleting physical file
+    emit deleteScanRequested(scanId, false);  // Default to not deleting physical file
 }
 
 void SidebarWidget::onDeleteClusterRecursive()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "cluster") {
+    if (itemType != "cluster")
+    {
         return;
     }
 
@@ -642,18 +708,20 @@ void SidebarWidget::onDeleteClusterRecursive()
 
     // Sprint 4: Emit signal instead of executing business logic
     // The confirmation dialog and scan path checking will be handled by MainPresenter
-    emit deleteClusterRequested(clusterId, false); // Default to not deleting physical files
+    emit deleteClusterRequested(clusterId, false);  // Default to not deleting physical files
 }
 
 // Sprint 2.1: Enhanced operation slot implementations
 void SidebarWidget::onPreprocessScan()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -663,12 +731,14 @@ void SidebarWidget::onPreprocessScan()
 
 void SidebarWidget::onOptimizeScan()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -679,7 +749,8 @@ void SidebarWidget::onOptimizeScan()
 void SidebarWidget::onBatchLoad()
 {
     QStringList selectedScans = getSelectedScanIds();
-    if (!selectedScans.isEmpty()) {
+    if (!selectedScans.isEmpty())
+    {
         emit batchOperationRequested("load", selectedScans);
     }
 }
@@ -687,7 +758,8 @@ void SidebarWidget::onBatchLoad()
 void SidebarWidget::onBatchUnload()
 {
     QStringList selectedScans = getSelectedScanIds();
-    if (!selectedScans.isEmpty()) {
+    if (!selectedScans.isEmpty())
+    {
         emit batchOperationRequested("unload", selectedScans);
     }
 }
@@ -699,12 +771,14 @@ void SidebarWidget::onMemoryOptimize()
 
 void SidebarWidget::onFilterMovingObjects()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -714,12 +788,14 @@ void SidebarWidget::onFilterMovingObjects()
 
 void SidebarWidget::onColorBalance()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -729,12 +805,14 @@ void SidebarWidget::onColorBalance()
 
 void SidebarWidget::onRegistrationPreview()
 {
-    if (!m_contextItem) {
+    if (!m_contextItem)
+    {
         return;
     }
 
     QString itemType = m_model->getItemType(m_contextItem);
-    if (itemType != "scan") {
+    if (itemType != "scan")
+    {
         return;
     }
 
@@ -748,11 +826,14 @@ QStringList SidebarWidget::getSelectedScanIds() const
     QStringList scanIds;
     QModelIndexList indexes = selectedIndexes();
 
-    for (const QModelIndex &index : indexes) {
-        QStandardItem *item = m_model->itemFromIndex(index);
-        if (item) {
+    for (const QModelIndex& index : indexes)
+    {
+        QStandardItem* item = m_model->itemFromIndex(index);
+        if (item)
+        {
             QString itemType = m_model->getItemType(item);
-            if (itemType == "scan") {
+            if (itemType == "scan")
+            {
                 QString scanId = m_model->getItemId(item);
                 scanIds.append(scanId);
             }
@@ -762,22 +843,24 @@ QStringList SidebarWidget::getSelectedScanIds() const
     return scanIds;
 }
 
-QString SidebarWidget::getItemIdFromIndex(const QModelIndex &index) const
+QString SidebarWidget::getItemIdFromIndex(const QModelIndex& index) const
 {
-    if (!index.isValid()) {
+    if (!index.isValid())
+    {
         return QString();
     }
 
-    QStandardItem *item = m_model->itemFromIndex(index);
+    QStandardItem* item = m_model->itemFromIndex(index);
     return item ? m_model->getItemId(item) : QString();
 }
 
-QString SidebarWidget::getItemTypeFromIndex(const QModelIndex &index) const
+QString SidebarWidget::getItemTypeFromIndex(const QModelIndex& index) const
 {
-    if (!index.isValid()) {
+    if (!index.isValid())
+    {
         return QString();
     }
 
-    QStandardItem *item = m_model->itemFromIndex(index);
+    QStandardItem* item = m_model->itemFromIndex(index);
     return item ? m_model->getItemType(item) : QString();
 }

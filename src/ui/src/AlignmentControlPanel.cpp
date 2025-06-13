@@ -1,10 +1,10 @@
 #include "ui/AlignmentControlPanel.h"
-#include <QMessageBox>
+
 #include <QApplication>
+#include <QMessageBox>
 #include <QStyle>
 
-AlignmentControlPanel::AlignmentControlPanel(QWidget* parent)
-    : QWidget(parent)
+AlignmentControlPanel::AlignmentControlPanel(QWidget* parent) : QWidget(parent)
 {
     setupUI();
     updateUIState(AlignmentEngine::AlignmentState::Idle);
@@ -137,8 +137,10 @@ QGroupBox* AlignmentControlPanel::createConfigurationGroup()
     m_rmsThresholdSpin->setValue(DEFAULT_RMS_THRESHOLD);
     m_rmsThresholdSpin->setSuffix(" mm");
     m_rmsThresholdSpin->setDecimals(1);
-    connect(m_rmsThresholdSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &AlignmentControlPanel::onQualityThresholdsChanged);
+    connect(m_rmsThresholdSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &AlignmentControlPanel::onQualityThresholdsChanged);
     layout->addWidget(m_rmsThresholdSpin, 0, 1);
 
     // Max Error Threshold
@@ -148,8 +150,10 @@ QGroupBox* AlignmentControlPanel::createConfigurationGroup()
     m_maxErrorThresholdSpin->setValue(DEFAULT_MAX_ERROR_THRESHOLD);
     m_maxErrorThresholdSpin->setSuffix(" mm");
     m_maxErrorThresholdSpin->setDecimals(1);
-    connect(m_maxErrorThresholdSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &AlignmentControlPanel::onQualityThresholdsChanged);
+    connect(m_maxErrorThresholdSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &AlignmentControlPanel::onQualityThresholdsChanged);
     layout->addWidget(m_maxErrorThresholdSpin, 1, 1);
 
     // Auto-recompute
@@ -164,29 +168,39 @@ QGroupBox* AlignmentControlPanel::createConfigurationGroup()
 void AlignmentControlPanel::setAlignmentEngine(AlignmentEngine* engine)
 {
     // Disconnect from previous engine
-    if (m_alignmentEngine) {
+    if (m_alignmentEngine)
+    {
         disconnect(m_alignmentEngine, nullptr, this, nullptr);
         disconnect(this, nullptr, m_alignmentEngine, nullptr);
     }
 
     m_alignmentEngine = engine;
 
-    if (m_alignmentEngine) {
+    if (m_alignmentEngine)
+    {
         // Connect signals for real-time updates
-        connect(m_alignmentEngine, &AlignmentEngine::qualityMetricsUpdated,
-                this, &AlignmentControlPanel::updateRMSError);
-        connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
-                this, &AlignmentControlPanel::updateAlignmentResult);
-        connect(m_alignmentEngine, &AlignmentEngine::alignmentStateChanged,
-                this, &AlignmentControlPanel::updateAlignmentState);
-        connect(m_alignmentEngine, &AlignmentEngine::correspondencesChanged,
-                this, &AlignmentControlPanel::updateCorrespondenceCount);
+        connect(
+            m_alignmentEngine, &AlignmentEngine::qualityMetricsUpdated, this, &AlignmentControlPanel::updateRMSError);
+        connect(m_alignmentEngine,
+                &AlignmentEngine::alignmentResultUpdated,
+                this,
+                &AlignmentControlPanel::updateAlignmentResult);
+        connect(m_alignmentEngine,
+                &AlignmentEngine::alignmentStateChanged,
+                this,
+                &AlignmentControlPanel::updateAlignmentState);
+        connect(m_alignmentEngine,
+                &AlignmentEngine::correspondencesChanged,
+                this,
+                &AlignmentControlPanel::updateCorrespondenceCount);
 
         // Connect control signals
-        connect(this, &AlignmentControlPanel::qualityThresholdsChanged,
-                m_alignmentEngine, &AlignmentEngine::setQualityThresholds);
-        connect(this, &AlignmentControlPanel::autoRecomputeChanged,
-                m_alignmentEngine, &AlignmentEngine::setAutoRecompute);
+        connect(this,
+                &AlignmentControlPanel::qualityThresholdsChanged,
+                m_alignmentEngine,
+                &AlignmentEngine::setQualityThresholds);
+        connect(
+            this, &AlignmentControlPanel::autoRecomputeChanged, m_alignmentEngine, &AlignmentEngine::setAutoRecompute);
 
         // Initialize UI with current state
         updateCorrespondenceCount(m_alignmentEngine->getCorrespondences().size());
@@ -204,11 +218,15 @@ void AlignmentControlPanel::updateRMSError(float error)
 
     // Update quality level color
     QString qualityLevel = getQualityLevel(error);
-    QString color = "#666"; // Default gray
-    if (qualityLevel == "Excellent") color = "#2E7D32"; // Green
-    else if (qualityLevel == "Good") color = "#388E3C"; // Light green
-    else if (qualityLevel == "Acceptable") color = "#F57C00"; // Orange
-    else if (qualityLevel == "Poor") color = "#D32F2F"; // Red
+    QString color = "#666";  // Default gray
+    if (qualityLevel == "Excellent")
+        color = "#2E7D32";  // Green
+    else if (qualityLevel == "Good")
+        color = "#388E3C";  // Light green
+    else if (qualityLevel == "Acceptable")
+        color = "#F57C00";  // Orange
+    else if (qualityLevel == "Poor")
+        color = "#D32F2F";  // Red
 
     m_qualityLevelLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: bold; }").arg(color));
 }
@@ -237,8 +255,9 @@ void AlignmentControlPanel::updateAlignmentState(AlignmentEngine::AlignmentState
 
     // Show/hide progress bar
     m_progressBar->setVisible(state == AlignmentEngine::AlignmentState::Computing);
-    if (state == AlignmentEngine::AlignmentState::Computing) {
-        m_progressBar->setRange(0, 0); // Indeterminate progress
+    if (state == AlignmentEngine::AlignmentState::Computing)
+    {
+        m_progressBar->setRange(0, 0);  // Indeterminate progress
     }
 }
 
@@ -247,11 +266,16 @@ void AlignmentControlPanel::updateCorrespondenceCount(int count)
     m_correspondenceCountLabel->setText(QString::number(count));
 
     QString status;
-    if (count == 0) {
+    if (count == 0)
+    {
         status = "No correspondences";
-    } else if (count < 3) {
+    }
+    else if (count < 3)
+    {
         status = "Insufficient (need ≥3)";
-    } else {
+    }
+    else
+    {
         status = "Ready for alignment";
     }
     m_correspondenceStatusLabel->setText(status);
@@ -262,7 +286,8 @@ void AlignmentControlPanel::updateCorrespondenceCount(int count)
 
 void AlignmentControlPanel::onAlignmentButtonClicked()
 {
-    if (m_alignmentEngine) {
+    if (m_alignmentEngine)
+    {
         emit alignmentRequested();
         m_alignmentEngine->recomputeAlignment();
     }
@@ -270,12 +295,15 @@ void AlignmentControlPanel::onAlignmentButtonClicked()
 
 void AlignmentControlPanel::onClearCorrespondencesClicked()
 {
-    if (m_alignmentEngine) {
-        int ret = QMessageBox::question(this, "Clear Correspondences",
-                                       "Are you sure you want to clear all correspondences?",
-                                       QMessageBox::Yes | QMessageBox::No,
-                                       QMessageBox::No);
-        if (ret == QMessageBox::Yes) {
+    if (m_alignmentEngine)
+    {
+        int ret = QMessageBox::question(this,
+                                        "Clear Correspondences",
+                                        "Are you sure you want to clear all correspondences?",
+                                        QMessageBox::Yes | QMessageBox::No,
+                                        QMessageBox::No);
+        if (ret == QMessageBox::Yes)
+        {
             emit clearCorrespondencesRequested();
             m_alignmentEngine->clearCorrespondences();
         }
@@ -296,7 +324,8 @@ void AlignmentControlPanel::onAutoRecomputeChanged()
 
 void AlignmentControlPanel::onShowDetailedReport()
 {
-    if (m_lastResult.state == AlignmentEngine::AlignmentState::Valid) {
+    if (m_lastResult.state == AlignmentEngine::AlignmentState::Valid)
+    {
         QString report = m_lastResult.errorStats.generateReport();
 
         QMessageBox msgBox(this);
@@ -309,15 +338,15 @@ void AlignmentControlPanel::onShowDetailedReport()
 
 void AlignmentControlPanel::updateUIState(AlignmentEngine::AlignmentState state)
 {
-    bool canAlign = (state == AlignmentEngine::AlignmentState::Idle ||
-                     state == AlignmentEngine::AlignmentState::Valid ||
-                     state == AlignmentEngine::AlignmentState::Insufficient);
+    bool canAlign =
+        (state == AlignmentEngine::AlignmentState::Idle || state == AlignmentEngine::AlignmentState::Valid ||
+         state == AlignmentEngine::AlignmentState::Insufficient);
 
-    m_alignButton->setEnabled(canAlign && m_alignmentEngine &&
-                             m_alignmentEngine->getCorrespondences().size() >= 3);
+    m_alignButton->setEnabled(canAlign && m_alignmentEngine && m_alignmentEngine->getCorrespondences().size() >= 3);
 
     // Update button text based on state
-    switch (state) {
+    switch (state)
+    {
         case AlignmentEngine::AlignmentState::Computing:
             m_alignButton->setText("Computing...");
             break;
@@ -332,7 +361,8 @@ void AlignmentControlPanel::updateUIState(AlignmentEngine::AlignmentState state)
 
 QString AlignmentControlPanel::formatError(float error) const
 {
-    if (error <= 0.0f) {
+    if (error <= 0.0f)
+    {
         return "- mm";
     }
     return QString("%1 mm").arg(error, 0, 'f', 3);
@@ -340,9 +370,13 @@ QString AlignmentControlPanel::formatError(float error) const
 
 QString AlignmentControlPanel::getQualityLevel(float rmsError) const
 {
-    if (rmsError <= 0.0f) return "-";
-    if (rmsError <= 1.0f) return "Excellent";
-    if (rmsError <= 3.0f) return "Good";
-    if (rmsError <= 5.0f) return "Acceptable";
+    if (rmsError <= 0.0f)
+        return "-";
+    if (rmsError <= 1.0f)
+        return "Excellent";
+    if (rmsError <= 3.0f)
+        return "Good";
+    if (rmsError <= 5.0f)
+        return "Acceptable";
     return "Poor";
 }

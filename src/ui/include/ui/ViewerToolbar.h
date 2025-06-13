@@ -1,20 +1,20 @@
 #ifndef VIEWERTOOLBAR_H
 #define VIEWERTOOLBAR_H
 
-#include <QToolBar>
 #include <QAction>
 #include <QActionGroup>
-#include <QSlider>
-#include <QLabel>
-#include <QSpinBox>
 #include <QCheckBox>
+#include <QLabel>
+#include <QSlider>
+#include <QSpinBox>
+#include <QToolBar>
 
 /**
  * @brief ViewerToolbar - 3D viewer-specific toolbar controls
- * 
- * This class provides a dedicated UI area for viewer-specific actions, 
+ *
+ * This class provides a dedicated UI area for viewer-specific actions,
  * such as camera controls, making them easily accessible to the user.
- * 
+ *
  * Sprint 1 Requirements:
  * - Camera preset controls (Top, Front, Side, Isometric)
  * - Fit to view functionality
@@ -37,13 +37,19 @@ public:
      * @brief Get the fit to view action
      * @return Pointer to fit to view action
      */
-    QAction* getFitToViewAction() const { return m_fitToViewAction; }
+    QAction* getFitToViewAction() const
+    {
+        return m_fitToViewAction;
+    }
 
     /**
      * @brief Get the reset view action
      * @return Pointer to reset view action
      */
-    QAction* getResetViewAction() const { return m_resetViewAction; }
+    QAction* getResetViewAction() const
+    {
+        return m_resetViewAction;
+    }
 
     /**
      * @brief Enable or disable LOD controls
@@ -137,4 +143,4 @@ private:
     void addSeparatorWithSpacing();
 };
 
-#endif // VIEWERTOOLBAR_H
+#endif  // VIEWERTOOLBAR_H

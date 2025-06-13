@@ -1,10 +1,11 @@
 #ifndef IPOINTCLOUDVIEWER_H
 #define IPOINTCLOUDVIEWER_H
 
+#include <QColor>
 #include <QObject>
 #include <QString>
-#include <QColor>
 #include <QVector3D>
+
 #include <vector>
 
 // Forward declaration for Sprint 6
@@ -13,12 +14,13 @@ struct Point;
 /**
  * @brief ViewerState - Enumeration of possible viewer states
  */
-enum class ViewerState {
-    Empty,       // No point cloud loaded
-    Loading,     // Point cloud is being loaded
-    Ready,       // Point cloud loaded and ready for display
-    Rendering,   // Currently rendering
-    Error        // Error state
+enum class ViewerState
+{
+    Empty,      // No point cloud loaded
+    Loading,    // Point cloud is being loaded
+    Ready,      // Point cloud loaded and ready for display
+    Rendering,  // Currently rendering
+    Error       // Error state
 };
 
 /**
@@ -36,7 +38,8 @@ enum class ViewerState {
  * - Maintains compatibility with existing MainWindow interface
  * - Does not inherit from QObject to avoid multiple inheritance issues
  */
-class IPointCloudViewer {
+class IPointCloudViewer
+{
 public:
     virtual ~IPointCloudViewer() = default;
 
@@ -202,8 +205,6 @@ public:
      */
     virtual bool hasData() const = 0;
 
-
-
     /**
      * @brief Get the number of points currently loaded
      * @return Number of points
@@ -256,8 +257,7 @@ public:
      * @param message Status message
      * @param points Loaded point data (if successful)
      */
-    virtual void onLoadingFinished(bool success, const QString& message,
-                                   const std::vector<float>& points) = 0;
+    virtual void onLoadingFinished(bool success, const QString& message, const std::vector<float>& points) = 0;
 
     // --- LOD Control Methods ---
 
@@ -294,4 +294,4 @@ public:
     virtual void focusOnCluster(const QString& clusterId) = 0;
 };
 
-#endif // IPOINTCLOUDVIEWER_H
+#endif  // IPOINTCLOUDVIEWER_H

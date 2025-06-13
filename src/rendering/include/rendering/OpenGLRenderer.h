@@ -1,22 +1,23 @@
 #ifndef OPENGLRENDERER_H
 #define OPENGLRENDERER_H
 
+#include <QMatrix4x4>
+#include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
-#include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
-#include <QMatrix4x4>
 #include <QVector3D>
-#include <vector>
+
 #include <memory>
+#include <vector>
 
 /**
  * @brief OpenGLRenderer - Core OpenGL rendering engine for point clouds
- * 
- * This class encapsulates the core OpenGL rendering logic, abstracting away 
- * the low-level API calls from the main viewer widget. It is responsible for 
+ *
+ * This class encapsulates the core OpenGL rendering logic, abstracting away
+ * the low-level API calls from the main viewer widget. It is responsible for
  * managing the lifecycle of OpenGL resources.
- * 
+ *
  * Sprint 1 Requirements:
  * - Shader management and compilation
  * - VAO/VBO handling and lifecycle management
@@ -31,7 +32,7 @@ public:
      * @brief Constructor
      */
     OpenGLRenderer();
-    
+
     /**
      * @brief Destructor - cleans up OpenGL resources
      */
@@ -75,25 +76,37 @@ public:
      * @brief Get the number of points currently loaded
      * @return Number of points
      */
-    int getPointCount() const { return m_pointCount; }
+    int getPointCount() const
+    {
+        return m_pointCount;
+    }
 
     /**
      * @brief Check if renderer is properly initialized
      * @return true if initialized
      */
-    bool isInitialized() const { return m_initialized; }
+    bool isInitialized() const
+    {
+        return m_initialized;
+    }
 
     /**
      * @brief Check if shaders are compiled and ready
      * @return true if shaders are ready
      */
-    bool areShadersReady() const { return m_shadersReady; }
+    bool areShadersReady() const
+    {
+        return m_shadersReady;
+    }
 
     /**
      * @brief Get OpenGL error information
      * @return Error string, empty if no error
      */
-    QString getLastError() const { return m_lastError; }
+    QString getLastError() const
+    {
+        return m_lastError;
+    }
 
 private:
     // OpenGL resources
@@ -119,4 +132,4 @@ private:
     QString readShaderFile(const QString& filePath);
 };
 
-#endif // OPENGLRENDERER_H
+#endif  // OPENGLRENDERER_H

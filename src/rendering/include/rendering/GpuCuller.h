@@ -1,14 +1,15 @@
 #ifndef GPUCULLER_H
 #define GPUCULLER_H
 
+#include <QMatrix4x4>
+#include <QOpenGLBuffer>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
-#include <QOpenGLBuffer>
-#include <QMatrix4x4>
 #include <QVector3D>
 #include <QVector4D>
-#include <vector>
+
 #include <memory>
+#include <vector>
 
 // Forward declarations
 class OctreeNode;
@@ -16,22 +17,24 @@ struct AxisAlignedBoundingBox;
 
 /**
  * @brief GPU-based culling module for high-performance point cloud rendering
- * 
+ *
  * This class implements GPU-based frustum and occlusion culling using compute shaders
  * to achieve interactive frame rates with large point cloud datasets (50+ million points).
- * 
+ *
  * Sprint 6 Requirements:
  * - GPU-based culling for massive datasets
  * - Compute shader integration
  * - Interactive frame rates (30+ FPS)
  * - Octree structure optimization
  */
-class GpuCuller : protected QOpenGLExtraFunctions {
+class GpuCuller : protected QOpenGLExtraFunctions
+{
 public:
     /**
      * @brief Structure representing a culling node for GPU processing
      */
-    struct CullingNode {
+    struct CullingNode
+    {
         QVector3D minBounds;
         float padding1;
         QVector3D maxBounds;
@@ -45,7 +48,8 @@ public:
     /**
      * @brief Culling result structure
      */
-    struct CullingResult {
+    struct CullingResult
+    {
         std::vector<uint32_t> visibleNodeIndices;
         std::vector<uint32_t> visiblePointCounts;
         uint32_t totalVisiblePoints;
@@ -55,7 +59,8 @@ public:
     /**
      * @brief Culling parameters for GPU shader
      */
-    struct CullingParams {
+    struct CullingParams
+    {
         QMatrix4x4 viewProjectionMatrix;
         QVector3D cameraPosition;
         float nearPlane;
@@ -164,9 +169,7 @@ private:
      * @param nodeIndex Current node index
      * @return Next available node index
      */
-    static uint32_t convertNodeRecursive(const OctreeNode* node, 
-                                       std::vector<CullingNode>& nodes, 
-                                       uint32_t nodeIndex);
+    static uint32_t convertNodeRecursive(const OctreeNode* node, std::vector<CullingNode>& nodes, uint32_t nodeIndex);
 
     /**
      * @brief Calculate child mask for octree node
@@ -181,25 +184,25 @@ private:
     QOpenGLBuffer m_nodeBuffer;
     QOpenGLBuffer m_resultBuffer;
     QOpenGLBuffer m_uniformBuffer;
-    
+
     // GPU state
     bool m_initialized;
     uint32_t m_maxNodes;
     uint32_t m_currentNodeCount;
     bool m_occlusionCullingEnabled;
-    
+
     // Performance tracking
     float m_lastCullingTime;
     size_t m_gpuMemoryUsage;
-    
+
     // Compute shader work group size
     static constexpr uint32_t WORK_GROUP_SIZE = 64;
     static constexpr uint32_t MAX_NODES_DEFAULT = 1000000;
-    
+
     // Buffer binding points
     static constexpr uint32_t NODE_BUFFER_BINDING = 0;
     static constexpr uint32_t RESULT_BUFFER_BINDING = 1;
     static constexpr uint32_t UNIFORM_BUFFER_BINDING = 2;
 };
 
-#endif // GPUCULLER_H
+#endif  // GPUCULLER_H

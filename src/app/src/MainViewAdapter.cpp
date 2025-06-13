@@ -1,9 +1,8 @@
 #include "MainViewAdapter.h"
+
 #include "mainwindow.h"
 
-MainViewAdapter::MainViewAdapter(MainWindow* mainWindow, QObject* parent)
-    : IMainView(parent)
-    , m_mainWindow(mainWindow)
+MainViewAdapter::MainViewAdapter(MainWindow* mainWindow, QObject* parent) : IMainView(parent), m_mainWindow(mainWindow)
 {
     Q_ASSERT(m_mainWindow != nullptr);
 }

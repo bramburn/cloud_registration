@@ -2,8 +2,8 @@
 #define VOXELGRIDFILTER_H
 
 // #include <QVector3D>  // Commented out for testing compatibility
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 // Forward declaration
 struct LoadingSettings;
@@ -42,10 +42,12 @@ private:
     /**
      * @brief Structure representing a 3D voxel key for spatial hashing
      */
-    struct VoxelKey {
+    struct VoxelKey
+    {
         int x, y, z;
 
-        bool operator==(const VoxelKey& other) const {
+        bool operator==(const VoxelKey& other) const
+        {
             return x == other.x && y == other.y && z == other.z;
         }
     };
@@ -53,17 +55,21 @@ private:
     /**
      * @brief Hash function for VoxelKey to enable use in unordered_map
      */
-    struct VoxelKeyHasher {
-        size_t operator()(const VoxelKey& k) const {
+    struct VoxelKeyHasher
+    {
+        size_t operator()(const VoxelKey& k) const
+        {
             // Use prime numbers to reduce hash collisions
-            return ((static_cast<size_t>(k.x) * 73856093) ^
-                    (static_cast<size_t>(k.y) * 19349663) ^
+            return ((static_cast<size_t>(k.x) * 73856093) ^ (static_cast<size_t>(k.y) * 19349663) ^
                     (static_cast<size_t>(k.z) * 83492791));
         }
     };
 
     // Simple 3D vector structure for testing compatibility
-    struct Vector3D { float x, y, z; };
+    struct Vector3D
+    {
+        float x, y, z;
+    };
 
     // Member variables for bounding box calculation
     Vector3D m_minBound;
@@ -93,4 +99,4 @@ private:
     VoxelKey worldToVoxelKey(float x, float y, float z, float leafSize) const;
 };
 
-#endif // VOXELGRIDFILTER_H
+#endif  // VOXELGRIDFILTER_H

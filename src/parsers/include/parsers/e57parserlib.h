@@ -1,23 +1,26 @@
 #ifndef E57PARSERLIB_H
 #define E57PARSERLIB_H
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <atomic>
+#include <QMutex>
 #include <QObject>
 #include <QString>
-#include <QMutex>
-#include <QTimer>
 #include <QThread>
-#include "interfaces/IE57Parser.h"
+#include <QTimer>
+
+#include <atomic>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "E57ParserCore.h"
+#include "interfaces/IE57Parser.h"
 
 // Forward declarations for E57Format types
-namespace e57 {
-    class ImageFile;
-    class StructureNode;
-}
+namespace e57
+{
+class ImageFile;
+class StructureNode;
+}  // namespace e57
 
 /**
  * @brief E57ParserLib - Qt adapter for E57ParserCore
@@ -30,15 +33,17 @@ namespace e57 {
  * Sprint 1 Decoupling: Now implements IE57Parser interface for loose coupling.
  * Sprint 2 Decoupling: Refactored to delegate core parsing to E57ParserCore.
  */
-class E57ParserLib : public IE57Parser {
+class E57ParserLib : public IE57Parser
+{
     Q_OBJECT
 
 public:
-    explicit E57ParserLib(QObject *parent = nullptr);
+    explicit E57ParserLib(QObject* parent = nullptr);
     ~E57ParserLib();
 
     // Main entry point for MainWindow integration
-    void startParsing(const QString& filePath, const IE57Parser::LoadingSettings& settings = IE57Parser::LoadingSettings()) override;
+    void startParsing(const QString& filePath,
+                      const IE57Parser::LoadingSettings& settings = IE57Parser::LoadingSettings()) override;
 
     // Thread-safe cancellation
     void cancelParsing() override;
@@ -89,8 +94,6 @@ public:
      */
     IE57Parser::ScanMetadata getScanMetadata(int scanIndex) const override;
 
-
-
     /**
      * @brief Check if a file is open
      * @return true if file is open, false otherwise
@@ -134,7 +137,7 @@ signals:
     // Additional signals for enhanced functionality
     void scanMetadataAvailable(int scanCount, const QStringList& scanNames);
     void intensityDataExtracted(const std::vector<float>& intensityValues);
-    void colorDataExtracted(const std::vector<uint8_t>& colorValues); // RGB interleaved
+    void colorDataExtracted(const std::vector<uint8_t>& colorValues);  // RGB interleaved
 
 private slots:
     void performParsing();
@@ -177,7 +180,8 @@ private:
     std::vector<float> m_points;  // Legacy point storage
 
     // Prototype information for parsing
-    struct PrototypeInfo {
+    struct PrototypeInfo
+    {
         bool hasCartesianX = false;
         bool hasCartesianY = false;
         bool hasCartesianZ = false;
@@ -189,7 +193,8 @@ private:
         std::string intensityDataType;
         std::string colorDataType;
 
-        void reset() {
+        void reset()
+        {
             hasCartesianX = hasCartesianY = hasCartesianZ = false;
             isDoublePrec = false;
             hasIntensity = false;
@@ -200,7 +205,8 @@ private:
     } m_prototypeInfo;
 
     // Data limits for normalization
-    struct DataLimits {
+    struct DataLimits
+    {
         double intensityMin = 0.0;
         double intensityMax = 1.0;
         double colorRedMin = 0.0;
@@ -212,7 +218,8 @@ private:
         bool hasIntensityLimits = false;
         bool hasColorLimits = false;
 
-        void reset() {
+        void reset()
+        {
             intensityMin = 0.0;
             intensityMax = 1.0;
             colorRedMin = colorGreenMin = colorBlueMin = 0.0;
@@ -240,4 +247,4 @@ private:
     uint8_t normalizeColorChannel(float rawValue, double minVal, double maxVal) const;
 };
 
-#endif // E57PARSERLIB_H
+#endif  // E57PARSERLIB_H

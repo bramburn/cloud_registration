@@ -1,16 +1,18 @@
-#include <gtest/gtest.h>
 #include <QCoreApplication>
-#include <QTemporaryFile>
 #include <QDataStream>
-#include <QSignalSpy>
-#include <QDomDocument>
 #include <QDebug>
+#include <QDomDocument>
 #include <QEventLoop>
-#include <QTimer>
-#include <QObject>
 #include <QFile>
 #include <QFileInfo>
+#include <QObject>
+#include <QSignalSpy>
+#include <QTemporaryFile>
+#include <QTimer>
+
 #include "e57parserlib.h"
+
+#include <gtest/gtest.h>
 
 class E57ParserLibTest : public QObject, public ::testing::Test
 {
@@ -20,7 +22,8 @@ protected:
     void SetUp() override
     {
         // Initialize Qt application for testing
-        if (!QCoreApplication::instance()) {
+        if (!QCoreApplication::instance())
+        {
             int argc = 0;
             char** argv = nullptr;
             app = new QCoreApplication(argc, argv);
@@ -29,10 +32,8 @@ protected:
         parser = new E57ParserLib();
 
         // Connect signals for testing
-        connect(parser, &E57ParserLib::parsingFinished,
-                this, &E57ParserLibTest::onParsingFinished);
-        connect(parser, &E57ParserLib::progressUpdated,
-                this, &E57ParserLibTest::onProgressUpdated);
+        connect(parser, &E57ParserLib::parsingFinished, this, &E57ParserLibTest::onParsingFinished);
+        connect(parser, &E57ParserLib::progressUpdated, this, &E57ParserLibTest::onProgressUpdated);
     }
 
     void TearDown() override
@@ -42,21 +43,24 @@ protected:
     }
 
 public slots:
-    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points) {
+    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points)
+    {
         lastSuccess = success;
         lastMessage = message;
         lastPoints = points;
         parsingComplete = true;
     }
 
-    void onProgressUpdated(int percentage, const QString& stage) {
+    void onProgressUpdated(int percentage, const QString& stage)
+    {
         lastProgress = percentage;
         lastStage = stage;
     }
 
 protected:
     // Helper function to wait for async parsing to complete
-    bool waitForParsing(int timeoutMs = 5000) {
+    bool waitForParsing(int timeoutMs = 5000)
+    {
         QEventLoop loop;
         QTimer timer;
         timer.setSingleShot(true);
@@ -76,9 +80,10 @@ protected:
     QString createMockE57File()
     {
         QTemporaryFile* tempFile = new QTemporaryFile();
-        tempFile->setAutoRemove(false); // Keep file for testing
+        tempFile->setAutoRemove(false);  // Keep file for testing
 
-        if (!tempFile->open()) {
+        if (!tempFile->open())
+        {
             return QString();
         }
 
@@ -86,18 +91,18 @@ protected:
         stream.setByteOrder(QDataStream::LittleEndian);
 
         // Write E57 signature
-        stream << static_cast<quint32>(0x41535446); // "ASTF"
+        stream << static_cast<quint32>(0x41535446);  // "ASTF"
 
         // Write version
-        stream << static_cast<quint32>(1); // Major version
-        stream << static_cast<quint32>(0); // Minor version
+        stream << static_cast<quint32>(1);  // Major version
+        stream << static_cast<quint32>(0);  // Minor version
 
         // Write file physical length
         stream << static_cast<quint64>(1024);
 
         // Write XML length and offset
-        stream << static_cast<quint64>(100); // XML length
-        stream << static_cast<quint64>(32);  // XML offset
+        stream << static_cast<quint64>(100);  // XML length
+        stream << static_cast<quint64>(32);   // XML offset
 
         QString fileName = tempFile->fileName();
         tempFile->close();
@@ -112,7 +117,8 @@ protected:
         QTemporaryFile* tempFile = new QTemporaryFile();
         tempFile->setAutoRemove(false);
 
-        if (!tempFile->open()) {
+        if (!tempFile->open())
+        {
             return QString();
         }
 
@@ -226,7 +232,8 @@ TEST_F(E57ParserLibTest, RealE57FileTest)
     // Test with the real E57 test file if it exists
     QString testFile = "test_data/test_real_points.e57";
 
-    if (QFile::exists(testFile)) {
+    if (QFile::exists(testFile))
+    {
         parser->startParsing(testFile);
 
         // Wait for parsing to complete
@@ -234,14 +241,15 @@ TEST_F(E57ParserLibTest, RealE57FileTest)
 
         // Should have successfully parsed real E57 data
         EXPECT_FALSE(lastPoints.empty());
-        EXPECT_EQ(lastPoints.size() % 3, 0); // Should be divisible by 3 (X, Y, Z)
+        EXPECT_EQ(lastPoints.size() % 3, 0);  // Should be divisible by 3 (X, Y, Z)
         EXPECT_TRUE(lastSuccess);
 
         // Should have exactly 3 points (9 floats)
         EXPECT_EQ(lastPoints.size(), 9);
 
         // Verify the actual coordinates (1,2,3), (4,5,6), (7,8,9)
-        if (lastPoints.size() >= 9) {
+        if (lastPoints.size() >= 9)
+        {
             EXPECT_FLOAT_EQ(lastPoints[0], 1.0f);
             EXPECT_FLOAT_EQ(lastPoints[1], 2.0f);
             EXPECT_FLOAT_EQ(lastPoints[2], 3.0f);
@@ -252,7 +260,9 @@ TEST_F(E57ParserLibTest, RealE57FileTest)
             EXPECT_FLOAT_EQ(lastPoints[7], 8.0f);
             EXPECT_FLOAT_EQ(lastPoints[8], 9.0f);
         }
-    } else {
+    }
+    else
+    {
         // Skip test if file doesn't exist
         GTEST_SKIP() << "Test file " << testFile.toStdString() << " not found";
     }
@@ -304,7 +314,7 @@ TEST_F(E57ParserLibTest, XYZVectorConversion)
     EXPECT_FALSE(lastSuccess);
 
     // Verify the vector is properly formatted (empty but valid)
-    EXPECT_EQ(lastPoints.size() % 3, 0); // Should be divisible by 3 even when empty
+    EXPECT_EQ(lastPoints.size() % 3, 0);  // Should be divisible by 3 even when empty
 }
 
 TEST_F(E57ParserLibTest, ErrorMessageTranslation)
@@ -332,13 +342,13 @@ TEST_F(E57ParserLibTest, ThreadSafeOperations)
     QEventLoop loop;
     QTimer timer;
     timer.setSingleShot(true);
-    timer.setInterval(100); // Short timeout for test
+    timer.setInterval(100);  // Short timeout for test
 
     connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
 
     // Test cancel operation thread safety
     timer.start();
-    parser->cancelParsing(); // Should not crash
+    parser->cancelParsing();  // Should not crash
     loop.exec();
 
     // If we reach here without crashing, test passes
@@ -396,7 +406,8 @@ TEST_F(E57ParserLibTest, ProgressReporting)
     // Should have received at least one progress update (even for failed parsing)
     EXPECT_GE(progressSpy.count(), 1);
 
-    if (progressSpy.count() > 0) {
+    if (progressSpy.count() > 0)
+    {
         QList<QVariant> arguments = progressSpy.first();
         EXPECT_TRUE(arguments.at(0).canConvert<int>());
         EXPECT_TRUE(arguments.at(1).canConvert<QString>());
@@ -409,7 +420,7 @@ TEST_F(E57ParserLibTest, ScanCountUtility)
     QString nonExistentFile = "/test/file.e57";
 
     int scanCount = parser->getScanCount(nonExistentFile);
-    EXPECT_EQ(scanCount, 0); // Should return 0 for non-existent files
+    EXPECT_EQ(scanCount, 0);  // Should return 0 for non-existent files
 }
 
 TEST_F(E57ParserLibTest, ValidE57FileUtility)
@@ -429,7 +440,7 @@ TEST_F(E57ParserLibTest, ValidE57FileUtility)
 }
 
 // Main function for running tests
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

@@ -1,12 +1,16 @@
-#include <gtest/gtest.h>
-#include <QVector3D>
 #include <QVariantMap>
+#include <QVector3D>
+
 #include "registration/Target.h"
 #include "registration/TargetCorrespondence.h"
 
-class TargetTest : public ::testing::Test {
+#include <gtest/gtest.h>
+
+class TargetTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Set up test data
         testPosition = QVector3D(1.0f, 2.0f, 3.0f);
         testId = "test_target_001";
@@ -17,7 +21,8 @@ protected:
 };
 
 // Test SphereTarget creation and basic functionality
-TEST_F(TargetTest, SphereTargetCreation) {
+TEST_F(TargetTest, SphereTargetCreation)
+{
     float testRadius = 0.15f;
     SphereTarget sphere(testId, testPosition, testRadius);
 
@@ -30,16 +35,17 @@ TEST_F(TargetTest, SphereTargetCreation) {
 }
 
 // Test SphereTarget serialization
-TEST_F(TargetTest, SphereTargetSerialization) {
+TEST_F(TargetTest, SphereTargetSerialization)
+{
     float testRadius = 0.25f;
     SphereTarget sphere(testId, testPosition, testRadius);
     sphere.setConfidence(0.85f);
     sphere.setRmsError(0.002f);
     sphere.setInlierCount(150);
-    
+
     // Serialize
     QVariantMap data = sphere.serialize();
-    
+
     // Check serialized data
     EXPECT_EQ(data["targetId"].toString(), testId);
     EXPECT_EQ(data["type"].toString(), "Sphere");
@@ -47,7 +53,7 @@ TEST_F(TargetTest, SphereTargetSerialization) {
     EXPECT_FLOAT_EQ(data["confidence"].toFloat(), 0.85f);
     EXPECT_FLOAT_EQ(data["rmsError"].toFloat(), 0.002f);
     EXPECT_EQ(data["inlierCount"].toInt(), 150);
-    
+
     // Test position serialization
     QVariantList posList = data["position"].toList();
     EXPECT_EQ(posList.size(), 3);
@@ -57,7 +63,8 @@ TEST_F(TargetTest, SphereTargetSerialization) {
 }
 
 // Test SphereTarget deserialization
-TEST_F(TargetTest, SphereTargetDeserialization) {
+TEST_F(TargetTest, SphereTargetDeserialization)
+{
     // Create test data
     QVariantMap data;
     data["targetId"] = testId;
@@ -68,11 +75,11 @@ TEST_F(TargetTest, SphereTargetDeserialization) {
     data["radius"] = 0.3f;
     data["rmsError"] = 0.001f;
     data["inlierCount"] = 200;
-    
+
     // Create sphere and deserialize
     SphereTarget sphere("", QVector3D(), 0.0f);
     bool success = sphere.deserialize(data);
-    
+
     EXPECT_TRUE(success);
     EXPECT_EQ(sphere.targetId(), testId);
     EXPECT_EQ(sphere.position(), testPosition);
@@ -83,7 +90,8 @@ TEST_F(TargetTest, SphereTargetDeserialization) {
 }
 
 // Test NaturalPointTarget creation and functionality
-TEST_F(TargetTest, NaturalPointTargetCreation) {
+TEST_F(TargetTest, NaturalPointTargetCreation)
+{
     QString description = "Building corner point";
     NaturalPointTarget naturalPoint(testId, testPosition, description);
 
@@ -95,17 +103,18 @@ TEST_F(TargetTest, NaturalPointTargetCreation) {
 }
 
 // Test NaturalPointTarget serialization
-TEST_F(TargetTest, NaturalPointTargetSerialization) {
+TEST_F(TargetTest, NaturalPointTargetSerialization)
+{
     QString description = "Rock formation edge";
     QList<float> featureDescriptor = {0.8f, 0.1f, 0.1f};  // High planarity
 
     NaturalPointTarget naturalPoint(testId, testPosition, description);
     naturalPoint.setFeatureDescriptor(featureDescriptor);
     naturalPoint.setConfidence(0.9f);
-    
+
     // Serialize
     QVariantMap data = naturalPoint.serialize();
-    
+
     // Check serialized data
     EXPECT_EQ(data["targetId"].toString(), testId);
     EXPECT_EQ(data["type"].toString(), "NaturalPoint");
@@ -121,14 +130,13 @@ TEST_F(TargetTest, NaturalPointTargetSerialization) {
 }
 
 // Test CheckerboardTarget creation and functionality
-TEST_F(TargetTest, CheckerboardTargetCreation) {
-    QList<QVector3D> corners = {
-        QVector3D(0.0f, 0.0f, 0.0f),
-        QVector3D(0.1f, 0.0f, 0.0f),
-        QVector3D(0.0f, 0.1f, 0.0f),
-        QVector3D(0.1f, 0.1f, 0.0f)
-    };
-    
+TEST_F(TargetTest, CheckerboardTargetCreation)
+{
+    QList<QVector3D> corners = {QVector3D(0.0f, 0.0f, 0.0f),
+                                QVector3D(0.1f, 0.0f, 0.0f),
+                                QVector3D(0.0f, 0.1f, 0.0f),
+                                QVector3D(0.1f, 0.1f, 0.0f)};
+
     CheckerboardTarget checkerboard(testId, testPosition, corners);
 
     EXPECT_EQ(checkerboard.targetId(), testId);
@@ -139,7 +147,8 @@ TEST_F(TargetTest, CheckerboardTargetCreation) {
 }
 
 // Test TargetCorrespondence functionality
-TEST_F(TargetTest, TargetCorrespondence) {
+TEST_F(TargetTest, TargetCorrespondence)
+{
     QString targetId1 = "target_001";
     QString targetId2 = "target_002";
     QString scanId1 = "scan_001";
@@ -157,16 +166,17 @@ TEST_F(TargetTest, TargetCorrespondence) {
 }
 
 // Test invalid target scenarios
-TEST_F(TargetTest, InvalidTargetScenarios) {
+TEST_F(TargetTest, InvalidTargetScenarios)
+{
     // Test empty ID
     SphereTarget invalidSphere("", testPosition, 0.1f);
     invalidSphere.setValid(false);
     EXPECT_FALSE(invalidSphere.isValid());
-    
+
     // Test invalid correspondence
     TargetCorrespondence invalidCorr("", "target_002", "scan_001", "scan_002");
     EXPECT_FALSE(invalidCorr.isValid());
-    
+
     // Test low confidence correspondence
     TargetCorrespondence lowConfCorr("target_001", "target_002", "scan_001", "scan_002");
     lowConfCorr.setConfidence(0.3f);  // Below 0.5 threshold
@@ -174,7 +184,8 @@ TEST_F(TargetTest, InvalidTargetScenarios) {
 }
 
 // Test target confidence settings
-TEST_F(TargetTest, TargetConfidenceSettings) {
+TEST_F(TargetTest, TargetConfidenceSettings)
+{
     SphereTarget sphere(testId, testPosition, 0.1f);
 
     // Test valid confidence range
@@ -190,7 +201,8 @@ TEST_F(TargetTest, TargetConfidenceSettings) {
 }
 
 // Test target position updates
-TEST_F(TargetTest, TargetPositionUpdates) {
+TEST_F(TargetTest, TargetPositionUpdates)
+{
     SphereTarget sphere(testId, testPosition, 0.1f);
 
     QVector3D newPosition(5.0f, 6.0f, 7.0f);
@@ -200,7 +212,8 @@ TEST_F(TargetTest, TargetPositionUpdates) {
     EXPECT_NE(sphere.position(), testPosition);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

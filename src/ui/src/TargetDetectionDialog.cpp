@@ -1,40 +1,44 @@
 #include "TargetDetectionDialog.h"
+
 #include <QApplication>
-#include <QMessageBox>
+#include <QDebug>
 #include <QFileDialog>
-#include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QDebug>
+#include <QMessageBox>
+#include <QStandardPaths>
 
 TargetDetectionDialog::TargetDetectionDialog(TargetManager* targetManager, QWidget* parent)
-    : QDialog(parent)
-    , m_targetManager(targetManager)
-    , m_sphereDetector(new SphereDetector(this))
-    , m_naturalPointSelector(new NaturalPointSelector(this))
-    , m_detectionRunning(false)
+    : QDialog(parent),
+      m_targetManager(targetManager),
+      m_sphereDetector(new SphereDetector(this)),
+      m_naturalPointSelector(new NaturalPointSelector(this)),
+      m_detectionRunning(false)
 {
     setWindowTitle("Target Detection");
     setModal(true);
     resize(800, 600);
-    
+
     setupUI();
-    
+
     // Connect detection signals
-    connect(m_sphereDetector, &TargetDetectionBase::detectionProgress,
-            this, &TargetDetectionDialog::onDetectionProgress);
-    connect(m_sphereDetector, &TargetDetectionBase::detectionCompleted,
-            this, &TargetDetectionDialog::onDetectionCompleted);
-    connect(m_sphereDetector, &TargetDetectionBase::detectionError,
-            this, &TargetDetectionDialog::onDetectionError);
-    
-    connect(m_naturalPointSelector, &TargetDetectionBase::detectionProgress,
-            this, &TargetDetectionDialog::onDetectionProgress);
-    connect(m_naturalPointSelector, &TargetDetectionBase::detectionCompleted,
-            this, &TargetDetectionDialog::onDetectionCompleted);
-    connect(m_naturalPointSelector, &TargetDetectionBase::detectionError,
-            this, &TargetDetectionDialog::onDetectionError);
-    
+    connect(
+        m_sphereDetector, &TargetDetectionBase::detectionProgress, this, &TargetDetectionDialog::onDetectionProgress);
+    connect(
+        m_sphereDetector, &TargetDetectionBase::detectionCompleted, this, &TargetDetectionDialog::onDetectionCompleted);
+    connect(m_sphereDetector, &TargetDetectionBase::detectionError, this, &TargetDetectionDialog::onDetectionError);
+
+    connect(m_naturalPointSelector,
+            &TargetDetectionBase::detectionProgress,
+            this,
+            &TargetDetectionDialog::onDetectionProgress);
+    connect(m_naturalPointSelector,
+            &TargetDetectionBase::detectionCompleted,
+            this,
+            &TargetDetectionDialog::onDetectionCompleted);
+    connect(
+        m_naturalPointSelector, &TargetDetectionBase::detectionError, this, &TargetDetectionDialog::onDetectionError);
+
     // Set default parameters
     resetToDefaults();
 }
@@ -43,14 +47,13 @@ void TargetDetectionDialog::setPointCloudData(const QString& scanId, const std::
 {
     m_currentScanId = scanId;
     m_currentPoints = points;
-    
-    m_statusLabel->setText(QString("Loaded %1 points from scan: %2")
-                          .arg(points.size()).arg(scanId));
-    
+
+    m_statusLabel->setText(QString("Loaded %1 points from scan: %2").arg(points.size()).arg(scanId));
+
     // Clear previous results
     m_resultsTable->setRowCount(0);
     m_logTextEdit->clear();
-    
+
     // Enable detection if we have data
     m_startButton->setEnabled(!points.empty() && !m_detectionRunning);
 }
@@ -72,50 +75,53 @@ TargetDetectionDialog::DetectionMode TargetDetectionDialog::getDetectionMode() c
 
 void TargetDetectionDialog::startDetection()
 {
-    if (m_currentPoints.empty()) {
+    if (m_currentPoints.empty())
+    {
         QMessageBox::warning(this, "No Data", "Please load point cloud data first.");
         return;
     }
-    
-    if (!validateParameters()) {
+
+    if (!validateParameters())
+    {
         QMessageBox::warning(this, "Invalid Parameters", "Please check your detection parameters.");
         return;
     }
-    
+
     m_detectionRunning = true;
     m_startButton->setEnabled(false);
     m_cancelButton->setEnabled(true);
     m_progressBar->setValue(0);
     m_progressBar->setVisible(true);
     m_statusLabel->setText("Starting detection...");
-    
+
     // Clear previous results
     m_resultsTable->setRowCount(0);
     m_logTextEdit->append(QString("Starting detection on scan: %1").arg(m_currentScanId));
-    
+
     TargetDetectionBase::DetectionParams params = getParametersFromUI();
     DetectionMode mode = getDetectionMode();
-    
-    switch (mode) {
-    case AutomaticSpheres:
-        m_logTextEdit->append("Running automatic sphere detection...");
-        m_sphereDetector->detectAsync(m_currentPoints, params);
-        break;
-        
-    case ManualNaturalPoints:
-        m_logTextEdit->append("Manual natural point selection mode activated.");
-        m_statusLabel->setText("Ready for manual point selection");
-        m_detectionRunning = false;
-        m_startButton->setEnabled(true);
-        m_cancelButton->setEnabled(false);
-        m_progressBar->setVisible(false);
-        emit manualSelectionRequested(m_currentScanId);
-        break;
-        
-    case Both:
-        m_logTextEdit->append("Running automatic sphere detection first...");
-        m_sphereDetector->detectAsync(m_currentPoints, params);
-        break;
+
+    switch (mode)
+    {
+        case AutomaticSpheres:
+            m_logTextEdit->append("Running automatic sphere detection...");
+            m_sphereDetector->detectAsync(m_currentPoints, params);
+            break;
+
+        case ManualNaturalPoints:
+            m_logTextEdit->append("Manual natural point selection mode activated.");
+            m_statusLabel->setText("Ready for manual point selection");
+            m_detectionRunning = false;
+            m_startButton->setEnabled(true);
+            m_cancelButton->setEnabled(false);
+            m_progressBar->setVisible(false);
+            emit manualSelectionRequested(m_currentScanId);
+            break;
+
+        case Both:
+            m_logTextEdit->append("Running automatic sphere detection first...");
+            m_sphereDetector->detectAsync(m_currentPoints, params);
+            break;
     }
 }
 
@@ -132,12 +138,13 @@ void TargetDetectionDialog::cancelDetection()
 void TargetDetectionDialog::resetToDefaults()
 {
     TargetDetectionBase::DetectionParams defaultParams;
-    
+
     // Use sphere detector defaults for sphere-specific parameters
-    if (m_sphereDetector) {
+    if (m_sphereDetector)
+    {
         defaultParams = m_sphereDetector->getDefaultParameters();
     }
-    
+
     setUIFromParameters(defaultParams);
     m_detectionModeCombo->setCurrentIndex(0);  // AutomaticSpheres
     onDetectionModeChanged();
@@ -145,71 +152,72 @@ void TargetDetectionDialog::resetToDefaults()
 
 void TargetDetectionDialog::loadParameters()
 {
-    QString fileName = QFileDialog::getOpenFileName(
-        this,
-        "Load Detection Parameters",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "JSON Files (*.json);;All Files (*)"
-    );
-    
-    if (fileName.isEmpty()) {
+    QString fileName = QFileDialog::getOpenFileName(this,
+                                                    "Load Detection Parameters",
+                                                    QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+                                                    "JSON Files (*.json);;All Files (*)");
+
+    if (fileName.isEmpty())
+    {
         return;
     }
-    
+
     QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) {
+    if (!file.open(QIODevice::ReadOnly))
+    {
         QMessageBox::warning(this, "Error", "Cannot open file for reading.");
         return;
     }
-    
+
     QByteArray data = file.readAll();
     file.close();
-    
+
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-    
-    if (error.error != QJsonParseError::NoError) {
+
+    if (error.error != QJsonParseError::NoError)
+    {
         QMessageBox::warning(this, "Error", "Invalid JSON file: " + error.errorString());
         return;
     }
-    
+
     QVariantMap paramMap = doc.toVariant().toMap();
     TargetDetectionBase::DetectionParams params;
     params.fromVariantMap(paramMap);
-    
+
     setUIFromParameters(params);
-    
+
     m_logTextEdit->append(QString("Loaded parameters from: %1").arg(fileName));
 }
 
 void TargetDetectionDialog::saveParameters()
 {
-    QString fileName = QFileDialog::getSaveFileName(
-        this,
-        "Save Detection Parameters",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        "JSON Files (*.json);;All Files (*)"
-    );
-    
-    if (fileName.isEmpty()) {
+    QString fileName = QFileDialog::getSaveFileName(this,
+                                                    "Save Detection Parameters",
+                                                    QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+                                                    "JSON Files (*.json);;All Files (*)");
+
+    if (fileName.isEmpty())
+    {
         return;
     }
-    
+
     TargetDetectionBase::DetectionParams params = getParametersFromUI();
     QVariantMap paramMap = params.toVariantMap();
-    
+
     QJsonDocument doc = QJsonDocument::fromVariant(paramMap);
     QByteArray data = doc.toJson();
-    
+
     QFile file(fileName);
-    if (!file.open(QIODevice::WriteOnly)) {
+    if (!file.open(QIODevice::WriteOnly))
+    {
         QMessageBox::warning(this, "Error", "Cannot open file for writing.");
         return;
     }
-    
+
     file.write(data);
     file.close();
-    
+
     m_logTextEdit->append(QString("Saved parameters to: %1").arg(fileName));
 }
 
@@ -226,29 +234,29 @@ void TargetDetectionDialog::onDetectionCompleted(const TargetDetectionBase::Dete
     m_startButton->setEnabled(true);
     m_cancelButton->setEnabled(false);
     m_progressBar->setVisible(false);
-    
+
     m_lastResult = result;
-    
-    if (result.success) {
-        m_statusLabel->setText(QString("Detection completed: %1 targets found")
-                              .arg(result.targets.size()));
-        
+
+    if (result.success)
+    {
+        m_statusLabel->setText(QString("Detection completed: %1 targets found").arg(result.targets.size()));
+
         m_logTextEdit->append(QString("Detection completed successfully:"));
         m_logTextEdit->append(QString("- Found %1 targets").arg(result.targets.size()));
         m_logTextEdit->append(QString("- Processed %1 points").arg(result.processedPoints));
-        m_logTextEdit->append(QString("- Processing time: %1 seconds")
-                             .arg(result.processingTime, 0, 'f', 2));
-        
+        m_logTextEdit->append(QString("- Processing time: %1 seconds").arg(result.processingTime, 0, 'f', 2));
+
         updateResultsTable(result);
-        
+
         // Enable accept/reject buttons if we have results
         m_acceptButton->setEnabled(!result.targets.isEmpty());
         m_rejectButton->setEnabled(!result.targets.isEmpty());
-        
-    } else {
+    }
+    else
+    {
         m_statusLabel->setText("Detection failed");
         m_logTextEdit->append(QString("Detection failed: %1").arg(result.errorMessage));
-        
+
         QMessageBox::warning(this, "Detection Failed", result.errorMessage);
     }
 }
@@ -259,10 +267,10 @@ void TargetDetectionDialog::onDetectionError(const QString& error)
     m_startButton->setEnabled(true);
     m_cancelButton->setEnabled(false);
     m_progressBar->setVisible(false);
-    
+
     m_statusLabel->setText("Detection error");
     m_logTextEdit->append(QString("Detection error: %1").arg(error));
-    
+
     QMessageBox::critical(this, "Detection Error", error);
 }
 
@@ -282,39 +290,41 @@ void TargetDetectionDialog::onTargetSelected()
 {
     // Handle target selection in results table
     int currentRow = m_resultsTable->currentRow();
-    if (currentRow >= 0 && currentRow < m_lastResult.targets.size()) {
+    if (currentRow >= 0 && currentRow < m_lastResult.targets.size())
+    {
         // Could emit signal to highlight target in 3D view
         auto target = m_lastResult.targets[currentRow];
         m_logTextEdit->append(QString("Selected target: %1 at %2")
-                             .arg(target->getTargetId())
-                             .arg(QString("(%1, %2, %3)")
-                                  .arg(target->getPosition().x())
-                                  .arg(target->getPosition().y())
-                                  .arg(target->getPosition().z())));
+                                  .arg(target->getTargetId())
+                                  .arg(QString("(%1, %2, %3)")
+                                           .arg(target->getPosition().x())
+                                           .arg(target->getPosition().y())
+                                           .arg(target->getPosition().z())));
     }
 }
 
 void TargetDetectionDialog::onAcceptTargets()
 {
-    if (m_lastResult.targets.isEmpty()) {
+    if (m_lastResult.targets.isEmpty())
+    {
         return;
     }
-    
+
     // Add all detected targets to the target manager
     int addedCount = 0;
-    for (const auto& target : m_lastResult.targets) {
-        if (m_targetManager->addTarget(m_currentScanId, target)) {
+    for (const auto& target : m_lastResult.targets)
+    {
+        if (m_targetManager->addTarget(m_currentScanId, target))
+        {
             addedCount++;
         }
     }
-    
-    m_logTextEdit->append(QString("Added %1 targets to scan %2")
-                         .arg(addedCount).arg(m_currentScanId));
-    
-    QMessageBox::information(this, "Targets Added", 
-                           QString("Successfully added %1 targets to the scan.")
-                           .arg(addedCount));
-    
+
+    m_logTextEdit->append(QString("Added %1 targets to scan %2").arg(addedCount).arg(m_currentScanId));
+
+    QMessageBox::information(
+        this, "Targets Added", QString("Successfully added %1 targets to the scan.").arg(addedCount));
+
     emit detectionCompleted(m_currentScanId, m_lastResult);
     accept();  // Close dialog
 }
@@ -322,11 +332,11 @@ void TargetDetectionDialog::onAcceptTargets()
 void TargetDetectionDialog::onRejectTargets()
 {
     m_logTextEdit->append("Rejected all detected targets.");
-    
+
     // Clear results
     m_resultsTable->setRowCount(0);
     m_lastResult = TargetDetectionBase::DetectionResult();
-    
+
     m_acceptButton->setEnabled(false);
     m_rejectButton->setEnabled(false);
 }
@@ -384,8 +394,10 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_detectionModeCombo->addItem("Automatic Sphere Detection");
     m_detectionModeCombo->addItem("Manual Natural Point Selection");
     m_detectionModeCombo->addItem("Both");
-    connect(m_detectionModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &TargetDetectionDialog::onDetectionModeChanged);
+    connect(m_detectionModeCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &TargetDetectionDialog::onDetectionModeChanged);
 
     modeLayout->addWidget(m_detectionModeCombo);
     layout->addWidget(modeGroup);
@@ -399,16 +411,20 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_distanceThresholdSpin->setRange(0.001, 1.0);
     m_distanceThresholdSpin->setSingleStep(0.001);
     m_distanceThresholdSpin->setDecimals(3);
-    connect(m_distanceThresholdSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_distanceThresholdSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     commonLayout->addWidget(m_distanceThresholdSpin, 0, 1);
 
     commonLayout->addWidget(new QLabel("Max Iterations:"), 1, 0);
     m_maxIterationsSpin = new QSpinBox();
     m_maxIterationsSpin->setRange(100, 10000);
     m_maxIterationsSpin->setSingleStep(100);
-    connect(m_maxIterationsSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_maxIterationsSpin,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     commonLayout->addWidget(m_maxIterationsSpin, 1, 1);
 
     commonLayout->addWidget(new QLabel("Min Quality:"), 2, 0);
@@ -416,13 +432,14 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_minQualitySpin->setRange(0.0, 1.0);
     m_minQualitySpin->setSingleStep(0.1);
     m_minQualitySpin->setDecimals(2);
-    connect(m_minQualitySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_minQualitySpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     commonLayout->addWidget(m_minQualitySpin, 2, 1);
 
     m_enablePreprocessingCheck = new QCheckBox("Enable Preprocessing");
-    connect(m_enablePreprocessingCheck, &QCheckBox::toggled,
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_enablePreprocessingCheck, &QCheckBox::toggled, this, &TargetDetectionDialog::onParametersChanged);
     commonLayout->addWidget(m_enablePreprocessingCheck, 3, 0, 1, 2);
 
     layout->addWidget(m_commonParamsGroup);
@@ -436,8 +453,10 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_minRadiusSpin->setRange(0.01, 10.0);
     m_minRadiusSpin->setSingleStep(0.01);
     m_minRadiusSpin->setDecimals(3);
-    connect(m_minRadiusSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_minRadiusSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     sphereLayout->addWidget(m_minRadiusSpin, 0, 1);
 
     sphereLayout->addWidget(new QLabel("Max Radius (m):"), 1, 0);
@@ -445,16 +464,20 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_maxRadiusSpin->setRange(0.01, 10.0);
     m_maxRadiusSpin->setSingleStep(0.01);
     m_maxRadiusSpin->setDecimals(3);
-    connect(m_maxRadiusSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_maxRadiusSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     sphereLayout->addWidget(m_maxRadiusSpin, 1, 1);
 
     sphereLayout->addWidget(new QLabel("Min Inliers:"), 2, 0);
     m_minInliersSpin = new QSpinBox();
     m_minInliersSpin->setRange(10, 1000);
     m_minInliersSpin->setSingleStep(10);
-    connect(m_minInliersSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_minInliersSpin,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     sphereLayout->addWidget(m_minInliersSpin, 2, 1);
 
     layout->addWidget(m_sphereParamsGroup);
@@ -468,8 +491,10 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_neighborhoodRadiusSpin->setRange(0.01, 1.0);
     m_neighborhoodRadiusSpin->setSingleStep(0.01);
     m_neighborhoodRadiusSpin->setDecimals(3);
-    connect(m_neighborhoodRadiusSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_neighborhoodRadiusSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     naturalLayout->addWidget(m_neighborhoodRadiusSpin, 0, 1);
 
     naturalLayout->addWidget(new QLabel("Curvature Threshold:"), 1, 0);
@@ -477,8 +502,10 @@ QWidget* TargetDetectionDialog::createParameterControls()
     m_curvatureThresholdSpin->setRange(0.0, 1.0);
     m_curvatureThresholdSpin->setSingleStep(0.01);
     m_curvatureThresholdSpin->setDecimals(3);
-    connect(m_curvatureThresholdSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &TargetDetectionDialog::onParametersChanged);
+    connect(m_curvatureThresholdSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            &TargetDetectionDialog::onParametersChanged);
     naturalLayout->addWidget(m_curvatureThresholdSpin, 1, 1);
 
     layout->addWidget(m_naturalPointParamsGroup);
@@ -531,8 +558,8 @@ QWidget* TargetDetectionDialog::createDetectionControls()
 
     // Manual selection button
     m_manualSelectionButton = new QPushButton("Enable Manual Selection Mode");
-    connect(m_manualSelectionButton, &QPushButton::clicked,
-            [this]() { emit manualSelectionRequested(m_currentScanId); });
+    connect(
+        m_manualSelectionButton, &QPushButton::clicked, [this]() { emit manualSelectionRequested(m_currentScanId); });
     layout->addWidget(m_manualSelectionButton);
 
     return widget;
@@ -550,8 +577,7 @@ QWidget* TargetDetectionDialog::createResultsDisplay()
     m_resultsTable->setHorizontalHeaderLabels(headers);
     m_resultsTable->horizontalHeader()->setStretchLastSection(true);
     m_resultsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    connect(m_resultsTable, &QTableWidget::currentRowChanged,
-            this, &TargetDetectionDialog::onTargetSelected);
+    connect(m_resultsTable, &QTableWidget::currentRowChanged, this, &TargetDetectionDialog::onTargetSelected);
 
     layout->addWidget(m_resultsTable);
 
@@ -600,7 +626,8 @@ void TargetDetectionDialog::updateResultsTable(const TargetDetectionBase::Detect
 {
     m_resultsTable->setRowCount(result.targets.size());
 
-    for (int i = 0; i < result.targets.size(); ++i) {
+    for (int i = 0; i < result.targets.size(); ++i)
+    {
         const auto& target = result.targets[i];
 
         // Type
@@ -611,31 +638,33 @@ void TargetDetectionDialog::updateResultsTable(const TargetDetectionBase::Detect
 
         // Position
         QVector3D pos = target->getPosition();
-        QString posStr = QString("(%1, %2, %3)")
-                        .arg(pos.x(), 0, 'f', 3)
-                        .arg(pos.y(), 0, 'f', 3)
-                        .arg(pos.z(), 0, 'f', 3);
+        QString posStr =
+            QString("(%1, %2, %3)").arg(pos.x(), 0, 'f', 3).arg(pos.y(), 0, 'f', 3).arg(pos.z(), 0, 'f', 3);
         m_resultsTable->setItem(i, 2, new QTableWidgetItem(posStr));
 
         // Quality
-        m_resultsTable->setItem(i, 3, new QTableWidgetItem(
-            QString::number(target->getQuality(), 'f', 3)));
+        m_resultsTable->setItem(i, 3, new QTableWidgetItem(QString::number(target->getQuality(), 'f', 3)));
 
         // Type-specific information
         QString sizeInfo;
         QString details;
 
-        if (target->getType() == "Sphere") {
+        if (target->getType() == "Sphere")
+        {
             auto sphereTarget = std::dynamic_pointer_cast<SphereTarget>(target);
-            if (sphereTarget) {
+            if (sphereTarget)
+            {
                 sizeInfo = QString("%1 m").arg(sphereTarget->getRadius(), 0, 'f', 3);
                 details = QString("RMS: %1, Inliers: %2")
-                         .arg(sphereTarget->getRMSError(), 0, 'f', 4)
-                         .arg(sphereTarget->getInlierCount());
+                              .arg(sphereTarget->getRMSError(), 0, 'f', 4)
+                              .arg(sphereTarget->getInlierCount());
             }
-        } else if (target->getType() == "Natural Point") {
+        }
+        else if (target->getType() == "Natural Point")
+        {
             auto naturalTarget = std::dynamic_pointer_cast<NaturalPointTarget>(target);
-            if (naturalTarget) {
+            if (naturalTarget)
+            {
                 sizeInfo = "Point";
                 details = naturalTarget->getDescription();
             }
@@ -655,9 +684,12 @@ bool TargetDetectionDialog::validateParameters() const
 
     DetectionMode mode = getDetectionMode();
 
-    if (mode == AutomaticSpheres || mode == Both) {
+    if (mode == AutomaticSpheres || mode == Both)
+    {
         return m_sphereDetector->validateParameters(params);
-    } else if (mode == ManualNaturalPoints) {
+    }
+    else if (mode == ManualNaturalPoints)
+    {
         return m_naturalPointSelector->validateParameters(params);
     }
 

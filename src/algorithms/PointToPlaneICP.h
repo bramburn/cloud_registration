@@ -5,13 +5,14 @@
 
 /**
  * @brief Point-to-Plane ICP Algorithm
- * 
+ *
  * Implements the point-to-plane variant of ICP which minimizes the distance
  * from source points to the planes defined by target points and their normals.
  * This variant typically converges faster and more accurately for structured
  * environments with planar surfaces.
  */
-class PointToPlaneICP : public ICPRegistration {
+class PointToPlaneICP : public ICPRegistration
+{
     Q_OBJECT
 
 public:
@@ -26,8 +27,10 @@ public:
      * @param params ICP algorithm parameters
      * @return Final transformation matrix
      */
-    QMatrix4x4 compute(const PointCloud& source, const PointCloud& target,
-                      const QMatrix4x4& initialGuess, const ICPParams& params) override;
+    QMatrix4x4 compute(const PointCloud& source,
+                       const PointCloud& target,
+                       const QMatrix4x4& initialGuess,
+                       const ICPParams& params) override;
 
 protected:
     /**
@@ -37,8 +40,8 @@ protected:
      * @param maxDistance Maximum correspondence distance
      * @return List of correspondences with normal information
      */
-    std::vector<Correspondence> findCorrespondences(
-        const PointCloud& source, const PointCloud& target, float maxDistance) override;
+    std::vector<Correspondence>
+    findCorrespondences(const PointCloud& source, const PointCloud& target, float maxDistance) override;
 
     /**
      * @brief Compute transformation using point-to-plane error metric
@@ -77,4 +80,4 @@ private:
     QMatrix4x4 parametersToMatrix(const std::vector<float>& params);
 };
 
-#endif // POINTTOPLANEICP_H
+#endif  // POINTTOPLANEICP_H

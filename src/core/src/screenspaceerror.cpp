@@ -1,12 +1,14 @@
 #include "core/screenspaceerror.h"
-#include "core/octree.h"
+
 #include <QVector3D>
+
 #include <cmath>
 
-float ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(
-    const AxisAlignedBoundingBox& bounds,
-    const QMatrix4x4& mvpMatrix,
-    const ViewportInfo& viewport)
+#include "core/octree.h"
+
+float ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(const AxisAlignedBoundingBox& bounds,
+                                                                const QMatrix4x4& mvpMatrix,
+                                                                const ViewportInfo& viewport)
 {
     // Calculate the center and size of the bounding box
     QVector3D center = bounds.center();
@@ -17,8 +19,9 @@ float ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(
     QVector4D centerClip = mvpMatrix * QVector4D(center, 1.0f);
 
     // Avoid division by zero
-    if (std::abs(centerClip.w()) < 1e-6f) {
-        return 1000.0f; // Very high error for degenerate cases
+    if (std::abs(centerClip.w()) < 1e-6f)
+    {
+        return 1000.0f;  // Very high error for degenerate cases
     }
 
     // Convert to normalized device coordinates
@@ -28,8 +31,9 @@ float ScreenSpaceErrorCalculator::calculateAABBScreenSpaceError(
     float distance = std::abs(centerNDC.z());
 
     // Avoid division by zero
-    if (distance < 1e-6f) {
-        return 1000.0f; // Very high error for very close objects
+    if (distance < 1e-6f)
+    {
+        return 1000.0f;  // Very high error for very close objects
     }
 
     // Calculate projected size in screen space

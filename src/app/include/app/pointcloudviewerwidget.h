@@ -1,58 +1,84 @@
 #ifndef POINTCLOUDVIEWERWIDGET_H
 #define POINTCLOUDVIEWERWIDGET_H
 
-#include <QOpenGLWidget>
-#include <QOpenGLFunctions>
+#include <QColor>
+#include <QFont>
+#include <QMatrix4x4>
+#include <QMouseEvent>
 #include <QOpenGLBuffer>
-#include <QOpenGLVertexArrayObject>
+#include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
-#include <QMatrix4x4>
-#include <QVector3D>
-#include <QColor>
-#include <QMouseEvent>
-#include <QWheelEvent>
+#include <QOpenGLVertexArrayObject>
+#include <QOpenGLWidget>
 #include <QTimer>
-#include <QFont>
-#include <vector>
-#include <memory>
+#include <QVector3D>
+#include <QWheelEvent>
+
 #include <chrono>
-#include "octree.h"
-#include "screenspaceerror.h"
-#include "core/pointdata.h"
+#include <memory>
+#include <vector>
+
 #include "IPointCloudViewer.h"
+#include "core/pointdata.h"
+#include "octree.h"
 #include "rendering/GpuCuller.h"
+#include "screenspaceerror.h"
 
 class PointCloudViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions, public IPointCloudViewer
 {
     Q_OBJECT
 
 public:
-    explicit PointCloudViewerWidget(QWidget *parent = nullptr);
+    explicit PointCloudViewerWidget(QWidget* parent = nullptr);
     ~PointCloudViewerWidget();
 
     // IPointCloudViewer interface implementation
     void loadPointCloud(const std::vector<float>& points) override;
     void clearPointCloud() override;
-    void setState(ViewerState state, const QString &message = "") override;
+    void setState(ViewerState state, const QString& message = "") override;
     void setTopView() override;
     void setLeftView() override;
     void setRightView() override;
     void setBottomView() override;
     void setLODEnabled(bool enabled) override;
-    bool isLODEnabled() const override { return m_lodEnabled; }
+    bool isLODEnabled() const override
+    {
+        return m_lodEnabled;
+    }
     void setRenderWithColor(bool enabled) override;
     void setRenderWithIntensity(bool enabled) override;
     void setPointSizeAttenuationEnabled(bool enabled) override;
     void setPointSizeAttenuationParams(float minSize, float maxSize, float factor) override;
-    ViewerState getViewerState() const override { return m_currentState; }
-    bool hasPointCloudData() const override { return m_hasData; }
-    bool hasData() const override { return m_hasData; }
-    size_t getPointCount() const override { return static_cast<size_t>(m_pointCount); }
-    QVector3D getGlobalOffset() const override { return m_globalOffset; }
+    ViewerState getViewerState() const override
+    {
+        return m_currentState;
+    }
+    bool hasPointCloudData() const override
+    {
+        return m_hasData;
+    }
+    bool hasData() const override
+    {
+        return m_hasData;
+    }
+    size_t getPointCount() const override
+    {
+        return static_cast<size_t>(m_pointCount);
+    }
+    QVector3D getGlobalOffset() const override
+    {
+        return m_globalOffset;
+    }
     std::vector<Point> getCurrentPointCloudData() const override;
-    float getCurrentFPS() const override { return m_fps; }
-    size_t getVisiblePointCount() const override { return m_visiblePointCount; }
+    float getCurrentFPS() const override
+    {
+        return m_fps;
+    }
+    size_t getVisiblePointCount() const override
+    {
+        return m_visiblePointCount;
+    }
     void resetCamera() override;
     void setFrontView() override;
     void setPointSize(float size) override;
@@ -64,14 +90,26 @@ public:
     void setAmbientIntensity(float intensity) override;
 
     // Additional public methods specific to PointCloudViewerWidget
-    float getCameraYaw() const { return m_cameraYaw; }
-    float getCameraPitch() const { return m_cameraPitch; }
-    QVector3D getCameraTarget() const { return m_cameraTarget; }
-    float getCameraDistance() const { return m_cameraDistance; }
+    float getCameraYaw() const
+    {
+        return m_cameraYaw;
+    }
+    float getCameraPitch() const
+    {
+        return m_cameraPitch;
+    }
+    QVector3D getCameraTarget() const
+    {
+        return m_cameraTarget;
+    }
+    float getCameraDistance() const
+    {
+        return m_cameraDistance;
+    }
 
     // Test simulation methods
-    void simulateOrbitCamera(const QPoint &start, const QPoint &end);
-    void simulatePanCamera(const QPoint &start, const QPoint &end);
+    void simulateOrbitCamera(const QPoint& start, const QPoint& end);
+    void simulatePanCamera(const QPoint& start, const QPoint& end);
     void simulateZoomCamera(float factor);
 
     // Additional LOD methods not in interface
@@ -82,9 +120,8 @@ public:
 public slots:
     // IPointCloudViewer interface slots implementation
     void onLoadingStarted() override;
-    void onLoadingProgress(int percentage, const QString &stage) override;
-    void onLoadingFinished(bool success, const QString &message,
-                          const std::vector<float> &points) override;
+    void onLoadingProgress(int percentage, const QString& stage) override;
+    void onLoadingFinished(bool success, const QString& message, const std::vector<float>& points) override;
     void toggleLOD(bool enabled) override;
     void setLODSubsampleRate(float rate) override;
     void setScreenSpaceErrorThreshold(float threshold) override;
@@ -103,7 +140,10 @@ public slots:
 
     // Sprint 4: Dynamic transformation support for real-time alignment preview
     void setDynamicTransform(const QMatrix4x4& transform);
-    QMatrix4x4 getDynamicTransform() const { return m_dynamicTransform; }
+    QMatrix4x4 getDynamicTransform() const
+    {
+        return m_dynamicTransform;
+    }
     void clearDynamicTransform();
 
     // Sprint 6: GPU culling support
@@ -129,9 +169,9 @@ protected:
     void paintOverlayGL();  // For text overlays
 
     // Mouse and keyboard events
-    void mousePressEvent(QMouseEvent *event) override;
-    void mouseMoveEvent(QMouseEvent *event) override;
-    void wheelEvent(QWheelEvent *event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
 
 private:
     void setupShaders();
@@ -149,9 +189,9 @@ private:
     void renderErrorState();
 
     // Sprint 2.3: Visual state rendering methods
-    void drawLoadingState(QPainter &painter);
-    void drawLoadFailedState(QPainter &painter);
-    void drawIdleState(QPainter &painter);
+    void drawLoadingState(QPainter& painter);
+    void drawLoadFailedState(QPainter& painter);
+    void drawIdleState(QPainter& painter);
 
     // Sprint R1: LOD rendering methods
     void renderOctree();
@@ -190,18 +230,18 @@ private:
 
 private slots:
     void updateLoadingAnimation();
-    void emitPerformanceStats(); // Sprint 2.2: Performance monitoring
+    void emitPerformanceStats();  // Sprint 2.2: Performance monitoring
 
 private:
     // OpenGL objects
     QOpenGLBuffer m_vertexBuffer;
     QOpenGLVertexArrayObject m_vertexArrayObject;
-    QOpenGLShaderProgram *m_shaderProgram;
+    QOpenGLShaderProgram* m_shaderProgram;
 
     // UCS OpenGL objects
     QOpenGLBuffer m_ucsVertexBuffer;
     QOpenGLVertexArrayObject m_ucsVertexArrayObject;
-    QOpenGLShaderProgram *m_ucsShaderProgram;
+    QOpenGLShaderProgram* m_ucsShaderProgram;
 
     // Shader uniform locations
     int m_mvpMatrixLocation;
@@ -261,11 +301,11 @@ private:
     QString m_loadingStage;
 
     // Loading animation
-    QTimer *m_loadingTimer;
+    QTimer* m_loadingTimer;
     int m_loadingAngle;
 
     // Sprint 2.2: Performance monitoring timer
-    QTimer *m_statsTimer;
+    QTimer* m_statsTimer;
 
     // Fonts for overlay text
     QFont m_overlayFont;
@@ -329,7 +369,8 @@ private:
     float m_gpuCullingThreshold;
 
     // Sprint 6: Multi-scan visualization support
-    struct ScanData {
+    struct ScanData
+    {
         QString scanId;
         std::vector<float> pointData;
         QColor color;
@@ -343,4 +384,4 @@ private:
     QMatrix4x4 m_dynamicTransform;  ///< Additional transformation applied during rendering
 };
 
-#endif // POINTCLOUDVIEWERWIDGET_H
+#endif  // POINTCLOUDVIEWERWIDGET_H

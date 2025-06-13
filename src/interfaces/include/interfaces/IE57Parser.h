@@ -1,32 +1,35 @@
 #ifndef IE57PARSER_H
 #define IE57PARSER_H
 
-#include <string>
-#include <vector>
-#include <memory>
 #include <QObject>
 #include <QString>
 
+#include <memory>
+#include <string>
+#include <vector>
+
 /**
  * @brief IE57Parser - Abstract interface for E57 file parsing
- * 
+ *
  * This interface defines the contract for all E57 parser implementations.
  * It enables loose coupling between the parsing logic and the rest of the application,
  * allowing for easy testing with mock implementations and future substitution
  * of different E57 parsing libraries.
- * 
+ *
  * Sprint 1 Decoupling Requirements:
  * - Provides abstraction layer for E57 parsing operations
  * - Enables dependency injection and polymorphic usage
  * - Supports unit testing with mock implementations
  * - Maintains compatibility with existing MainWindow interface
  */
-class IE57Parser : public QObject {
+class IE57Parser : public QObject
+{
     Q_OBJECT
 
 public:
     // Point data structure for enhanced parsing
-    struct PointData {
+    struct PointData
+    {
         double x = 0.0, y = 0.0, z = 0.0;
         float intensity = 0.0f;
         uint8_t r = 0, g = 0, b = 0;
@@ -42,15 +45,17 @@ public:
     };
 
     // Loading settings structure
-    struct LoadingSettings {
+    struct LoadingSettings
+    {
         bool loadIntensity = true;
         bool loadColor = true;
-        int maxPointsPerScan = -1;  // -1 = unlimited
+        int maxPointsPerScan = -1;      // -1 = unlimited
         double subsamplingRatio = 1.0;  // 1.0 = no subsampling
     };
 
     // Scan metadata structure
-    struct ScanMetadata {
+    struct ScanMetadata
+    {
         int index = -1;
         std::string name;
         std::string guid;
@@ -61,7 +66,7 @@ public:
     };
 
 public:
-    explicit IE57Parser(QObject *parent = nullptr) : QObject(parent) {}
+    explicit IE57Parser(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IE57Parser() = default;
 
     // Main entry point for MainWindow integration
@@ -155,7 +160,7 @@ signals:
     // Additional signals for enhanced functionality
     void scanMetadataAvailable(int scanCount, const QStringList& scanNames);
     void intensityDataExtracted(const std::vector<float>& intensityValues);
-    void colorDataExtracted(const std::vector<uint8_t>& colorValues); // RGB interleaved
+    void colorDataExtracted(const std::vector<uint8_t>& colorValues);  // RGB interleaved
 };
 
-#endif // IE57PARSER_H
+#endif  // IE57PARSER_H

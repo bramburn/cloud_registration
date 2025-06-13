@@ -1,10 +1,13 @@
-#include <gtest/gtest.h>
-#include <QtTest/QSignalSpy>
 #include <QCoreApplication>
-#include "../src/e57parserlib.h"
-#include "../src/IE57Parser.h"
+#include <QtTest/QSignalSpy>
+
 #include <fstream>
 #include <memory>
+
+#include "../src/IE57Parser.h"
+#include "../src/e57parserlib.h"
+
+#include <gtest/gtest.h>
 
 /**
  * @brief Sprint 5 Addition: Interface-based testing
@@ -15,27 +18,30 @@
 
 /**
  * @brief Unit tests for E57ParserLib class
- * 
+ *
  * Tests Sprint 1 requirements:
  * - File opening functionality
  * - Metadata extraction (GUID, version, scan count)
  * - Error handling for invalid files
  * - Resource management
  */
-class E57ParserLibTest : public ::testing::Test {
+class E57ParserLibTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create a temporary invalid file for testing
         std::ofstream tempFile("test_invalid.e57");
         tempFile << "This is not a valid E57 file";
         tempFile.close();
     }
-    
-    void TearDown() override {
+
+    void TearDown() override
+    {
         // Clean up test files
         std::remove("test_invalid.e57");
     }
-    
+
     E57ParserLib parser;
     const std::string validFile = "sample/bunnyDouble.e57";
     const std::string invalidFile = "test_invalid.e57";
@@ -43,62 +49,64 @@ protected:
 };
 
 // Test Case 1.2.1: Test opening a known valid E57 file
-TEST_F(E57ParserLibTest, OpenValidFile) {
+TEST_F(E57ParserLibTest, OpenValidFile)
+{
     // Test with the sample file if it exists
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
-        
+
         EXPECT_TRUE(parser.openFile(validFile));
         EXPECT_TRUE(parser.isOpen());
         EXPECT_TRUE(parser.getLastError().isEmpty());
 
         // Test that we can get basic metadata
         auto version = parser.getVersion();
-        EXPECT_GT(version.first, 0); // Major version should be > 0
+        EXPECT_GT(version.first, 0);  // Major version should be > 0
 
         // Scan count should be >= 0
         EXPECT_GE(parser.getScanCount(), 0);
 
         parser.closeFile();
         EXPECT_FALSE(parser.isOpen());
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case 1.2.2: Test opening a non-existent E57 file
-TEST_F(E57ParserLibTest, OpenNonExistentFile) {
+TEST_F(E57ParserLibTest, OpenNonExistentFile)
+{
     EXPECT_FALSE(parser.openFile(nonExistentFile));
     EXPECT_FALSE(parser.isOpen());
     EXPECT_FALSE(parser.getLastError().isEmpty());
 
     // Error message should indicate some kind of error (E57 exception is expected)
     QString error = parser.getLastError();
-    std::cout << "Error message: " << error.toStdString() << std::endl; // Debug output
-    EXPECT_TRUE(error.contains("E57") ||
-                error.contains("exception") ||
-                error.contains("file") ||
-                error.contains("open") ||
-                error.contains("exist"));
+    std::cout << "Error message: " << error.toStdString() << std::endl;  // Debug output
+    EXPECT_TRUE(error.contains("E57") || error.contains("exception") || error.contains("file") ||
+                error.contains("open") || error.contains("exist"));
 }
 
 // Test Case 1.2.3: Test opening a corrupted or non-E57 file
-TEST_F(E57ParserLibTest, OpenInvalidFile) {
+TEST_F(E57ParserLibTest, OpenInvalidFile)
+{
     EXPECT_FALSE(parser.openFile(invalidFile));
     EXPECT_FALSE(parser.isOpen());
     EXPECT_FALSE(parser.getLastError().isEmpty());
 
     // Error message should indicate invalid E57 format or parsing error
     QString error = parser.getLastError();
-    EXPECT_TRUE(error.contains("E57") ||
-                error.contains("format") ||
-                error.contains("invalid") ||
+    EXPECT_TRUE(error.contains("E57") || error.contains("format") || error.contains("invalid") ||
                 error.contains("parse"));
 }
 
 // Test metadata extraction with closed file
-TEST_F(E57ParserLibTest, MetadataWithClosedFile) {
+TEST_F(E57ParserLibTest, MetadataWithClosedFile)
+{
     // Ensure file is closed
     parser.closeFile();
 
@@ -109,9 +117,11 @@ TEST_F(E57ParserLibTest, MetadataWithClosedFile) {
 }
 
 // Test resource management
-TEST_F(E57ParserLibTest, ResourceManagement) {
+TEST_F(E57ParserLibTest, ResourceManagement)
+{
     // Test multiple open/close cycles
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
+    {
         EXPECT_FALSE(parser.isOpen());
 
         // Try to open invalid file
@@ -125,7 +135,8 @@ TEST_F(E57ParserLibTest, ResourceManagement) {
 }
 
 // Test error state management
-TEST_F(E57ParserLibTest, ErrorStateManagement) {
+TEST_F(E57ParserLibTest, ErrorStateManagement)
+{
     // Initially no error
     EXPECT_TRUE(parser.getLastError().isEmpty());
 
@@ -136,10 +147,12 @@ TEST_F(E57ParserLibTest, ErrorStateManagement) {
     // After successful operation, error should be cleared
     // (We'll test this if we have a valid file)
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
         parser.openFile(validFile);
-        if (parser.isOpen()) {
+        if (parser.isOpen())
+        {
             // Error should be cleared on successful open
             // Note: getLastError() might still contain the error from failed open
             // This is acceptable behavior for this sprint
@@ -148,13 +161,14 @@ TEST_F(E57ParserLibTest, ErrorStateManagement) {
 }
 
 // Test constructor and destructor
-TEST_F(E57ParserLibTest, ConstructorDestructor) {
+TEST_F(E57ParserLibTest, ConstructorDestructor)
+{
     // Test that we can create and destroy parser objects
     {
         E57ParserLib tempParser;
         EXPECT_FALSE(tempParser.isOpen());
         EXPECT_TRUE(tempParser.getLastError().isEmpty());
-    } // tempParser should be destroyed cleanly here
+    }  // tempParser should be destroyed cleanly here
 
     // Original parser should still work
     EXPECT_FALSE(parser.isOpen());
@@ -165,9 +179,11 @@ TEST_F(E57ParserLibTest, ConstructorDestructor) {
 // ============================================================================
 
 // Test Case 2.1.1: Parse an E57 file with standard prototype (XYZ as double-precision floats)
-TEST_F(E57ParserLibTest, ExtractPointDataValidFile) {
+TEST_F(E57ParserLibTest, ExtractPointDataValidFile)
+{
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         ASSERT_TRUE(parser.openFile(validFile));
@@ -184,8 +200,10 @@ TEST_F(E57ParserLibTest, ExtractPointDataValidFile) {
 
         // Verify points are not all zeros (basic sanity check)
         bool hasNonZeroValues = false;
-        for (float coord : points) {
-            if (coord != 0.0f) {
+        for (float coord : points)
+        {
+            if (coord != 0.0f)
+            {
                 hasNonZeroValues = true;
                 break;
             }
@@ -193,13 +211,16 @@ TEST_F(E57ParserLibTest, ExtractPointDataValidFile) {
         EXPECT_TRUE(hasNonZeroValues) << "Expected at least some non-zero coordinate values";
 
         parser.closeFile();
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case 2.1.2: Test error handling for missing cartesian fields
-TEST_F(E57ParserLibTest, ExtractPointDataClosedFile) {
+TEST_F(E57ParserLibTest, ExtractPointDataClosedFile)
+{
     // Ensure file is closed
     parser.closeFile();
 
@@ -212,9 +233,11 @@ TEST_F(E57ParserLibTest, ExtractPointDataClosedFile) {
 }
 
 // Test Case 2.1.3: Test invalid scan index
-TEST_F(E57ParserLibTest, ExtractPointDataInvalidScanIndex) {
+TEST_F(E57ParserLibTest, ExtractPointDataInvalidScanIndex)
+{
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         ASSERT_TRUE(parser.openFile(validFile));
@@ -229,15 +252,19 @@ TEST_F(E57ParserLibTest, ExtractPointDataInvalidScanIndex) {
         EXPECT_TRUE(parser.getLastError().contains("Invalid scan index"));
 
         parser.closeFile();
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case 2.3.1: Test progressUpdated signal emission
-TEST_F(E57ParserLibTest, ProgressSignalEmission) {
+TEST_F(E57ParserLibTest, ProgressSignalEmission)
+{
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         ASSERT_TRUE(parser.openFile(validFile));
@@ -252,22 +279,27 @@ TEST_F(E57ParserLibTest, ProgressSignalEmission) {
         EXPECT_GT(progressSpy.count(), 0) << "Expected at least one progressUpdated signal";
 
         // Check that progress values are reasonable
-        for (const auto& signal : progressSpy) {
+        for (const auto& signal : progressSpy)
+        {
             int percentage = signal[0].toInt();
             EXPECT_GE(percentage, 0) << "Progress percentage should be >= 0";
             EXPECT_LE(percentage, 100) << "Progress percentage should be <= 100";
         }
 
         parser.closeFile();
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case 2.3.2: Test parsingFinished signal on successful parsing
-TEST_F(E57ParserLibTest, ParsingFinishedSignalSuccess) {
+TEST_F(E57ParserLibTest, ParsingFinishedSignalSuccess)
+{
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         ASSERT_TRUE(parser.openFile(validFile));
@@ -281,7 +313,8 @@ TEST_F(E57ParserLibTest, ParsingFinishedSignalSuccess) {
         // Verify that parsingFinished signal was emitted exactly once
         EXPECT_EQ(finishedSpy.count(), 1) << "Expected exactly one parsingFinished signal";
 
-        if (finishedSpy.count() > 0) {
+        if (finishedSpy.count() > 0)
+        {
             QList<QVariant> arguments = finishedSpy.at(0);
             bool success = arguments[0].toBool();
             QString message = arguments[1].toString();
@@ -292,13 +325,16 @@ TEST_F(E57ParserLibTest, ParsingFinishedSignalSuccess) {
         }
 
         parser.closeFile();
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case 2.3.3: Test parsingFinished signal on parsing failure
-TEST_F(E57ParserLibTest, ParsingFinishedSignalFailure) {
+TEST_F(E57ParserLibTest, ParsingFinishedSignalFailure)
+{
     // Set up signal spy for parsingFinished signal
     QSignalSpy finishedSpy(&parser, &E57ParserLib::parsingFinished);
 
@@ -308,7 +344,8 @@ TEST_F(E57ParserLibTest, ParsingFinishedSignalFailure) {
     // Verify that parsingFinished signal was emitted exactly once
     EXPECT_EQ(finishedSpy.count(), 1) << "Expected exactly one parsingFinished signal";
 
-    if (finishedSpy.count() > 0) {
+    if (finishedSpy.count() > 0)
+    {
         QList<QVariant> arguments = finishedSpy.at(0);
         bool success = arguments[0].toBool();
         QString message = arguments[1].toString();
@@ -323,7 +360,8 @@ TEST_F(E57ParserLibTest, ParsingFinishedSignalFailure) {
 // ============================================================================
 
 // Test Case: Polymorphic Usage Through Interface
-TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface) {
+TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface)
+{
     // Test that E57ParserLib can be used polymorphically through IE57Parser interface
     std::unique_ptr<IE57Parser> interfaceParser(new E57ParserLib());
 
@@ -334,7 +372,8 @@ TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface) {
 
     // Test that we can call interface methods
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         EXPECT_TRUE(interfaceParser->openFile(validFile));
@@ -347,7 +386,8 @@ TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface) {
         int scanCount = interfaceParser->getScanCount();
         EXPECT_GE(scanCount, 0);
 
-        if (scanCount > 0) {
+        if (scanCount > 0)
+        {
             auto metadata = interfaceParser->getScanMetadata(0);
             EXPECT_EQ(metadata.index, 0);
             EXPECT_GE(metadata.pointCount, 0);
@@ -355,13 +395,16 @@ TEST_F(E57ParserLibTest, PolymorphicUsageThroughInterface) {
 
         interfaceParser->closeFile();
         EXPECT_FALSE(interfaceParser->isOpen());
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case: Interface Signal Compatibility
-TEST_F(E57ParserLibTest, InterfaceSignalCompatibility) {
+TEST_F(E57ParserLibTest, InterfaceSignalCompatibility)
+{
     std::unique_ptr<IE57Parser> interfaceParser(new E57ParserLib());
 
     // Test that signals are accessible through the interface
@@ -379,7 +422,8 @@ TEST_F(E57ParserLibTest, InterfaceSignalCompatibility) {
 }
 
 // Test Case: Interface Method Override Verification
-TEST_F(E57ParserLibTest, InterfaceMethodOverrideVerification) {
+TEST_F(E57ParserLibTest, InterfaceMethodOverrideVerification)
+{
     // This test verifies that all interface methods are properly overridden
     E57ParserLib concreteParser;
     IE57Parser* interfacePtr = &concreteParser;
@@ -397,7 +441,8 @@ TEST_F(E57ParserLibTest, InterfaceMethodOverrideVerification) {
 }
 
 // Test Case: Dependency Injection Compatibility
-TEST_F(E57ParserLibTest, DependencyInjectionCompatibility) {
+TEST_F(E57ParserLibTest, DependencyInjectionCompatibility)
+{
     // Test that E57ParserLib can be used for dependency injection
     std::unique_ptr<IE57Parser> parser(new E57ParserLib());
 
@@ -423,16 +468,20 @@ TEST_F(E57ParserLibTest, DependencyInjectionCompatibility) {
  * These tests verify that E57ParserLib works correctly when used through
  * the IE57Parser interface, ensuring complete abstraction compliance.
  */
-class E57ParserLibInterfaceTest : public ::testing::Test {
+class E57ParserLibInterfaceTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create parser through interface
         m_parser = std::make_unique<E57ParserLib>();
         m_interface = m_parser.get();
     }
 
-    void TearDown() override {
-        if (m_interface && m_interface->isOpen()) {
+    void TearDown() override
+    {
+        if (m_interface && m_interface->isOpen())
+        {
             m_interface->closeFile();
         }
         m_parser.reset();
@@ -446,7 +495,8 @@ protected:
 };
 
 // Test Case: Interface Method Compliance
-TEST_F(E57ParserLibInterfaceTest, InterfaceMethodCompliance) {
+TEST_F(E57ParserLibInterfaceTest, InterfaceMethodCompliance)
+{
     // Test that all interface methods are accessible and work correctly
     EXPECT_FALSE(m_interface->isOpen());
     EXPECT_TRUE(m_interface->getLastError().isEmpty());
@@ -459,9 +509,11 @@ TEST_F(E57ParserLibInterfaceTest, InterfaceMethodCompliance) {
 }
 
 // Test Case: Interface File Operations
-TEST_F(E57ParserLibInterfaceTest, InterfaceFileOperations) {
+TEST_F(E57ParserLibInterfaceTest, InterfaceFileOperations)
+{
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         // Test opening through interface
@@ -476,12 +528,14 @@ TEST_F(E57ParserLibInterfaceTest, InterfaceFileOperations) {
         EXPECT_GE(scanCount, 0);
 
         // Test point data extraction through interface
-        if (scanCount > 0) {
+        if (scanCount > 0)
+        {
             auto points = m_interface->extractPointData(0);
             EXPECT_GE(points.size(), 0);
 
             int64_t pointCount = m_interface->getPointCount(0);
-            if (!points.empty()) {
+            if (!points.empty())
+            {
                 EXPECT_EQ(points.size(), pointCount * 3);
             }
         }
@@ -489,13 +543,16 @@ TEST_F(E57ParserLibInterfaceTest, InterfaceFileOperations) {
         // Test closing through interface
         m_interface->closeFile();
         EXPECT_FALSE(m_interface->isOpen());
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case: Interface Error Handling
-TEST_F(E57ParserLibInterfaceTest, InterfaceErrorHandling) {
+TEST_F(E57ParserLibInterfaceTest, InterfaceErrorHandling)
+{
     // Test error handling through interface
     EXPECT_FALSE(m_interface->openFile(invalidFile));
     EXPECT_FALSE(m_interface->isOpen());
@@ -508,7 +565,8 @@ TEST_F(E57ParserLibInterfaceTest, InterfaceErrorHandling) {
 }
 
 // Test Case: Interface Signal Compatibility
-TEST_F(E57ParserLibInterfaceTest, InterfaceSignalCompatibility) {
+TEST_F(E57ParserLibInterfaceTest, InterfaceSignalCompatibility)
+{
     // Test that signals work through the interface
     QSignalSpy progressSpy(m_interface, &IE57Parser::progressUpdated);
     QSignalSpy finishedSpy(m_interface, &IE57Parser::parsingFinished);
@@ -519,34 +577,40 @@ TEST_F(E57ParserLibInterfaceTest, InterfaceSignalCompatibility) {
     EXPECT_TRUE(metadataSpy.isValid());
 
     std::ifstream file(validFile);
-    if (file.good()) {
+    if (file.good())
+    {
         file.close();
 
         m_interface->openFile(validFile);
-        if (m_interface->isOpen()) {
+        if (m_interface->isOpen())
+        {
             // Extract data to trigger signals
             m_interface->extractPointData(0);
 
             // Verify signals were emitted
             EXPECT_GT(finishedSpy.count(), 0);
         }
-    } else {
+    }
+    else
+    {
         GTEST_SKIP() << "Valid E57 test file not found: " << validFile;
     }
 }
 
 // Test Case: Polymorphic Usage Verification
-TEST_F(E57ParserLibInterfaceTest, PolymorphicUsageVerification) {
+TEST_F(E57ParserLibInterfaceTest, PolymorphicUsageVerification)
+{
     // Test that the parser can be used polymorphically
     std::vector<std::unique_ptr<IE57Parser>> parsers;
     parsers.push_back(std::make_unique<E57ParserLib>());
 
-    for (auto& parser : parsers) {
+    for (auto& parser : parsers)
+    {
         EXPECT_FALSE(parser->isOpen());
         EXPECT_TRUE(parser->getLastError().isEmpty());
 
         // Test that virtual method dispatch works correctly
-        parser->closeFile(); // Should be safe to call
+        parser->closeFile();  // Should be safe to call
         EXPECT_FALSE(parser->isOpen());
     }
 }

@@ -1,16 +1,17 @@
 #ifndef LASPARSER_H
 #define LASPARSER_H
 
+#include <QByteArray>
+#include <QDataStream>
+#include <QFile>
 #include <QObject>
 #include <QString>
-#include <QFile>
-#include <QDataStream>
-#include <QByteArray>
 // #include <QVector3D>  // Commented out for testing compatibility
-#include <vector>
 #include <stdexcept>
-#include "core/voxelgridfilter.h"
+#include <vector>
+
 #include "core/lasheadermetadata.h"
+#include "core/voxelgridfilter.h"
 
 // Forward declarations
 struct LoadingSettings;
@@ -20,7 +21,7 @@ class LasParser : public QObject
     Q_OBJECT
 
 public:
-    explicit LasParser(QObject *parent = nullptr);
+    explicit LasParser(QObject* parent = nullptr);
     ~LasParser();
 
     // Main parsing function
@@ -32,33 +33,49 @@ public:
     QString getLastError() const;
 
     // Sprint 1.3: Accessor methods for header information
-    uint8_t getVersionMajor() const { return m_versionMajor; }
-    uint8_t getVersionMinor() const { return m_versionMinor; }
-    uint8_t getPointDataFormat() const { return m_pointFormat; }
-    uint16_t getPointDataRecordLength() const { return m_pointDataRecordLength; }
-    uint16_t getHeaderSize() const { return m_headerSize; }
+    uint8_t getVersionMajor() const
+    {
+        return m_versionMajor;
+    }
+    uint8_t getVersionMinor() const
+    {
+        return m_versionMinor;
+    }
+    uint8_t getPointDataFormat() const
+    {
+        return m_pointFormat;
+    }
+    uint16_t getPointDataRecordLength() const
+    {
+        return m_pointDataRecordLength;
+    }
+    uint16_t getHeaderSize() const
+    {
+        return m_headerSize;
+    }
 
 public slots:
     void startParsing(const QString& filePath);
     void startParsing(const QString& filePath, const LoadingSettings& settings);
 
 signals:
-    void progressUpdated(int percentage, const QString &stage);
+    void progressUpdated(int percentage, const QString& stage);
     void parsingFinished(bool success, const QString& message, const std::vector<float>& points);
     void headerParsed(const LasHeaderMetadata& metadata);
 
 private:
     // Enhanced LAS file header structure for LAS 1.2-1.4 support (Sprint 1.3)
-    struct LasHeader {
-        char signature[4];              // "LASF"
+    struct LasHeader
+    {
+        char signature[4];  // "LASF"
         uint16_t fileSourceId;
         uint16_t globalEncoding;
         uint32_t guidData1;
         uint16_t guidData2;
         uint16_t guidData3;
         uint8_t guidData4[8];
-        uint8_t versionMajor;           // Must be 1
-        uint8_t versionMinor;           // 2, 3, or 4 supported (Sprint 1.3)
+        uint8_t versionMajor;  // Must be 1
+        uint8_t versionMinor;  // 2, 3, or 4 supported (Sprint 1.3)
         char systemIdentifier[32];
         char generatingSoftware[32];
         uint16_t creationDayOfYear;
@@ -66,7 +83,7 @@ private:
         uint16_t headerSize;
         uint32_t pointDataOffset;
         uint32_t numberOfVLRs;
-        uint8_t pointDataFormat;        // 0-3 supported (Sprint 1.3)
+        uint8_t pointDataFormat;  // 0-3 supported (Sprint 1.3)
         uint16_t pointDataRecordLength;
         uint32_t numberOfPointRecords;
         uint32_t numberOfPointsByReturn[5];
@@ -84,17 +101,18 @@ private:
         double minZ;
 
         // LAS 1.3+ extensions (Sprint 1.3)
-        uint64_t startOfWaveformData;   // LAS 1.3+
+        uint64_t startOfWaveformData;  // LAS 1.3+
 
         // LAS 1.4+ extensions (Sprint 1.3)
-        uint64_t startOfFirstEVLR;      // LAS 1.4+
-        uint32_t numEVLRRecords;        // LAS 1.4+
-        uint64_t numPointRecords64;     // LAS 1.4+
-        uint64_t numPointsByReturn64[15]; // LAS 1.4+
+        uint64_t startOfFirstEVLR;         // LAS 1.4+
+        uint32_t numEVLRRecords;           // LAS 1.4+
+        uint64_t numPointRecords64;        // LAS 1.4+
+        uint64_t numPointsByReturn64[15];  // LAS 1.4+
     };
 
     // Point data format structures
-    struct PointFormat0 {
+    struct PointFormat0
+    {
         int32_t x;
         int32_t y;
         int32_t z;
@@ -106,7 +124,8 @@ private:
         uint16_t pointSourceId;
     };
 
-    struct PointFormat1 {
+    struct PointFormat1
+    {
         int32_t x;
         int32_t y;
         int32_t z;
@@ -131,7 +150,7 @@ private:
     std::vector<float> readPointFormat3(QFile& file, const LasHeader& header);
 
     // Helper functions
-    template<typename T>
+    template <typename T>
     bool readValue(QFile& file, T& value);
 
     // Coordinate transformation helper
@@ -188,11 +207,12 @@ private:
 class LasParseException : public std::runtime_error
 {
 public:
-    explicit LasParseException(const QString& message)
-        : std::runtime_error(message.toStdString()) {}
+    explicit LasParseException(const QString& message) : std::runtime_error(message.toStdString()) {}
 
     LasParseException(const QString& message, qint64 offset)
-        : std::runtime_error((message + QString(" at offset %1").arg(offset)).toStdString()) {}
+        : std::runtime_error((message + QString(" at offset %1").arg(offset)).toStdString())
+    {
+    }
 };
 
-#endif // LASPARSER_H
+#endif  // LASPARSER_H

@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+
 #include <vector>
 
 class IMainView;
@@ -14,19 +15,20 @@ struct LasHeaderMetadata;
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
- * 
+ *
  * This class implements the MVP (Model-View-Presenter) pattern by acting as the
  * intermediary between the view (IMainView) and the model (services like IE57Parser).
  * It contains all the application logic and coordinates between different components
  * without being coupled to specific UI or service implementations.
- * 
+ *
  * Sprint 4 Decoupling Requirements:
  * - Separates presentation logic from UI implementation
  * - Coordinates between view and model components through interfaces
  * - Enables unit testing of application logic without UI dependencies
  * - Promotes loose coupling and high cohesion
  */
-class MainPresenter : public QObject {
+class MainPresenter : public QObject
+{
     Q_OBJECT
 
 public:
@@ -37,10 +39,10 @@ public:
      * @param e57Writer Pointer to the E57 writer interface
      * @param parent Parent QObject
      */
-    explicit MainPresenter(IMainView* view, 
-                          IE57Parser* e57Parser, 
-                          IE57Writer* e57Writer = nullptr,
-                          QObject* parent = nullptr);
+    explicit MainPresenter(IMainView* view,
+                           IE57Parser* e57Parser,
+                           IE57Writer* e57Writer = nullptr,
+                           QObject* parent = nullptr);
 
     virtual ~MainPresenter() = default;
 
@@ -293,4 +295,4 @@ private:
     int m_currentVisiblePoints;
 };
 
-#endif // MAINPRESENTER_H
+#endif  // MAINPRESENTER_H

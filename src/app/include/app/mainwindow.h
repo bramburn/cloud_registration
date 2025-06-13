@@ -1,19 +1,21 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <QStackedWidget>
-#include <QSplitter>
-#include <QLabel>
 #include <QAction>
+#include <QLabel>
+#include <QMainWindow>
 #include <QProgressBar>
+#include <QSplitter>
+#include <QStackedWidget>
 #include <QVBoxLayout>
-#include <vector>
+
 #include <memory>
+#include <vector>
+
+#include "IMainView.h"
+#include "IPointCloudViewer.h"
 #include "progressmanager.h"
 #include "projectmanager.h"
-#include "IPointCloudViewer.h"
-#include "IMainView.h"
 
 class ProjectHubWidget;
 class SidebarWidget;
@@ -46,8 +48,8 @@ class MainWindow : public QMainWindow, public IMainView
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
-    explicit MainWindow(IE57Parser* e57Parser, QWidget *parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(IE57Parser* e57Parser, QWidget* parent = nullptr);
     ~MainWindow();
 
     // IMainView interface implementation
@@ -69,7 +71,8 @@ public:
     void updateMemoryUsage(size_t totalBytes) override;
     void updateRenderingStats(float fps, int visiblePoints) override;
     QString askForOpenFilePath(const QString& title, const QString& filter) override;
-    QString askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
+    QString
+    askForSaveFilePath(const QString& title, const QString& filter, const QString& defaultName = QString()) override;
     bool askForConfirmation(const QString& title, const QString& message) override;
 
     // Sprint 3: Sidebar operation interface methods
@@ -106,30 +109,106 @@ public:
 
 private slots:
     // Simplified slots that delegate to presenter
-    void onProjectOpened(const QString &projectPath) { if (m_presenter) m_presenter->handleProjectOpened(projectPath); }
-    void onFileNewProject() { if (m_presenter) m_presenter->handleNewProject(); }
-    void onFileOpenProject() { if (m_presenter) m_presenter->handleOpenProject(); }
-    void closeCurrentProject() { if (m_presenter) m_presenter->handleCloseProject(); }
-    void onImportScans() { if (m_presenter) m_presenter->handleImportScans(); }
+    void onProjectOpened(const QString& projectPath)
+    {
+        if (m_presenter)
+            m_presenter->handleProjectOpened(projectPath);
+    }
+    void onFileNewProject()
+    {
+        if (m_presenter)
+            m_presenter->handleNewProject();
+    }
+    void onFileOpenProject()
+    {
+        if (m_presenter)
+            m_presenter->handleOpenProject();
+    }
+    void closeCurrentProject()
+    {
+        if (m_presenter)
+            m_presenter->handleCloseProject();
+    }
+    void onImportScans()
+    {
+        if (m_presenter)
+            m_presenter->handleImportScans();
+    }
 
-    void onScanActivated(const QString& scanId) { if (m_presenter) m_presenter->handleScanActivated(scanId); }
-    void onOpenFileClicked() { if (m_presenter) m_presenter->handleOpenFile(); }
-    void onLoadingFinished(bool success, const QString& message) { if (m_presenter) m_presenter->handleLoadingFinished(success, message); }
-    void onParsingProgressUpdated(int percentage, const QString &stage) { if (m_presenter) m_presenter->handleParsingProgressUpdated(percentage, stage); }
-    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points) { if (m_presenter) m_presenter->handleParsingFinished(success, message, points); }
-    void onLoadingSettingsTriggered() { if (m_presenter) m_presenter->handleLoadingSettings(); }
-    void onLasHeaderParsed(const LasHeaderMetadata& metadata) { if (m_presenter) m_presenter->handleLasHeaderParsed(metadata); }
-    void onScanMetadataReceived(int scanCount, const QStringList& scanNames) { if (m_presenter) m_presenter->handleScanMetadataReceived(scanCount, scanNames); }
-    void onIntensityDataReceived(const std::vector<float>& intensityValues) { if (m_presenter) m_presenter->handleIntensityDataReceived(intensityValues); }
-    void onColorDataReceived(const std::vector<uint8_t>& colorValues) { if (m_presenter) m_presenter->handleColorDataReceived(colorValues); }
-    void onTopViewClicked() { if (m_presenter) m_presenter->handleTopViewClicked(); }
-    void onLeftViewClicked() { if (m_presenter) m_presenter->handleLeftViewClicked(); }
-    void onRightViewClicked() { if (m_presenter) m_presenter->handleRightViewClicked(); }
-    void onBottomViewClicked() { if (m_presenter) m_presenter->handleBottomViewClicked(); }
+    void onScanActivated(const QString& scanId)
+    {
+        if (m_presenter)
+            m_presenter->handleScanActivated(scanId);
+    }
+    void onOpenFileClicked()
+    {
+        if (m_presenter)
+            m_presenter->handleOpenFile();
+    }
+    void onLoadingFinished(bool success, const QString& message)
+    {
+        if (m_presenter)
+            m_presenter->handleLoadingFinished(success, message);
+    }
+    void onParsingProgressUpdated(int percentage, const QString& stage)
+    {
+        if (m_presenter)
+            m_presenter->handleParsingProgressUpdated(percentage, stage);
+    }
+    void onParsingFinished(bool success, const QString& message, const std::vector<float>& points)
+    {
+        if (m_presenter)
+            m_presenter->handleParsingFinished(success, message, points);
+    }
+    void onLoadingSettingsTriggered()
+    {
+        if (m_presenter)
+            m_presenter->handleLoadingSettings();
+    }
+    void onLasHeaderParsed(const LasHeaderMetadata& metadata)
+    {
+        if (m_presenter)
+            m_presenter->handleLasHeaderParsed(metadata);
+    }
+    void onScanMetadataReceived(int scanCount, const QStringList& scanNames)
+    {
+        if (m_presenter)
+            m_presenter->handleScanMetadataReceived(scanCount, scanNames);
+    }
+    void onIntensityDataReceived(const std::vector<float>& intensityValues)
+    {
+        if (m_presenter)
+            m_presenter->handleIntensityDataReceived(intensityValues);
+    }
+    void onColorDataReceived(const std::vector<uint8_t>& colorValues)
+    {
+        if (m_presenter)
+            m_presenter->handleColorDataReceived(colorValues);
+    }
+    void onTopViewClicked()
+    {
+        if (m_presenter)
+            m_presenter->handleTopViewClicked();
+    }
+    void onLeftViewClicked()
+    {
+        if (m_presenter)
+            m_presenter->handleLeftViewClicked();
+    }
+    void onRightViewClicked()
+    {
+        if (m_presenter)
+            m_presenter->handleRightViewClicked();
+    }
+    void onBottomViewClicked()
+    {
+        if (m_presenter)
+            m_presenter->handleBottomViewClicked();
+    }
 
     // Sprint 3.2: Point cloud viewing slots
-    void onPointCloudDataReady(const std::vector<float> &points, const QString &sourceInfo);
-    void onPointCloudViewFailed(const QString &error);
+    void onPointCloudDataReady(const std::vector<float>& points, const QString& sourceInfo);
+    void onPointCloudViewFailed(const QString& error);
 
     // Sprint 3.3: Progress management slots
     void onOperationStarted(const QString& operationId, const QString& name, OperationType type);
@@ -166,8 +245,8 @@ private:
     void setupStatusBar();
     void setupSprintR3Controls(QVBoxLayout* parentLayout);
     void setupSprintR4Controls(QVBoxLayout* parentLayout);
-    void transitionToProjectView(const QString &projectPath);
-    void updateWindowTitle(const QString &projectName = QString());
+    void transitionToProjectView(const QString& projectPath);
+    void updateWindowTitle(const QString& projectName = QString());
 
     // Sprint 1.2: Import guidance methods
     void showImportGuidance(bool show);
@@ -179,17 +258,28 @@ private:
     void cleanupProgressDialog();
     void updateUIAfterParsing(bool success, const QString& message);
     void setStatusReady();
-    void setStatusLoading(const QString &filename);
-    void setStatusLoadSuccess(const QString &filename, int pointCount);
-    void setStatusLoadFailed(const QString &filename, const QString &error);
-    void setStatusFileInfo(const QString &filename, int pointCount,
-                          double minX, double minY, double minZ,
-                          double maxX, double maxY, double maxZ);
-    void setStatusViewChanged(const QString &viewName);
+    void setStatusLoading(const QString& filename);
+    void setStatusLoadSuccess(const QString& filename, int pointCount);
+    void setStatusLoadFailed(const QString& filename, const QString& error);
+    void setStatusFileInfo(const QString& filename,
+                           int pointCount,
+                           double minX,
+                           double minY,
+                           double minZ,
+                           double maxX,
+                           double maxY,
+                           double maxZ);
+    void setStatusViewChanged(const QString& viewName);
 
     // Sprint 3.2: Test helper methods
-    IPointCloudViewer* getPointCloudViewer() const { return m_viewer; }
-    PointCloudLoadManager* getPointCloudLoadManager() const { return m_loadManager; }
+    IPointCloudViewer* getPointCloudViewer() const
+    {
+        return m_viewer;
+    }
+    PointCloudLoadManager* getPointCloudLoadManager() const
+    {
+        return m_loadManager;
+    }
 
     // Sprint 3.4: Memory statistics display
     void setupMemoryDisplay();
@@ -199,53 +289,53 @@ private:
     void onStatsUpdated(float fps, int visiblePoints);
 
     // Main UI Components
-    QStackedWidget *m_centralStack;
-    ProjectHubWidget *m_projectHub;
-    QWidget *m_projectView;
-    QSplitter *m_projectSplitter;
-    SidebarWidget *m_sidebar;
-    QWidget *m_mainContentArea;
+    QStackedWidget* m_centralStack;
+    ProjectHubWidget* m_projectHub;
+    QWidget* m_projectView;
+    QSplitter* m_projectSplitter;
+    SidebarWidget* m_sidebar;
+    QWidget* m_mainContentArea;
 
     // Point cloud viewer (interface-based for decoupling)
-    IPointCloudViewer *m_viewer;
-    PointCloudViewerWidget *m_viewerWidget; // Concrete widget for layout management
-    QProgressDialog *m_progressDialog;
+    IPointCloudViewer* m_viewer;
+    PointCloudViewerWidget* m_viewerWidget;  // Concrete widget for layout management
+    QProgressDialog* m_progressDialog;
 
     // Project management
-    ProjectManager *m_projectManager;
-    PointCloudLoadManager *m_loadManager;
-    Project *m_currentProject;
+    ProjectManager* m_projectManager;
+    PointCloudLoadManager* m_loadManager;
+    Project* m_currentProject;
 
     // Menu actions
-    QAction *m_newProjectAction;
-    QAction *m_openProjectAction;
-    QAction *m_closeProjectAction;
-    QAction *m_importScansAction;
-    QAction *m_loadingSettingsAction;
-    QAction *m_topViewAction;
-    QAction *m_leftViewAction;
-    QAction *m_rightViewAction;
-    QAction *m_bottomViewAction;
+    QAction* m_newProjectAction;
+    QAction* m_openProjectAction;
+    QAction* m_closeProjectAction;
+    QAction* m_importScansAction;
+    QAction* m_loadingSettingsAction;
+    QAction* m_topViewAction;
+    QAction* m_leftViewAction;
+    QAction* m_rightViewAction;
+    QAction* m_bottomViewAction;
 
     // Sprint 6: Export and Quality Assessment actions
-    QAction *m_exportPointCloudAction;
-    QAction *m_qualityAssessmentAction;
-    QAction *m_generateReportAction;
-    QAction *m_coordinateSystemAction;
+    QAction* m_exportPointCloudAction;
+    QAction* m_qualityAssessmentAction;
+    QAction* m_generateReportAction;
+    QAction* m_coordinateSystemAction;
 
     // Sprint 1.2: Import guidance widgets
-    QWidget *m_importGuidanceWidget;
-    QPushButton *m_importGuidanceButton;
+    QWidget* m_importGuidanceWidget;
+    QPushButton* m_importGuidanceButton;
 
     // Legacy data processing
-    LasParser *m_lasParser;
-    QThread *m_parserThread;
-    QObject *m_workerParser = nullptr;  // Generic pointer for any parser type
+    LasParser* m_lasParser;
+    QThread* m_parserThread;
+    QObject* m_workerParser = nullptr;  // Generic pointer for any parser type
     QString m_currentFilePath;
     bool m_isLoading;
 
     // Sprint 1 Decoupling: Injected E57 parser interface
-    IE57Parser *m_e57Parser = nullptr;
+    IE57Parser* m_e57Parser = nullptr;
 
     // E57-specific data storage
     int m_currentScanCount = 0;
@@ -254,17 +344,17 @@ private:
     std::vector<uint8_t> m_currentColorData;
 
     // Status bar widgets
-    QLabel *m_statusLabel;
-    QLabel *m_permanentStatusLabel;
+    QLabel* m_statusLabel;
+    QLabel* m_permanentStatusLabel;
     QString m_currentFileName;
     int m_currentPointCount;
 
     // Sprint 3.4: Memory usage display
-    QLabel *m_memoryLabel;
+    QLabel* m_memoryLabel;
 
     // Sprint 2.2: Performance monitoring display
-    QLabel *m_fpsLabel;
-    QLabel *m_pointsLabel;
+    QLabel* m_fpsLabel;
+    QLabel* m_pointsLabel;
 
     // Sprint 3.3: Progress display widgets
     QProgressBar* m_progressBar;
@@ -318,4 +408,4 @@ private:
     QualityReport* m_lastQualityReport;
 };
 
-#endif // MAINWINDOW_H
+#endif  // MAINWINDOW_H

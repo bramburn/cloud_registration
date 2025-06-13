@@ -1,76 +1,89 @@
 #include "app/pointcloudviewerwidget.h"
+
 #include "core/performance_profiler.h"
 // Sprint 6: Include for Point struct
-#include "export/IFormatWriter.h"
+#include <QBrush>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
-#include <QCoreApplication>
 #include <QPainter>
 #include <QRadialGradient>
-#include <QBrush>
+
 #include <cmath>
 
-PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
-    : QOpenGLWidget(parent)
-    , m_vertexBuffer(QOpenGLBuffer::VertexBuffer)
-    , m_shaderProgram(nullptr)
-    , m_ucsVertexBuffer(QOpenGLBuffer::VertexBuffer)
-    , m_ucsShaderProgram(nullptr)
-    , m_mvpMatrixLocation(-1)
-    , m_colorLocation(-1)
-    , m_pointSizeLocation(-1)
-    , m_ucsMvpMatrixLocation(-1)
-    , m_cameraPosition(0.0f, 0.0f, 5.0f)
-    , m_cameraTarget(0.0f, 0.0f, 0.0f)
-    , m_cameraUp(0.0f, 1.0f, 0.0f)
-    , m_cameraDistance(5.0f)
-    , m_cameraYaw(0.0f)
-    , m_cameraPitch(0.0f)
-    , m_mousePressed(false)
-    , m_pressedButton(Qt::NoButton)
-    , m_pointCount(0)
-    , m_globalOffset(0.0f, 0.0f, 0.0f)
-    , m_boundingBoxMin(0.0f, 0.0f, 0.0f)
-    , m_boundingBoxMax(0.0f, 0.0f, 0.0f)
-    , m_boundingBoxCenter(0.0f, 0.0f, 0.0f)
-    , m_boundingBoxSize(1.0f)
-    , m_pointColor(1.0f, 1.0f, 1.0f)
-    , m_pointSize(2.0f)
-    , m_hasData(false)
-    , m_shadersInitialized(false)
-    , m_showErrorState(true)  // Sprint 1.3: Start in error state
-    , m_errorMessage("No point cloud data loaded")
-    , m_currentState(ViewerState::Idle)  // Sprint 2.3: Initialize state
-    , m_loadingProgress(0)
-    , m_loadingAngle(0)
-    , m_lodEnabled(false)  // Sprint 3.4: Initialize LOD state
-    , m_lodSubsampleRate(0.5f)
-    , m_octree(std::make_unique<Octree>())  // Sprint R1: Initialize octree
-    , m_lodDistance1(50.0f)  // Sprint R1: Close LOD distance
-    , m_lodDistance2(200.0f)  // Sprint R1: Far LOD distance
-    , m_primaryScreenSpaceErrorThreshold(50.0f)  // Sprint R2: Primary threshold (pixels)
-    , m_cullScreenSpaceErrorThreshold(2.0f)      // Sprint R2: Cull threshold (pixels)
-    , m_renderWithColor(false)                   // Sprint R3: Initialize attribute rendering
-    , m_renderWithIntensity(false)
-    , m_pointSizeAttenuationEnabled(false)
-    , m_minPointSize(1.0f)
-    , m_maxPointSize(10.0f)
-    , m_attenuationFactor(0.1f)
-    , m_splattingEnabled(true)                    // Sprint R4: Initialize splatting and lighting
-    , m_lightingEnabled(false)
-    , m_lightDirection(0, 0, -1)
-    , m_lightColor(Qt::white)
-    , m_ambientIntensity(0.3f)
-    , m_splatThreshold(10.0f)
-    , m_pointShaderProgram(nullptr)
-    , m_splatShaderProgram(nullptr)
-    , m_splatTexture(nullptr)
-    , m_fps(0.0f)
-    , m_frameCount(0)
-    , m_visiblePointCount(0)
-    , m_gpuCuller(nullptr)
-    , m_gpuCullingEnabled(false)
-    , m_gpuCullingThreshold(1.0f)
+#include "export/IFormatWriter.h"
+
+PointCloudViewerWidget::PointCloudViewerWidget(QWidget* parent)
+    : QOpenGLWidget(parent),
+      m_vertexBuffer(QOpenGLBuffer::VertexBuffer),
+      m_shaderProgram(nullptr),
+      m_ucsVertexBuffer(QOpenGLBuffer::VertexBuffer),
+      m_ucsShaderProgram(nullptr),
+      m_mvpMatrixLocation(-1),
+      m_colorLocation(-1),
+      m_pointSizeLocation(-1),
+      m_ucsMvpMatrixLocation(-1),
+      m_cameraPosition(0.0f, 0.0f, 5.0f),
+      m_cameraTarget(0.0f, 0.0f, 0.0f),
+      m_cameraUp(0.0f, 1.0f, 0.0f),
+      m_cameraDistance(5.0f),
+      m_cameraYaw(0.0f),
+      m_cameraPitch(0.0f),
+      m_mousePressed(false),
+      m_pressedButton(Qt::NoButton),
+      m_pointCount(0),
+      m_globalOffset(0.0f, 0.0f, 0.0f),
+      m_boundingBoxMin(0.0f, 0.0f, 0.0f),
+      m_boundingBoxMax(0.0f, 0.0f, 0.0f),
+      m_boundingBoxCenter(0.0f, 0.0f, 0.0f),
+      m_boundingBoxSize(1.0f),
+      m_pointColor(1.0f, 1.0f, 1.0f),
+      m_pointSize(2.0f),
+      m_hasData(false),
+      m_shadersInitialized(false),
+      m_showErrorState(true)  // Sprint 1.3: Start in error state
+      ,
+      m_errorMessage("No point cloud data loaded"),
+      m_currentState(ViewerState::Idle)  // Sprint 2.3: Initialize state
+      ,
+      m_loadingProgress(0),
+      m_loadingAngle(0),
+      m_lodEnabled(false)  // Sprint 3.4: Initialize LOD state
+      ,
+      m_lodSubsampleRate(0.5f),
+      m_octree(std::make_unique<Octree>())  // Sprint R1: Initialize octree
+      ,
+      m_lodDistance1(50.0f)  // Sprint R1: Close LOD distance
+      ,
+      m_lodDistance2(200.0f)  // Sprint R1: Far LOD distance
+      ,
+      m_primaryScreenSpaceErrorThreshold(50.0f)  // Sprint R2: Primary threshold (pixels)
+      ,
+      m_cullScreenSpaceErrorThreshold(2.0f)  // Sprint R2: Cull threshold (pixels)
+      ,
+      m_renderWithColor(false)  // Sprint R3: Initialize attribute rendering
+      ,
+      m_renderWithIntensity(false),
+      m_pointSizeAttenuationEnabled(false),
+      m_minPointSize(1.0f),
+      m_maxPointSize(10.0f),
+      m_attenuationFactor(0.1f),
+      m_splattingEnabled(true)  // Sprint R4: Initialize splatting and lighting
+      ,
+      m_lightingEnabled(false),
+      m_lightDirection(0, 0, -1),
+      m_lightColor(Qt::white),
+      m_ambientIntensity(0.3f),
+      m_splatThreshold(10.0f),
+      m_pointShaderProgram(nullptr),
+      m_splatShaderProgram(nullptr),
+      m_splatTexture(nullptr),
+      m_fps(0.0f),
+      m_frameCount(0),
+      m_visiblePointCount(0),
+      m_gpuCuller(nullptr),
+      m_gpuCullingEnabled(false),
+      m_gpuCullingThreshold(1.0f)
 {
     qDebug() << "PointCloudViewerWidget constructor started";
     setFocusPolicy(Qt::StrongFocus);
@@ -86,15 +99,13 @@ PointCloudViewerWidget::PointCloudViewerWidget(QWidget *parent)
 
     // Sprint 2.3: Setup loading animation timer
     m_loadingTimer = new QTimer(this);
-    m_loadingTimer->setInterval(50); // 20 FPS animation
-    connect(m_loadingTimer, &QTimer::timeout,
-            this, &PointCloudViewerWidget::updateLoadingAnimation);
+    m_loadingTimer->setInterval(50);  // 20 FPS animation
+    connect(m_loadingTimer, &QTimer::timeout, this, &PointCloudViewerWidget::updateLoadingAnimation);
 
     // Sprint 2.2: Setup performance statistics timer
     m_statsTimer = new QTimer(this);
-    m_statsTimer->setInterval(1000); // Update stats every second
-    connect(m_statsTimer, &QTimer::timeout,
-            this, &PointCloudViewerWidget::emitPerformanceStats);
+    m_statsTimer->setInterval(1000);  // Update stats every second
+    connect(m_statsTimer, &QTimer::timeout, this, &PointCloudViewerWidget::emitPerformanceStats);
     m_statsTimer->start();
 
     // Setup fonts for overlay text
@@ -115,24 +126,29 @@ PointCloudViewerWidget::~PointCloudViewerWidget()
 {
     makeCurrent();
 
-    if (m_shaderProgram) {
+    if (m_shaderProgram)
+    {
         delete m_shaderProgram;
     }
 
-    if (m_ucsShaderProgram) {
+    if (m_ucsShaderProgram)
+    {
         delete m_ucsShaderProgram;
     }
 
     // Sprint R4: Clean up splatting and lighting resources
-    if (m_pointShaderProgram) {
+    if (m_pointShaderProgram)
+    {
         delete m_pointShaderProgram;
     }
 
-    if (m_splatShaderProgram) {
+    if (m_splatShaderProgram)
+    {
         delete m_splatShaderProgram;
     }
 
-    if (m_splatTexture) {
+    if (m_splatTexture)
+    {
         delete m_splatTexture;
     }
 
@@ -143,7 +159,8 @@ void PointCloudViewerWidget::initializeGL()
 {
     qDebug() << "PointCloudViewerWidget::initializeGL() started";
 
-    try {
+    try
+    {
         qDebug() << "Initializing OpenGL functions...";
         initializeOpenGLFunctions();
         qDebug() << "OpenGL functions initialized";
@@ -158,21 +175,24 @@ void PointCloudViewerWidget::initializeGL()
         qDebug() << "Setting OpenGL state...";
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         GLenum error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after glClearColor:" << QString("0x%1").arg(error, 0, 16);
         }
 
         // Enable depth testing with error checking
         glEnable(GL_DEPTH_TEST);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after glEnable(GL_DEPTH_TEST):" << QString("0x%1").arg(error, 0, 16);
         }
 
         // Enable point size control from vertex shader with error checking
         glEnable(GL_PROGRAM_POINT_SIZE);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after glEnable(GL_PROGRAM_POINT_SIZE):" << QString("0x%1").arg(error, 0, 16);
         }
 
@@ -180,7 +200,8 @@ void PointCloudViewerWidget::initializeGL()
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after enabling blending:" << QString("0x%1").arg(error, 0, 16);
         }
         qDebug() << "OpenGL state configured";
@@ -222,10 +243,14 @@ void PointCloudViewerWidget::initializeGL()
         qDebug() << "Sprint 6 GPU culler initialization completed";
 
         qDebug() << "OpenGL initialized successfully";
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         qCritical() << "Exception in initializeGL:" << e.what();
         throw;
-    } catch (...) {
+    }
+    catch (...)
+    {
         qCritical() << "Unknown exception in initializeGL";
         throw;
     }
@@ -248,35 +273,44 @@ void PointCloudViewerWidget::paintGL()
     // Clear buffers with error checking (User Story 2)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
+    if (error != GL_NO_ERROR)
+    {
         qCritical() << "OpenGL Error after glClear:" << QString("0x%1").arg(error, 0, 16);
     }
 
     // Sprint 2.3: Handle state-based rendering
-    if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized) {
+    if (m_currentState == ViewerState::DisplayingData && m_hasData && m_shadersInitialized)
+    {
         // Sprint R4: Use new scene rendering with splatting and lighting
-        if (m_splattingEnabled || m_lightingEnabled) {
+        if (m_splattingEnabled || m_lightingEnabled)
+        {
             renderScene();
         }
         // Sprint R3: Use enhanced attribute rendering if color/intensity features are enabled
-        else if (m_renderWithColor || m_renderWithIntensity || m_pointSizeAttenuationEnabled) {
+        else if (m_renderWithColor || m_renderWithIntensity || m_pointSizeAttenuationEnabled)
+        {
             renderWithAttributes();
         }
         // Sprint R2: Use screen-space error LOD if enabled, otherwise fall back to R1 or traditional
-        else if (m_lodEnabled && m_octree && m_octree->root) {
+        else if (m_lodEnabled && m_octree && m_octree->root)
+        {
             renderWithScreenSpaceErrorLOD();
-        } else {
+        }
+        else
+        {
             // Fallback: traditional rendering
             qDebug() << "paintGL: Rendering" << m_pointCount << "points (traditional)";
 
             // Use shader program with error checking
-            if (!m_shaderProgram->bind()) {
+            if (!m_shaderProgram->bind())
+            {
                 qWarning() << "Failed to bind shader program";
-                paintOverlayGL(); // Still show overlay even if shader fails
+                paintOverlayGL();  // Still show overlay even if shader fails
                 return;
             }
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after shader bind:" << QString("0x%1").arg(error, 0, 16);
             }
 
@@ -286,32 +320,37 @@ void PointCloudViewerWidget::paintGL()
             // Set uniforms with error checking
             m_shaderProgram->setUniformValue(m_mvpMatrixLocation, mvpMatrix);
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after setting MVP matrix uniform:" << QString("0x%1").arg(error, 0, 16);
             }
 
             m_shaderProgram->setUniformValue(m_colorLocation, m_pointColor);
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after setting color uniform:" << QString("0x%1").arg(error, 0, 16);
             }
 
             m_shaderProgram->setUniformValue(m_pointSizeLocation, m_pointSize);
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after setting point size uniform:" << QString("0x%1").arg(error, 0, 16);
             }
 
             // Bind VAO and draw points with error checking
             m_vertexArrayObject.bind();
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
             }
 
             glDrawArrays(GL_POINTS, 0, m_pointCount);
             error = glGetError();
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
                 qCritical() << "OpenGL Error after glDrawArrays:" << QString("0x%1").arg(error, 0, 16);
             }
 
@@ -324,7 +363,9 @@ void PointCloudViewerWidget::paintGL()
 
         // Update FPS counter
         updateFPS();
-    } else if (m_showErrorState || !m_hasData) {
+    }
+    else if (m_showErrorState || !m_hasData)
+    {
         // Sprint 1.3: Handle legacy error state rendering (Task 1.3.3.2)
         renderErrorState();
     }
@@ -426,18 +467,21 @@ void PointCloudViewerWidget::setupShaders()
     )";
 
     // Compile shaders
-    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource)) {
+    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource))
+    {
         qCritical() << "Failed to compile vertex shader:" << m_shaderProgram->log();
         return;
     }
 
-    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource)) {
+    if (!m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource))
+    {
         qCritical() << "Failed to compile fragment shader:" << m_shaderProgram->log();
         return;
     }
 
     // Link shader program
-    if (!m_shaderProgram->link()) {
+    if (!m_shaderProgram->link())
+    {
         qCritical() << "Failed to link shader program:" << m_shaderProgram->log();
         return;
     }
@@ -452,21 +496,29 @@ void PointCloudViewerWidget::setupShaders()
     qDebug() << "  color:" << m_colorLocation;
     qDebug() << "  pointSize:" << m_pointSizeLocation;
 
-    if (m_mvpMatrixLocation == -1) {
-        qCritical() << "Failed to get mvpMatrix uniform location - shader may have optimized it out or name is incorrect";
+    if (m_mvpMatrixLocation == -1)
+    {
+        qCritical()
+            << "Failed to get mvpMatrix uniform location - shader may have optimized it out or name is incorrect";
     }
-    if (m_colorLocation == -1) {
+    if (m_colorLocation == -1)
+    {
         qCritical() << "Failed to get color uniform location - shader may have optimized it out or name is incorrect";
     }
-    if (m_pointSizeLocation == -1) {
-        qCritical() << "Failed to get pointSize uniform location - shader may have optimized it out or name is incorrect";
+    if (m_pointSizeLocation == -1)
+    {
+        qCritical()
+            << "Failed to get pointSize uniform location - shader may have optimized it out or name is incorrect";
     }
 
     // Only set initialized flag if all uniforms are found
-    if (m_mvpMatrixLocation != -1 && m_colorLocation != -1 && m_pointSizeLocation != -1) {
+    if (m_mvpMatrixLocation != -1 && m_colorLocation != -1 && m_pointSizeLocation != -1)
+    {
         m_shadersInitialized = true;
         qDebug() << "Shaders compiled and linked successfully - all uniforms found";
-    } else {
+    }
+    else
+    {
         m_shadersInitialized = false;
         qCritical() << "Shader setup failed - one or more uniform locations not found";
     }
@@ -475,13 +527,15 @@ void PointCloudViewerWidget::setupShaders()
 void PointCloudViewerWidget::setupBuffers()
 {
     // Create VAO
-    if (!m_vertexArrayObject.create()) {
+    if (!m_vertexArrayObject.create())
+    {
         qCritical() << "Failed to create VAO";
         return;
     }
 
     // Create VBO
-    if (!m_vertexBuffer.create()) {
+    if (!m_vertexBuffer.create())
+    {
         qCritical() << "Failed to create VBO";
         return;
     }
@@ -498,23 +552,21 @@ void PointCloudViewerWidget::setupEnhancedVertexArrayObject()
     m_vertexArrayObject.bind();
     m_vertexBuffer.bind();
 
-    if (m_shaderProgram) {
+    if (m_shaderProgram)
+    {
         m_shaderProgram->bind();
 
         // Position attribute (location 0) - XYZ
         m_shaderProgram->enableAttributeArray(0);
-        m_shaderProgram->setAttributeBuffer(0, GL_FLOAT,
-            offsetof(VertexData, position), 3, sizeof(VertexData));
+        m_shaderProgram->setAttributeBuffer(0, GL_FLOAT, offsetof(VertexData, position), 3, sizeof(VertexData));
 
         // Color attribute (location 1) - RGB
         m_shaderProgram->enableAttributeArray(1);
-        m_shaderProgram->setAttributeBuffer(1, GL_FLOAT,
-            offsetof(VertexData, color), 3, sizeof(VertexData));
+        m_shaderProgram->setAttributeBuffer(1, GL_FLOAT, offsetof(VertexData, color), 3, sizeof(VertexData));
 
         // Intensity attribute (location 2) - I
         m_shaderProgram->enableAttributeArray(2);
-        m_shaderProgram->setAttributeBuffer(2, GL_FLOAT,
-            offsetof(VertexData, intensity), 1, sizeof(VertexData));
+        m_shaderProgram->setAttributeBuffer(2, GL_FLOAT, offsetof(VertexData, intensity), 1, sizeof(VertexData));
 
         m_shaderProgram->release();
     }
@@ -532,7 +584,8 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
     qDebug() << "Received points vector size:" << points.size();
     qDebug() << "Number of points:" << (points.size() / 3);
 
-    if (points.empty() || points.size() % 3 != 0) {
+    if (points.empty() || points.size() % 3 != 0)
+    {
         qWarning() << "Invalid point cloud data - empty or not divisible by 3";
         return;
     }
@@ -541,12 +594,15 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
 
     // First, calculate the global offset from the original data (User Story 3)
     QVector3D originalMin, originalMax;
-    if (!points.empty()) {
+    if (!points.empty())
+    {
         originalMin = QVector3D(points[0], points[1], points[2]);
         originalMax = originalMin;
 
-        for (size_t i = 0; i < points.size(); i += 3) {
-            if (i + 2 < points.size()) {
+        for (size_t i = 0; i < points.size(); i += 3)
+        {
+            if (i + 2 < points.size())
+            {
                 QVector3D point(points[i], points[i + 1], points[i + 2]);
                 originalMin.setX(std::min(originalMin.x(), point.x()));
                 originalMin.setY(std::min(originalMin.y(), point.y()));
@@ -564,9 +620,11 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
         qDebug() << "Global offset calculated:" << m_globalOffset;
 
         // Apply coordinate transformation - center points around origin
-        m_pointData = points; // Copy the data first
-        for (size_t i = 0; i < m_pointData.size(); i += 3) {
-            if (i + 2 < m_pointData.size()) {
+        m_pointData = points;  // Copy the data first
+        for (size_t i = 0; i < m_pointData.size(); i += 3)
+        {
+            if (i + 2 < m_pointData.size())
+            {
                 m_pointData[i] -= m_globalOffset.x();
                 m_pointData[i + 1] -= m_globalOffset.y();
                 m_pointData[i + 2] -= m_globalOffset.z();
@@ -574,7 +632,9 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
         }
 
         qDebug() << "Applied coordinate transformation - points centered around origin";
-    } else {
+    }
+    else
+    {
         m_pointData = points;
         m_globalOffset = QVector3D(0, 0, 0);
     }
@@ -611,32 +671,37 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
         PROFILE_SECTION("GPU::DataUpload");
         m_vertexArrayObject.bind();
         GLenum error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after VAO bind:" << QString("0x%1").arg(error, 0, 16);
         }
 
         m_vertexBuffer.bind();
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after VBO bind:" << QString("0x%1").arg(error, 0, 16);
         }
 
         m_vertexBuffer.allocate(m_pointData.data(), static_cast<int>(m_pointData.size() * sizeof(float)));
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after VBO allocate:" << QString("0x%1").arg(error, 0, 16);
         }
 
         // Set vertex attribute
         glEnableVertexAttribArray(0);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after glEnableVertexAttribArray:" << QString("0x%1").arg(error, 0, 16);
         }
 
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
+        if (error != GL_NO_ERROR)
+        {
             qCritical() << "OpenGL Error after glVertexAttribPointer:" << QString("0x%1").arg(error, 0, 16);
         }
 
@@ -648,12 +713,12 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
     qDebug() << "m_hasData set to true";
 
     // Sprint R1: Build octree for LOD system
-    if (m_lodEnabled) {
+    if (m_lodEnabled)
+    {
         qDebug() << "Building octree for LOD system...";
         m_octree->buildFromFloatArray(m_pointData, 8, 100);
         qDebug() << "Octree built - Total points:" << m_octree->getTotalPointCount()
-                 << "Max depth:" << m_octree->getMaxDepth()
-                 << "Node count:" << m_octree->getNodeCount();
+                 << "Max depth:" << m_octree->getMaxDepth() << "Node count:" << m_octree->getNodeCount();
     }
 
     // Sprint 1.3: Clear error state when data is successfully loaded
@@ -661,7 +726,7 @@ void PointCloudViewerWidget::loadPointCloud(const std::vector<float>& points)
     m_errorMessage.clear();
 
     doneCurrent();
-    update(); // Trigger repaint
+    update();  // Trigger repaint
 
     qDebug() << "Point cloud loading completed successfully";
 }
@@ -692,14 +757,15 @@ void PointCloudViewerWidget::clearPointCloud()
     m_errorMessage = "No point cloud data loaded";
 
     doneCurrent();
-    update(); // Trigger repaint to show cleared state
+    update();  // Trigger repaint to show cleared state
 
     qDebug() << "PointCloudViewerWidget::clearPointCloud() - Data cleared, error state set";
 }
 
 void PointCloudViewerWidget::calculateBoundingBox()
 {
-    if (m_pointData.empty()) {
+    if (m_pointData.empty())
+    {
         return;
     }
 
@@ -708,7 +774,8 @@ void PointCloudViewerWidget::calculateBoundingBox()
     m_boundingBoxMax = m_boundingBoxMin;
 
     // Find min/max for each axis
-    for (size_t i = 0; i < m_pointData.size(); i += 3) {
+    for (size_t i = 0; i < m_pointData.size(); i += 3)
+    {
         QVector3D point(m_pointData[i], m_pointData[i + 1], m_pointData[i + 2]);
 
         m_boundingBoxMin.setX(std::min(m_boundingBoxMin.x(), point.x()));
@@ -725,22 +792,24 @@ void PointCloudViewerWidget::calculateBoundingBox()
     QVector3D size = m_boundingBoxMax - m_boundingBoxMin;
     m_boundingBoxSize = std::max({size.x(), size.y(), size.z()});
 
-    if (m_boundingBoxSize < 0.001f) {
-        m_boundingBoxSize = 1.0f; // Prevent division by zero
+    if (m_boundingBoxSize < 0.001f)
+    {
+        m_boundingBoxSize = 1.0f;  // Prevent division by zero
     }
 }
 
 void PointCloudViewerWidget::fitCameraToPointCloud()
 {
-    if (m_boundingBoxSize < 0.001f) {
-        return; // No valid bounding box
+    if (m_boundingBoxSize < 0.001f)
+    {
+        return;  // No valid bounding box
     }
 
     // Set camera target to bounding box center
     m_cameraTarget = m_boundingBoxCenter;
 
     // Calculate optimal camera distance using field of view
-    const float fov = 45.0f; // Field of view in degrees (matches projection matrix)
+    const float fov = 45.0f;  // Field of view in degrees (matches projection matrix)
     const float aspect = static_cast<float>(width()) / static_cast<float>(height() ? height() : 1);
 
     // Calculate the maximum extent in any direction
@@ -756,7 +825,8 @@ void PointCloudViewerWidget::fitCameraToPointCloud()
     float distance = (maxExtent / 2.0f) / std::tan(fovRadians);
 
     // Adjust for aspect ratio - use the smaller dimension to ensure everything fits
-    if (aspect < 1.0f) {
+    if (aspect < 1.0f)
+    {
         distance /= aspect;
     }
 
@@ -769,8 +839,7 @@ void PointCloudViewerWidget::fitCameraToPointCloud()
     m_cameraYaw = 0.0f;
     m_cameraPitch = 0.0f;
 
-    qDebug() << "Camera fitted - Distance:" << m_cameraDistance
-             << "Target:" << m_cameraTarget
+    qDebug() << "Camera fitted - Distance:" << m_cameraDistance << "Target:" << m_cameraTarget
              << "Max extent:" << maxExtent;
 }
 
@@ -790,16 +859,17 @@ void PointCloudViewerWidget::updateCamera()
     update();
 }
 
-void PointCloudViewerWidget::mousePressEvent(QMouseEvent *event)
+void PointCloudViewerWidget::mousePressEvent(QMouseEvent* event)
 {
     m_lastMousePosition = event->pos();
     m_mousePressed = true;
     m_pressedButton = event->button();
 }
 
-void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent *event)
+void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (!m_mousePressed) {
+    if (!m_mousePressed)
+    {
         return;
     }
 
@@ -808,16 +878,20 @@ void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent *event)
 
     const float sensitivity = 0.01f;
 
-    if (m_pressedButton == Qt::LeftButton) {
+    if (m_pressedButton == Qt::LeftButton)
+    {
         // Orbit camera
         m_cameraYaw += delta.x() * sensitivity;
         m_cameraPitch -= delta.y() * sensitivity;
 
         // Clamp pitch to prevent flipping
-        m_cameraPitch = std::max(-static_cast<float>(M_PI)/2.0f + 0.1f, std::min(static_cast<float>(M_PI)/2.0f - 0.1f, m_cameraPitch));
+        m_cameraPitch = std::max(-static_cast<float>(M_PI) / 2.0f + 0.1f,
+                                 std::min(static_cast<float>(M_PI) / 2.0f - 0.1f, m_cameraPitch));
 
         updateCamera();
-    } else if (m_pressedButton == Qt::RightButton) {
+    }
+    else if (m_pressedButton == Qt::RightButton)
+    {
         // Pan camera
         QVector3D right = QVector3D::crossProduct(m_cameraTarget - m_cameraPosition, m_cameraUp).normalized();
         QVector3D up = QVector3D::crossProduct(right, m_cameraTarget - m_cameraPosition).normalized();
@@ -830,7 +904,7 @@ void PointCloudViewerWidget::mouseMoveEvent(QMouseEvent *event)
     }
 }
 
-void PointCloudViewerWidget::wheelEvent(QWheelEvent *event)
+void PointCloudViewerWidget::wheelEvent(QWheelEvent* event)
 {
     const float zoomSpeed = 0.1f;
     float zoomFactor = 1.0f + (event->angleDelta().y() / 120.0f) * zoomSpeed;
@@ -846,8 +920,8 @@ void PointCloudViewerWidget::setTopView()
 {
     // Top view: Camera directly above target, looking down
     m_cameraYaw = 0.0f;
-    m_cameraPitch = static_cast<float>(M_PI) / 2.0f - 0.1f; // Almost 90 degrees, avoid singularity
-    m_cameraUp = QVector3D(0.0f, 0.0f, -1.0f); // Z-axis points forward in top view
+    m_cameraPitch = static_cast<float>(M_PI) / 2.0f - 0.1f;  // Almost 90 degrees, avoid singularity
+    m_cameraUp = QVector3D(0.0f, 0.0f, -1.0f);               // Z-axis points forward in top view
     updateCamera();
 }
 
@@ -859,7 +933,7 @@ void PointCloudViewerWidget::renderErrorState()
 
     // Create a simple text rendering using OpenGL-compatible method
     // For now, just clear the screen with a different color to indicate error state
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f); // Darker background for error state
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);  // Darker background for error state
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Note: For proper text rendering in OpenGL context, we would need to:
@@ -874,18 +948,18 @@ void PointCloudViewerWidget::renderErrorState()
 void PointCloudViewerWidget::setLeftView()
 {
     // Left view: Camera to the left of target, looking right
-    m_cameraYaw = -static_cast<float>(M_PI) / 2.0f; // -90 degrees
+    m_cameraYaw = -static_cast<float>(M_PI) / 2.0f;  // -90 degrees
     m_cameraPitch = 0.0f;
-    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f); // Y-axis points up
+    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f);  // Y-axis points up
     updateCamera();
 }
 
 void PointCloudViewerWidget::setRightView()
 {
     // Right view: Camera to the right of target, looking left
-    m_cameraYaw = static_cast<float>(M_PI) / 2.0f; // 90 degrees
+    m_cameraYaw = static_cast<float>(M_PI) / 2.0f;  // 90 degrees
     m_cameraPitch = 0.0f;
-    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f); // Y-axis points up
+    m_cameraUp = QVector3D(0.0f, 1.0f, 0.0f);  // Y-axis points up
     updateCamera();
 }
 
@@ -893,8 +967,8 @@ void PointCloudViewerWidget::setBottomView()
 {
     // Bottom view: Camera directly below target, looking up
     m_cameraYaw = 0.0f;
-    m_cameraPitch = -static_cast<float>(M_PI) / 2.0f + 0.1f; // Almost -90 degrees, avoid singularity
-    m_cameraUp = QVector3D(0.0f, 0.0f, 1.0f); // Z-axis points forward in bottom view
+    m_cameraPitch = -static_cast<float>(M_PI) / 2.0f + 0.1f;  // Almost -90 degrees, avoid singularity
+    m_cameraUp = QVector3D(0.0f, 0.0f, 1.0f);                 // Z-axis points forward in bottom view
     updateCamera();
 }
 
@@ -935,17 +1009,20 @@ void PointCloudViewerWidget::setupUCSShaders()
     )";
 
     // Compile and link UCS shaders
-    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, ucsVertexShaderSource)) {
+    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, ucsVertexShaderSource))
+    {
         qCritical() << "Failed to compile UCS vertex shader:" << m_ucsShaderProgram->log();
         return;
     }
 
-    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, ucsFragmentShaderSource)) {
+    if (!m_ucsShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, ucsFragmentShaderSource))
+    {
         qCritical() << "Failed to compile UCS fragment shader:" << m_ucsShaderProgram->log();
         return;
     }
 
-    if (!m_ucsShaderProgram->link()) {
+    if (!m_ucsShaderProgram->link())
+    {
         qCritical() << "Failed to link UCS shader program:" << m_ucsShaderProgram->log();
         return;
     }
@@ -953,7 +1030,8 @@ void PointCloudViewerWidget::setupUCSShaders()
     // Get UCS uniform locations
     m_ucsMvpMatrixLocation = m_ucsShaderProgram->uniformLocation("mvpMatrix");
 
-    if (m_ucsMvpMatrixLocation == -1) {
+    if (m_ucsMvpMatrixLocation == -1)
+    {
         qWarning() << "Failed to get UCS uniform locations";
     }
 
@@ -963,13 +1041,15 @@ void PointCloudViewerWidget::setupUCSShaders()
 void PointCloudViewerWidget::setupUCSBuffers()
 {
     // Create UCS VAO
-    if (!m_ucsVertexArrayObject.create()) {
+    if (!m_ucsVertexArrayObject.create())
+    {
         qCritical() << "Failed to create UCS VAO";
         return;
     }
 
     // Create UCS VBO
-    if (!m_ucsVertexBuffer.create()) {
+    if (!m_ucsVertexBuffer.create())
+    {
         qCritical() << "Failed to create UCS VBO";
         return;
     }
@@ -979,16 +1059,46 @@ void PointCloudViewerWidget::setupUCSBuffers()
     // X-axis: Red (1,0,0), Y-axis: Green (0,1,0), Z-axis: Blue (0,0,1)
     float ucsVertices[] = {
         // X-axis (Red)
-        0.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // Origin, Red
-        1.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  // X endpoint, Red
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,  // Origin, Red
+        1.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,  // X endpoint, Red
 
         // Y-axis (Green)
-        0.0f, 0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Origin, Green
-        0.0f, 1.0f, 0.0f,  0.0f, 1.0f, 0.0f,  // Y endpoint, Green
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,  // Origin, Green
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,  // Y endpoint, Green
 
         // Z-axis (Blue)
-        0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  // Origin, Blue
-        0.0f, 0.0f, 1.0f,  0.0f, 0.0f, 1.0f   // Z endpoint, Blue
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,  // Origin, Blue
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,
+        1.0f  // Z endpoint, Blue
     };
 
     // Upload UCS data to GPU
@@ -1013,7 +1123,8 @@ void PointCloudViewerWidget::setupUCSBuffers()
 
 void PointCloudViewerWidget::drawUCS()
 {
-    if (!m_ucsShaderProgram || m_ucsMvpMatrixLocation == -1) {
+    if (!m_ucsShaderProgram || m_ucsMvpMatrixLocation == -1)
+    {
         return;
     }
 
@@ -1023,11 +1134,12 @@ void PointCloudViewerWidget::drawUCS()
     glGetFloatv(GL_LINE_WIDTH, &lineWidth);
 
     // Configure OpenGL for UCS rendering
-    glDisable(GL_DEPTH_TEST); // UCS should always be visible
-    glLineWidth(3.0f); // Make UCS lines thicker
+    glDisable(GL_DEPTH_TEST);  // UCS should always be visible
+    glLineWidth(3.0f);         // Make UCS lines thicker
 
     // Use UCS shader program
-    if (!m_ucsShaderProgram->bind()) {
+    if (!m_ucsShaderProgram->bind())
+    {
         qWarning() << "Failed to bind UCS shader program";
         return;
     }
@@ -1044,11 +1156,11 @@ void PointCloudViewerWidget::drawUCS()
 
     // Extract rotation from current view matrix (remove translation)
     QMatrix4x4 rotationMatrix = m_viewMatrix;
-    rotationMatrix.setColumn(3, QVector4D(0, 0, 0, 1)); // Remove translation
+    rotationMatrix.setColumn(3, QVector4D(0, 0, 0, 1));  // Remove translation
 
     // Position UCS in top-right corner
-    ucsModelMatrix.translate(aspectRatio * 0.7f, 0.7f, 0.0f); // Top-right corner
-    ucsModelMatrix.scale(0.15f); // Scale down the UCS
+    ucsModelMatrix.translate(aspectRatio * 0.7f, 0.7f, 0.0f);  // Top-right corner
+    ucsModelMatrix.scale(0.15f);                               // Scale down the UCS
 
     // Apply only rotation from camera (not translation)
     ucsViewMatrix = rotationMatrix;
@@ -1061,26 +1173,29 @@ void PointCloudViewerWidget::drawUCS()
 
     // Bind UCS VAO and draw lines
     m_ucsVertexArrayObject.bind();
-    glDrawArrays(GL_LINES, 0, 6); // 6 vertices (3 lines, 2 vertices each)
+    glDrawArrays(GL_LINES, 0, 6);  // 6 vertices (3 lines, 2 vertices each)
     m_ucsVertexArrayObject.release();
 
     m_ucsShaderProgram->release();
 
     // Restore OpenGL state
-    if (depthTestEnabled) {
+    if (depthTestEnabled)
+    {
         glEnable(GL_DEPTH_TEST);
     }
     glLineWidth(lineWidth);
 }
 
 // Sprint 2.3: State management and visual feedback methods
-void PointCloudViewerWidget::setState(ViewerState state, const QString &message)
+void PointCloudViewerWidget::setState(ViewerState state, const QString& message)
 {
-    if (m_currentState != state) {
+    if (m_currentState != state)
+    {
         m_currentState = state;
         m_stateMessage = message;
 
-        switch (state) {
+        switch (state)
+        {
             case ViewerState::Loading:
                 m_loadingProgress = 0;
                 m_loadingStage = "Initializing...";
@@ -1100,7 +1215,7 @@ void PointCloudViewerWidget::setState(ViewerState state, const QString &message)
                 break;
         }
 
-        update(); // Trigger repaint
+        update();  // Trigger repaint
     }
 }
 
@@ -1109,20 +1224,22 @@ void PointCloudViewerWidget::onLoadingStarted()
     setState(ViewerState::Loading, "Loading point cloud...");
 }
 
-void PointCloudViewerWidget::onLoadingProgress(int percentage, const QString &stage)
+void PointCloudViewerWidget::onLoadingProgress(int percentage, const QString& stage)
 {
     m_loadingProgress = percentage;
     m_loadingStage = stage;
-    update(); // Trigger repaint to update progress display
+    update();  // Trigger repaint to update progress display
 }
 
-void PointCloudViewerWidget::onLoadingFinished(bool success, const QString &message,
-                                              const std::vector<float> &points)
+void PointCloudViewerWidget::onLoadingFinished(bool success, const QString& message, const std::vector<float>& points)
 {
-    if (success && !points.empty()) {
+    if (success && !points.empty())
+    {
         setState(ViewerState::DisplayingData, message);
         loadPointCloud(points);
-    } else {
+    }
+    else
+    {
         setState(ViewerState::LoadFailed, message);
     }
 }
@@ -1130,7 +1247,7 @@ void PointCloudViewerWidget::onLoadingFinished(bool success, const QString &mess
 void PointCloudViewerWidget::updateLoadingAnimation()
 {
     m_loadingAngle = (m_loadingAngle + 10) % 360;
-    update(); // Trigger repaint for animation
+    update();  // Trigger repaint for animation
 }
 
 void PointCloudViewerWidget::paintOverlayGL()
@@ -1139,7 +1256,8 @@ void PointCloudViewerWidget::paintOverlayGL()
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    switch (m_currentState) {
+    switch (m_currentState)
+    {
         case ViewerState::Loading:
             drawLoadingState(painter);
             break;
@@ -1158,7 +1276,7 @@ void PointCloudViewerWidget::paintOverlayGL()
     }
 }
 
-void PointCloudViewerWidget::drawLoadingState(QPainter &painter)
+void PointCloudViewerWidget::drawLoadingState(QPainter& painter)
 {
     QRect rect = this->rect();
     QPoint center = rect.center();
@@ -1173,10 +1291,10 @@ void PointCloudViewerWidget::drawLoadingState(QPainter &painter)
     const int spinnerRadius = 30;
 
     // Draw spinning arc
-    QRect spinnerRect(center.x() - spinnerRadius, center.y() - spinnerRadius - 40,
-                      spinnerRadius * 2, spinnerRadius * 2);
+    QRect spinnerRect(
+        center.x() - spinnerRadius, center.y() - spinnerRadius - 40, spinnerRadius * 2, spinnerRadius * 2);
 
-    painter.drawArc(spinnerRect, m_loadingAngle * 16, 120 * 16); // 120 degree arc
+    painter.drawArc(spinnerRect, m_loadingAngle * 16, 120 * 16);  // 120 degree arc
 
     // Draw main loading text
     painter.setPen(QColor(255, 255, 255));
@@ -1198,8 +1316,7 @@ void PointCloudViewerWidget::drawLoadingState(QPainter &painter)
     // Draw progress bar
     const int progressBarWidth = 300;
     const int progressBarHeight = 6;
-    QRect progressBarRect(center.x() - progressBarWidth/2, center.y() + 80,
-                         progressBarWidth, progressBarHeight);
+    QRect progressBarRect(center.x() - progressBarWidth / 2, center.y() + 80, progressBarWidth, progressBarHeight);
 
     // Background
     painter.fillRect(progressBarRect, QColor(70, 70, 70));
@@ -1214,7 +1331,7 @@ void PointCloudViewerWidget::drawLoadingState(QPainter &painter)
     painter.drawRect(progressBarRect);
 }
 
-void PointCloudViewerWidget::drawLoadFailedState(QPainter &painter)
+void PointCloudViewerWidget::drawLoadFailedState(QPainter& painter)
 {
     QRect rect = this->rect();
     QPoint center = rect.center();
@@ -1225,8 +1342,7 @@ void PointCloudViewerWidget::drawLoadFailedState(QPainter &painter)
     // Draw error icon (simple X)
     painter.setPen(QPen(QColor(255, 100, 100), 4));
     const int iconSize = 40;
-    QRect iconRect(center.x() - iconSize/2, center.y() - iconSize/2 - 40,
-                   iconSize, iconSize);
+    QRect iconRect(center.x() - iconSize / 2, center.y() - iconSize / 2 - 40, iconSize, iconSize);
 
     painter.drawLine(iconRect.topLeft(), iconRect.bottomRight());
     painter.drawLine(iconRect.topRight(), iconRect.bottomLeft());
@@ -1246,12 +1362,12 @@ void PointCloudViewerWidget::drawLoadFailedState(QPainter &painter)
     QRect detailRect = rect;
     detailRect.setTop(center.y() + 50);
     detailRect.setHeight(60);
-    detailRect.adjust(20, 0, -20, 0); // Add margins
+    detailRect.adjust(20, 0, -20, 0);  // Add margins
 
     painter.drawText(detailRect, Qt::AlignCenter | Qt::TextWordWrap, m_stateMessage);
 }
 
-void PointCloudViewerWidget::drawIdleState(QPainter &painter)
+void PointCloudViewerWidget::drawIdleState(QPainter& painter)
 {
     QRect rect = this->rect();
     QPoint center = rect.center();
@@ -1265,18 +1381,17 @@ void PointCloudViewerWidget::drawIdleState(QPainter &painter)
 
     const int iconWidth = 60;
     const int iconHeight = 80;
-    QRect iconRect(center.x() - iconWidth/2, center.y() - iconHeight/2 - 20,
-                   iconWidth, iconHeight);
+    QRect iconRect(center.x() - iconWidth / 2, center.y() - iconHeight / 2 - 20, iconWidth, iconHeight);
 
     painter.drawRoundedRect(iconRect, 5, 5);
 
     // Draw some lines to represent file content
     painter.setPen(QColor(150, 150, 150));
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; ++i)
+    {
         int lineY = iconRect.top() + 20 + i * 12;
         int lineWidth = (i == 3) ? iconWidth / 2 : iconWidth - 20;
-        painter.drawLine(iconRect.left() + 10, lineY,
-                        iconRect.left() + 10 + lineWidth, lineY);
+        painter.drawLine(iconRect.left() + 10, lineY, iconRect.left() + 10 + lineWidth, lineY);
     }
 
     // Draw main text
@@ -1295,12 +1410,11 @@ void PointCloudViewerWidget::drawIdleState(QPainter &painter)
     instructionRect.setTop(center.y() + 90);
     instructionRect.setHeight(40);
 
-    painter.drawText(instructionRect, Qt::AlignCenter,
-                    "Click 'Open File' to load E57 or LAS files");
+    painter.drawText(instructionRect, Qt::AlignCenter, "Click 'Open File' to load E57 or LAS files");
 }
 
 // Sprint 3.2: Test simulation methods implementation
-void PointCloudViewerWidget::simulateOrbitCamera(const QPoint &start, const QPoint &end)
+void PointCloudViewerWidget::simulateOrbitCamera(const QPoint& start, const QPoint& end)
 {
     QPoint delta = end - start;
     const float sensitivity = 0.01f;
@@ -1309,13 +1423,13 @@ void PointCloudViewerWidget::simulateOrbitCamera(const QPoint &start, const QPoi
     m_cameraPitch -= delta.y() * sensitivity;
 
     // Clamp pitch to prevent flipping
-    m_cameraPitch = std::max(-static_cast<float>(M_PI)/2.0f + 0.1f,
-                            std::min(static_cast<float>(M_PI)/2.0f - 0.1f, m_cameraPitch));
+    m_cameraPitch = std::max(-static_cast<float>(M_PI) / 2.0f + 0.1f,
+                             std::min(static_cast<float>(M_PI) / 2.0f - 0.1f, m_cameraPitch));
 
     updateCamera();
 }
 
-void PointCloudViewerWidget::simulatePanCamera(const QPoint &start, const QPoint &end)
+void PointCloudViewerWidget::simulatePanCamera(const QPoint& start, const QPoint& end)
 {
     QPoint delta = end - start;
 
@@ -1354,7 +1468,8 @@ void PointCloudViewerWidget::setLODSubsampleRate(float rate)
     qDebug() << "LOD subsample rate set to:" << m_lodSubsampleRate;
 
     // If LOD is currently enabled, trigger repaint
-    if (m_lodEnabled) {
+    if (m_lodEnabled)
+    {
         update();
     }
 }
@@ -1366,15 +1481,15 @@ void PointCloudViewerWidget::setLODEnabled(bool enabled)
     qDebug() << "Advanced LOD system:" << (enabled ? "enabled" : "disabled");
 
     // Sprint R1: Build octree when LOD is enabled
-    if (enabled && m_hasData && !m_pointData.empty()) {
+    if (enabled && m_hasData && !m_pointData.empty())
+    {
         qDebug() << "Building octree for LOD system...";
         m_octree->buildFromFloatArray(m_pointData, 8, 100);
         qDebug() << "Octree built - Total points:" << m_octree->getTotalPointCount()
-                 << "Max depth:" << m_octree->getMaxDepth()
-                 << "Node count:" << m_octree->getNodeCount();
+                 << "Max depth:" << m_octree->getMaxDepth() << "Node count:" << m_octree->getNodeCount();
     }
 
-    update(); // Trigger repaint
+    update();  // Trigger repaint
 }
 
 void PointCloudViewerWidget::setLODDistances(float distance1, float distance2)
@@ -1420,7 +1535,8 @@ void PointCloudViewerWidget::setCullScreenSpaceErrorThreshold(float threshold)
 
 void PointCloudViewerWidget::renderOctree()
 {
-    if (!m_octree || !m_octree->root) {
+    if (!m_octree || !m_octree->root)
+    {
         return;
     }
 
@@ -1432,30 +1548,32 @@ void PointCloudViewerWidget::renderOctree()
     m_visiblePoints.clear();
 
     // Collect visible points using octree traversal
-    m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition,
-                              m_lodDistance1, m_lodDistance2, m_visiblePoints);
+    m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition, m_lodDistance1, m_lodDistance2, m_visiblePoints);
 
     m_visiblePointCount = m_visiblePoints.size();
 
-    if (m_visiblePoints.empty()) {
+    if (m_visiblePoints.empty())
+    {
         return;
     }
 
-    qDebug() << "Octree rendering - Visible points:" << m_visiblePointCount
-             << "out of" << m_octree->getTotalPointCount();
+    qDebug() << "Octree rendering - Visible points:" << m_visiblePointCount << "out of"
+             << m_octree->getTotalPointCount();
 
     // Convert PointFullData to flat float array for OpenGL
     std::vector<float> renderData;
     renderData.reserve(m_visiblePoints.size() * 3);
 
-    for (const auto& point : m_visiblePoints) {
+    for (const auto& point : m_visiblePoints)
+    {
         renderData.push_back(point.x);
         renderData.push_back(point.y);
         renderData.push_back(point.z);
     }
 
     // Use shader program with error checking
-    if (!m_shaderProgram->bind()) {
+    if (!m_shaderProgram->bind())
+    {
         qWarning() << "Failed to bind shader program in octree rendering";
         return;
     }
@@ -1467,7 +1585,8 @@ void PointCloudViewerWidget::renderOctree()
 
     // Create temporary VBO for visible points
     QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
-    if (!tempBuffer.create()) {
+    if (!tempBuffer.create())
+    {
         qWarning() << "Failed to create temporary VBO for octree rendering";
         m_shaderProgram->release();
         return;
@@ -1500,15 +1619,16 @@ void PointCloudViewerWidget::updateFPS()
     auto deltaTime = std::chrono::duration_cast<std::chrono::microseconds>(currentTime - m_lastFrameTime);
 
     m_frameCount++;
-    if (deltaTime.count() >= 1000000) { // Update every second
+    if (deltaTime.count() >= 1000000)
+    {  // Update every second
         m_fps = m_frameCount * 1000000.0f / deltaTime.count();
         m_frameCount = 0;
         m_lastFrameTime = currentTime;
 
         // Debug output for performance monitoring
-        if (m_lodEnabled && m_octree && m_octree->root) {
-            qDebug() << "FPS:" << QString::number(m_fps, 'f', 1)
-                     << "Visible points:" << m_visiblePointCount
+        if (m_lodEnabled && m_octree && m_octree->root)
+        {
+            qDebug() << "FPS:" << QString::number(m_fps, 'f', 1) << "Visible points:" << m_visiblePointCount
                      << "Total points:" << m_octree->getTotalPointCount();
         }
     }
@@ -1517,7 +1637,8 @@ void PointCloudViewerWidget::updateFPS()
 // Sprint R2: Enhanced rendering methods implementation
 void PointCloudViewerWidget::renderWithScreenSpaceErrorLOD()
 {
-    if (!m_octree || !m_octree->root) {
+    if (!m_octree || !m_octree->root)
+    {
         return;
     }
 
@@ -1531,16 +1652,17 @@ void PointCloudViewerWidget::renderWithScreenSpaceErrorLOD()
     m_visiblePoints.clear();
 
     // Collect visible points using screen-space error LOD
-    m_octree->root->collectVisiblePointsWithScreenSpaceError(
-        frustumPlanes, viewProjection, m_viewportInfo,
-        m_primaryScreenSpaceErrorThreshold,
-        m_cullScreenSpaceErrorThreshold,
-        m_visiblePoints
-    );
+    m_octree->root->collectVisiblePointsWithScreenSpaceError(frustumPlanes,
+                                                             viewProjection,
+                                                             m_viewportInfo,
+                                                             m_primaryScreenSpaceErrorThreshold,
+                                                             m_cullScreenSpaceErrorThreshold,
+                                                             m_visiblePoints);
 
     m_visiblePointCount = m_visiblePoints.size();
 
-    if (m_visiblePoints.empty()) {
+    if (m_visiblePoints.empty())
+    {
         return;
     }
 
@@ -1551,14 +1673,16 @@ void PointCloudViewerWidget::renderWithScreenSpaceErrorLOD()
     std::vector<float> renderData;
     renderData.reserve(m_visiblePoints.size() * 3);
 
-    for (const auto& point : m_visiblePoints) {
+    for (const auto& point : m_visiblePoints)
+    {
         renderData.push_back(point.x);
         renderData.push_back(point.y);
         renderData.push_back(point.z);
     }
 
     // Use shader program with error checking
-    if (!m_shaderProgram->bind()) {
+    if (!m_shaderProgram->bind())
+    {
         qWarning() << "Failed to bind shader program in screen-space error LOD rendering";
         return;
     }
@@ -1570,7 +1694,8 @@ void PointCloudViewerWidget::renderWithScreenSpaceErrorLOD()
 
     // Create temporary VBO for visible points
     QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
-    if (!tempBuffer.create()) {
+    if (!tempBuffer.create())
+    {
         qWarning() << "Failed to create temporary VBO for screen-space error LOD rendering";
         m_shaderProgram->release();
         return;
@@ -1596,8 +1721,8 @@ void PointCloudViewerWidget::updateViewportInfo()
 {
     m_viewportInfo.width = width();
     m_viewportInfo.height = height();
-    m_viewportInfo.nearPlane = 0.1f;  // Should match your projection matrix
-    m_viewportInfo.farPlane = 1000.0f; // Should match your projection matrix
+    m_viewportInfo.nearPlane = 0.1f;    // Should match your projection matrix
+    m_viewportInfo.farPlane = 1000.0f;  // Should match your projection matrix
 }
 
 void PointCloudViewerWidget::logLODStatistics(const std::vector<PointFullData>& visiblePoints)
@@ -1605,38 +1730,41 @@ void PointCloudViewerWidget::logLODStatistics(const std::vector<PointFullData>& 
     static int frameCount = 0;
     frameCount++;
 
-    if (frameCount % 60 == 0) { // Log every 60 frames
+    if (frameCount % 60 == 0)
+    {  // Log every 60 frames
         qDebug() << "Sprint R2 LOD Statistics:"
                  << "Visible points:" << visiblePoints.size()
                  << "Total points:" << (m_octree ? m_octree->getTotalPointCount() : 0)
                  << "Primary threshold:" << m_primaryScreenSpaceErrorThreshold
-                 << "Cull threshold:" << m_cullScreenSpaceErrorThreshold
-                 << "FPS:" << QString::number(m_fps, 'f', 1);
+                 << "Cull threshold:" << m_cullScreenSpaceErrorThreshold << "FPS:" << QString::number(m_fps, 'f', 1);
     }
 }
 
 // Sprint R3: Enhanced rendering methods implementation (as per backlog Tasks R3.1.4, R3.1.5)
 void PointCloudViewerWidget::renderWithAttributes()
 {
-    if (!m_shaderProgram || m_vertexData.empty()) return;
+    if (!m_shaderProgram || m_vertexData.empty())
+        return;
 
     // Collect visible points using LOD system (integrating with R1/R2 as specified in backlog)
     QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
     auto frustumPlanes = extractFrustumPlanes(viewProjection);
 
     m_visiblePoints.clear();
-    if (m_octree && m_octree->root) {
-        m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition,
-                                  m_lodDistance1, m_lodDistance2, m_visiblePoints);
+    if (m_octree && m_octree->root)
+    {
+        m_octree->getVisiblePoints(frustumPlanes, m_cameraPosition, m_lodDistance1, m_lodDistance2, m_visiblePoints);
     }
 
-    if (m_visiblePoints.empty()) return;
+    if (m_visiblePoints.empty())
+        return;
 
     // Prepare vertex data for visible points
     prepareVertexData(m_visiblePoints);
 
     // Bind shader and set uniforms as specified in Task R3.1.5, R3.3.2
-    if (!m_shaderProgram->bind()) {
+    if (!m_shaderProgram->bind())
+    {
         qWarning() << "Failed to bind enhanced shader program";
         return;
     }
@@ -1674,21 +1802,22 @@ void PointCloudViewerWidget::prepareVertexData(const std::vector<PointFullData>&
     m_vertexData.clear();
     m_vertexData.reserve(points.size());
 
-    for (const auto& point : points) {
+    for (const auto& point : points)
+    {
         m_vertexData.emplace_back(point);
     }
 
     // Update VBO with new vertex data (interleaved X,Y,Z,R,G,B,I as per backlog Task R3.1.4)
     m_vertexBuffer.bind();
-    m_vertexBuffer.allocate(m_vertexData.data(),
-                           static_cast<int>(m_vertexData.size() * sizeof(VertexData)));
+    m_vertexBuffer.allocate(m_vertexData.data(), static_cast<int>(m_vertexData.size() * sizeof(VertexData)));
     m_vertexBuffer.release();
 }
 
 // Sprint R4: Splatting and lighting rendering methods implementation (Task R4.1.3, R4.1.4, R4.1.5)
 void PointCloudViewerWidget::renderScene()
 {
-    if (!m_octree || !m_octree->root) return;
+    if (!m_octree || !m_octree->root)
+        return;
 
     // Collect visible points and splats (Task R4.1.4)
     QMatrix4x4 viewProjection = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
@@ -1699,26 +1828,31 @@ void PointCloudViewerWidget::renderScene()
     m_visiblePoints.clear();
     m_visibleSplats.clear();
 
-    m_octree->root->collectRenderData(
-        frustumPlanes, viewProjection, viewport,
-        m_splatThreshold, m_splattingEnabled,
-        m_visiblePoints, m_visibleSplats
-    );
+    m_octree->root->collectRenderData(frustumPlanes,
+                                      viewProjection,
+                                      viewport,
+                                      m_splatThreshold,
+                                      m_splattingEnabled,
+                                      m_visiblePoints,
+                                      m_visibleSplats);
 
     // Render individual points
-    if (!m_visiblePoints.empty()) {
+    if (!m_visiblePoints.empty())
+    {
         renderPoints(m_visiblePoints);
     }
 
     // Render splats
-    if (!m_visibleSplats.empty() && m_splattingEnabled) {
+    if (!m_visibleSplats.empty() && m_splattingEnabled)
+    {
         renderSplats(m_visibleSplats);
     }
 }
 
 void PointCloudViewerWidget::renderPoints(const std::vector<PointFullData>& points)
 {
-    if (!m_pointShaderProgram || points.empty()) return;
+    if (!m_pointShaderProgram || points.empty())
+        return;
 
     // Prepare vertex data
     prepareVertexData(points);
@@ -1751,11 +1885,12 @@ void PointCloudViewerWidget::renderPoints(const std::vector<PointFullData>& poin
 
     // Set lighting parameters (Task R4.2.3)
     m_pointShaderProgram->setUniformValue("lightingEnabled", m_lightingEnabled);
-    if (m_lightingEnabled) {
+    if (m_lightingEnabled)
+    {
         QVector3D lightDir_viewSpace = m_viewMatrix.mapVector(m_lightDirection).normalized();
         m_pointShaderProgram->setUniformValue("lightDirection_viewSpace", lightDir_viewSpace);
-        m_pointShaderProgram->setUniformValue("lightColor",
-            QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
+        m_pointShaderProgram->setUniformValue(
+            "lightColor", QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
         m_pointShaderProgram->setUniformValue("ambientIntensity", m_ambientIntensity);
     }
 
@@ -1769,7 +1904,8 @@ void PointCloudViewerWidget::renderPoints(const std::vector<PointFullData>& poin
 
 void PointCloudViewerWidget::renderSplats(const std::vector<AggregateNodeData>& splats)
 {
-    if (!m_splatShaderProgram || splats.empty()) return;
+    if (!m_splatShaderProgram || splats.empty())
+        return;
 
     prepareSplatVertexData(splats);
 
@@ -1796,16 +1932,18 @@ void PointCloudViewerWidget::renderSplats(const std::vector<AggregateNodeData>& 
 
     // Set lighting parameters
     m_splatShaderProgram->setUniformValue("lightingEnabled", m_lightingEnabled);
-    if (m_lightingEnabled) {
+    if (m_lightingEnabled)
+    {
         QVector3D lightDir_viewSpace = m_viewMatrix.mapVector(m_lightDirection).normalized();
         m_splatShaderProgram->setUniformValue("lightDirection_viewSpace", lightDir_viewSpace);
-        m_splatShaderProgram->setUniformValue("lightColor",
-            QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
+        m_splatShaderProgram->setUniformValue(
+            "lightColor", QVector3D(m_lightColor.redF(), m_lightColor.greenF(), m_lightColor.blueF()));
         m_splatShaderProgram->setUniformValue("ambientIntensity", m_ambientIntensity);
     }
 
     // Bind splat texture
-    if (m_splatTexture) {
+    if (m_splatTexture)
+    {
         m_splatTexture->bind(0);
         m_splatShaderProgram->setUniformValue("splatTexture", 0);
     }
@@ -1823,14 +1961,15 @@ void PointCloudViewerWidget::prepareSplatVertexData(const std::vector<AggregateN
     m_splatVertexData.clear();
     m_splatVertexData.reserve(splats.size());
 
-    for (const auto& splat : splats) {
+    for (const auto& splat : splats)
+    {
         m_splatVertexData.emplace_back(splat);
     }
 
     // Update VBO with new splat vertex data
     m_splatVertexBuffer.bind();
     m_splatVertexBuffer.allocate(m_splatVertexData.data(),
-                                static_cast<int>(m_splatVertexData.size() * sizeof(SplatVertex)));
+                                 static_cast<int>(m_splatVertexData.size() * sizeof(SplatVertex)));
     m_splatVertexBuffer.release();
 }
 
@@ -1960,17 +2099,20 @@ void PointCloudViewerWidget::setupSplatShaders()
     )";
 
     // Compile point shaders
-    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, pointVertexShader)) {
+    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, pointVertexShader))
+    {
         qCritical() << "Failed to compile point vertex shader:" << m_pointShaderProgram->log();
         return;
     }
 
-    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, pointFragmentShader)) {
+    if (!m_pointShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, pointFragmentShader))
+    {
         qCritical() << "Failed to compile point fragment shader:" << m_pointShaderProgram->log();
         return;
     }
 
-    if (!m_pointShaderProgram->link()) {
+    if (!m_pointShaderProgram->link())
+    {
         qCritical() << "Failed to link point shader program:" << m_pointShaderProgram->log();
         return;
     }
@@ -2090,17 +2232,20 @@ void PointCloudViewerWidget::setupSplatShaders()
     )";
 
     // Compile splat shaders
-    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, splatVertexShader)) {
+    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, splatVertexShader))
+    {
         qCritical() << "Failed to compile splat vertex shader:" << m_splatShaderProgram->log();
         return;
     }
 
-    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, splatFragmentShader)) {
+    if (!m_splatShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, splatFragmentShader))
+    {
         qCritical() << "Failed to compile splat fragment shader:" << m_splatShaderProgram->log();
         return;
     }
 
-    if (!m_splatShaderProgram->link()) {
+    if (!m_splatShaderProgram->link())
+    {
         qCritical() << "Failed to link splat shader program:" << m_splatShaderProgram->log();
         return;
     }
@@ -2119,7 +2264,7 @@ void PointCloudViewerWidget::setupSplatTexture()
     painter.setRenderHint(QPainter::Antialiasing);
 
     // Create radial gradient
-    QRadialGradient gradient(textureSize/2, textureSize/2, textureSize/2);
+    QRadialGradient gradient(textureSize / 2, textureSize / 2, textureSize / 2);
     gradient.setColorAt(0.0, QColor(255, 255, 255, 255));
     gradient.setColorAt(0.7, QColor(255, 255, 255, 128));
     gradient.setColorAt(1.0, QColor(255, 255, 255, 0));
@@ -2138,23 +2283,27 @@ void PointCloudViewerWidget::setupSplatTexture()
 void PointCloudViewerWidget::setupSplatVertexArrayObject()
 {
     // Create point VAO
-    if (!m_pointVAO.create()) {
+    if (!m_pointVAO.create())
+    {
         qCritical() << "Failed to create point VAO";
         return;
     }
 
-    if (!m_pointVertexBuffer.create()) {
+    if (!m_pointVertexBuffer.create())
+    {
         qCritical() << "Failed to create point vertex buffer";
         return;
     }
 
     // Create splat VAO
-    if (!m_splatVAO.create()) {
+    if (!m_splatVAO.create())
+    {
         qCritical() << "Failed to create splat VAO";
         return;
     }
 
-    if (!m_splatVertexBuffer.create()) {
+    if (!m_splatVertexBuffer.create())
+    {
         qCritical() << "Failed to create splat vertex buffer";
         return;
     }
@@ -2163,23 +2312,21 @@ void PointCloudViewerWidget::setupSplatVertexArrayObject()
     m_pointVAO.bind();
     m_pointVertexBuffer.bind();
 
-    if (m_pointShaderProgram) {
+    if (m_pointShaderProgram)
+    {
         m_pointShaderProgram->bind();
 
         // Position attribute (location 0)
         m_pointShaderProgram->enableAttributeArray(0);
-        m_pointShaderProgram->setAttributeBuffer(0, GL_FLOAT,
-            offsetof(VertexData, position), 3, sizeof(VertexData));
+        m_pointShaderProgram->setAttributeBuffer(0, GL_FLOAT, offsetof(VertexData, position), 3, sizeof(VertexData));
 
         // Color attribute (location 1)
         m_pointShaderProgram->enableAttributeArray(1);
-        m_pointShaderProgram->setAttributeBuffer(1, GL_FLOAT,
-            offsetof(VertexData, color), 3, sizeof(VertexData));
+        m_pointShaderProgram->setAttributeBuffer(1, GL_FLOAT, offsetof(VertexData, color), 3, sizeof(VertexData));
 
         // Intensity attribute (location 2)
         m_pointShaderProgram->enableAttributeArray(2);
-        m_pointShaderProgram->setAttributeBuffer(2, GL_FLOAT,
-            offsetof(VertexData, intensity), 1, sizeof(VertexData));
+        m_pointShaderProgram->setAttributeBuffer(2, GL_FLOAT, offsetof(VertexData, intensity), 1, sizeof(VertexData));
 
         // Normal attribute (location 3) - default to up vector
         glVertexAttrib3f(3, 0.0f, 0.0f, 1.0f);
@@ -2194,33 +2341,29 @@ void PointCloudViewerWidget::setupSplatVertexArrayObject()
     m_splatVAO.bind();
     m_splatVertexBuffer.bind();
 
-    if (m_splatShaderProgram) {
+    if (m_splatShaderProgram)
+    {
         m_splatShaderProgram->bind();
 
         // Position attribute (location 0)
         m_splatShaderProgram->enableAttributeArray(0);
-        m_splatShaderProgram->setAttributeBuffer(0, GL_FLOAT,
-            offsetof(SplatVertex, position), 3, sizeof(SplatVertex));
+        m_splatShaderProgram->setAttributeBuffer(0, GL_FLOAT, offsetof(SplatVertex, position), 3, sizeof(SplatVertex));
 
         // Color attribute (location 1)
         m_splatShaderProgram->enableAttributeArray(1);
-        m_splatShaderProgram->setAttributeBuffer(1, GL_FLOAT,
-            offsetof(SplatVertex, color), 3, sizeof(SplatVertex));
+        m_splatShaderProgram->setAttributeBuffer(1, GL_FLOAT, offsetof(SplatVertex, color), 3, sizeof(SplatVertex));
 
         // Normal attribute (location 2)
         m_splatShaderProgram->enableAttributeArray(2);
-        m_splatShaderProgram->setAttributeBuffer(2, GL_FLOAT,
-            offsetof(SplatVertex, normal), 3, sizeof(SplatVertex));
+        m_splatShaderProgram->setAttributeBuffer(2, GL_FLOAT, offsetof(SplatVertex, normal), 3, sizeof(SplatVertex));
 
         // Intensity attribute (location 3)
         m_splatShaderProgram->enableAttributeArray(3);
-        m_splatShaderProgram->setAttributeBuffer(3, GL_FLOAT,
-            offsetof(SplatVertex, intensity), 1, sizeof(SplatVertex));
+        m_splatShaderProgram->setAttributeBuffer(3, GL_FLOAT, offsetof(SplatVertex, intensity), 1, sizeof(SplatVertex));
 
         // Radius attribute (location 4)
         m_splatShaderProgram->enableAttributeArray(4);
-        m_splatShaderProgram->setAttributeBuffer(4, GL_FLOAT,
-            offsetof(SplatVertex, radius), 1, sizeof(SplatVertex));
+        m_splatShaderProgram->setAttributeBuffer(4, GL_FLOAT, offsetof(SplatVertex, radius), 1, sizeof(SplatVertex));
 
         m_splatShaderProgram->release();
     }
@@ -2258,8 +2401,7 @@ void PointCloudViewerWidget::setPointSizeAttenuationParams(float minSize, float 
     m_minPointSize = minSize;
     m_maxPointSize = maxSize;
     m_attenuationFactor = factor;
-    qDebug() << "Point size attenuation params - Min:" << minSize
-             << "Max:" << maxSize << "Factor:" << factor;
+    qDebug() << "Point size attenuation params - Min:" << minSize << "Max:" << maxSize << "Factor:" << factor;
     update();
 }
 
@@ -2304,10 +2446,14 @@ void PointCloudViewerWidget::emitPerformanceStats()
 {
     // Calculate visible points based on current rendering mode
     int visiblePoints = 0;
-    if (m_hasData) {
-        if (m_lodEnabled && !m_visiblePoints.empty()) {
+    if (m_hasData)
+    {
+        if (m_lodEnabled && !m_visiblePoints.empty())
+        {
             visiblePoints = static_cast<int>(m_visiblePoints.size());
-        } else {
+        }
+        else
+        {
             visiblePoints = m_pointCount;
         }
     }
@@ -2319,13 +2465,14 @@ void PointCloudViewerWidget::emitPerformanceStats()
 // IPointCloudViewer interface implementation
 void PointCloudViewerWidget::addPointCloudData(const std::vector<float>& additionalPoints)
 {
-    if (additionalPoints.empty()) {
+    if (additionalPoints.empty())
+    {
         return;
     }
 
     // Append new points to existing data
     m_pointData.insert(m_pointData.end(), additionalPoints.begin(), additionalPoints.end());
-    m_pointCount = static_cast<int>(m_pointData.size() / 6); // Assuming XYZ RGB format
+    m_pointCount = static_cast<int>(m_pointData.size() / 6);  // Assuming XYZ RGB format
 
     // Update buffers and recalculate bounding box
     calculateBoundingBox();
@@ -2399,7 +2546,7 @@ void PointCloudViewerWidget::setBackView()
 void PointCloudViewerWidget::setIsometricView()
 {
     m_cameraYaw = 45.0f;
-    m_cameraPitch = -35.264f; // Isometric angle
+    m_cameraPitch = -35.264f;  // Isometric angle
     updateCamera();
     update();
 }
@@ -2440,9 +2587,12 @@ void PointCloudViewerWidget::setAttenuationFactor(float factor)
 
 void PointCloudViewerWidget::onLoadingFinished(bool success, const QString& message)
 {
-    if (success) {
+    if (success)
+    {
         setState(ViewerState::DisplayingData, message);
-    } else {
+    }
+    else
+    {
         setState(ViewerState::LoadFailed, message);
     }
 }
@@ -2464,7 +2614,8 @@ void PointCloudViewerWidget::optimizeMemory()
     m_visiblePoints.shrink_to_fit();
 
     // Force garbage collection of octree if needed
-    if (m_octree && !m_hasData) {
+    if (m_octree && !m_hasData)
+    {
         m_octree.reset(new Octree());
     }
 }
@@ -2474,21 +2625,28 @@ void PointCloudViewerWidget::optimizeMemory()
 // Sprint 6: GPU Culling Implementation
 // ============================================================================
 
-void PointCloudViewerWidget::initializeGpuCuller() {
+void PointCloudViewerWidget::initializeGpuCuller()
+{
     qDebug() << "PointCloudViewerWidget::initializeGpuCuller started";
 
-    try {
+    try
+    {
         m_gpuCuller = std::make_unique<GpuCuller>();
 
-        if (m_gpuCuller->initialize()) {
+        if (m_gpuCuller->initialize())
+        {
             qDebug() << "GPU culler initialized successfully";
             qDebug() << "GPU memory usage:" << m_gpuCuller->getGpuMemoryUsage() << "bytes";
-        } else {
+        }
+        else
+        {
             qWarning() << "Failed to initialize GPU culler - falling back to CPU culling";
             m_gpuCuller.reset();
             m_gpuCullingEnabled = false;
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         qWarning() << "Exception during GPU culler initialization:" << e.what();
         m_gpuCuller.reset();
         m_gpuCullingEnabled = false;
@@ -2497,8 +2655,10 @@ void PointCloudViewerWidget::initializeGpuCuller() {
     qDebug() << "PointCloudViewerWidget::initializeGpuCuller completed";
 }
 
-void PointCloudViewerWidget::setGpuCullingEnabled(bool enabled) {
-    if (enabled && !m_gpuCuller) {
+void PointCloudViewerWidget::setGpuCullingEnabled(bool enabled)
+{
+    if (enabled && !m_gpuCuller)
+    {
         qWarning() << "Cannot enable GPU culling - GPU culler not initialized";
         return;
     }
@@ -2510,37 +2670,46 @@ void PointCloudViewerWidget::setGpuCullingEnabled(bool enabled) {
     update();
 }
 
-bool PointCloudViewerWidget::isGpuCullingEnabled() const {
+bool PointCloudViewerWidget::isGpuCullingEnabled() const
+{
     return m_gpuCullingEnabled && m_gpuCuller && m_gpuCuller->isInitialized();
 }
 
-void PointCloudViewerWidget::setGpuCullingThreshold(float threshold) {
+void PointCloudViewerWidget::setGpuCullingThreshold(float threshold)
+{
     m_gpuCullingThreshold = threshold;
     qDebug() << "GPU culling threshold set to:" << threshold;
 }
 
-float PointCloudViewerWidget::getGpuCullingPerformance() const {
-    if (m_gpuCuller) {
+float PointCloudViewerWidget::getGpuCullingPerformance() const
+{
+    if (m_gpuCuller)
+    {
         return m_gpuCuller->getLastCullingTime();
     }
     return 0.0f;
 }
 
-void PointCloudViewerWidget::performGpuCulling() {
-    if (!isGpuCullingEnabled() || !m_octree || !m_octree->root) {
+void PointCloudViewerWidget::performGpuCulling()
+{
+    if (!isGpuCullingEnabled() || !m_octree || !m_octree->root)
+    {
         return;
     }
 
-    try {
+    try
+    {
         // Convert octree to GPU format
         auto gpuNodes = GpuCuller::convertOctreeToGpuFormat(m_octree->root.get());
 
-        if (gpuNodes.empty()) {
+        if (gpuNodes.empty())
+        {
             return;
         }
 
         // Upload octree data to GPU
-        if (!m_gpuCuller->updateOctreeData(gpuNodes)) {
+        if (!m_gpuCuller->updateOctreeData(gpuNodes))
+        {
             qWarning() << "Failed to upload octree data to GPU";
             return;
         }
@@ -2562,17 +2731,19 @@ void PointCloudViewerWidget::performGpuCulling() {
         // Update visible point count for performance monitoring
         m_visiblePointCount = result.totalVisiblePoints;
 
-        qDebug() << "GPU culling completed:" << result.visibleNodeIndices.size()
-                 << "visible nodes," << result.totalVisiblePoints << "visible points in"
-                 << result.cullingTimeMs << "ms";
-
-    } catch (const std::exception& e) {
+        qDebug() << "GPU culling completed:" << result.visibleNodeIndices.size() << "visible nodes,"
+                 << result.totalVisiblePoints << "visible points in" << result.cullingTimeMs << "ms";
+    }
+    catch (const std::exception& e)
+    {
         qWarning() << "Exception during GPU culling:" << e.what();
     }
 }
 
-void PointCloudViewerWidget::renderWithGpuCulling() {
-    if (!isGpuCullingEnabled()) {
+void PointCloudViewerWidget::renderWithGpuCulling()
+{
+    if (!isGpuCullingEnabled())
+    {
         return;
     }
 
@@ -2591,7 +2762,8 @@ void PointCloudViewerWidget::renderWithGpuCulling() {
 // Sprint 6: Multi-Scan Visualization Implementation
 // ============================================================================
 
-void PointCloudViewerWidget::loadMultipleScans(const QStringList& scanIds) {
+void PointCloudViewerWidget::loadMultipleScans(const QStringList& scanIds)
+{
     qDebug() << "Loading multiple scans:" << scanIds;
 
     m_activeScanIds = scanIds;
@@ -2600,7 +2772,8 @@ void PointCloudViewerWidget::loadMultipleScans(const QStringList& scanIds) {
     m_loadedScans.clear();
     m_loadedScans.reserve(scanIds.size());
 
-    for (int i = 0; i < scanIds.size(); ++i) {
+    for (int i = 0; i < scanIds.size(); ++i)
+    {
         ScanData scanData;
         scanData.scanId = scanIds[i];
         scanData.color = generateScanColor(i);
@@ -2614,28 +2787,31 @@ void PointCloudViewerWidget::loadMultipleScans(const QStringList& scanIds) {
     update();
 }
 
-void PointCloudViewerWidget::unloadScan(const QString& scanId) {
+void PointCloudViewerWidget::unloadScan(const QString& scanId)
+{
     qDebug() << "Unloading scan:" << scanId;
 
     // Remove from active scan IDs
     m_activeScanIds.removeAll(scanId);
 
     // Remove from loaded scans
-    auto it = std::remove_if(m_loadedScans.begin(), m_loadedScans.end(),
-        [&scanId](const ScanData& scan) {
-            return scan.scanId == scanId;
-        });
+    auto it = std::remove_if(
+        m_loadedScans.begin(), m_loadedScans.end(), [&scanId](const ScanData& scan) { return scan.scanId == scanId; });
 
-    if (it != m_loadedScans.end()) {
+    if (it != m_loadedScans.end())
+    {
         m_loadedScans.erase(it, m_loadedScans.end());
         qDebug() << "Scan" << scanId << "unloaded successfully";
         update();
-    } else {
+    }
+    else
+    {
         qWarning() << "Scan" << scanId << "not found for unloading";
     }
 }
 
-void PointCloudViewerWidget::clearAllScans() {
+void PointCloudViewerWidget::clearAllScans()
+{
     qDebug() << "Clearing all scans";
 
     m_activeScanIds.clear();
@@ -2648,9 +2824,12 @@ void PointCloudViewerWidget::clearAllScans() {
     update();
 }
 
-void PointCloudViewerWidget::setScanColor(const QString& scanId, const QColor& color) {
-    for (auto& scan : m_loadedScans) {
-        if (scan.scanId == scanId) {
+void PointCloudViewerWidget::setScanColor(const QString& scanId, const QColor& color)
+{
+    for (auto& scan : m_loadedScans)
+    {
+        if (scan.scanId == scanId)
+        {
             scan.color = color;
             qDebug() << "Set color for scan" << scanId << "to" << color.name();
             update();
@@ -2661,26 +2840,33 @@ void PointCloudViewerWidget::setScanColor(const QString& scanId, const QColor& c
     qWarning() << "Scan" << scanId << "not found for color setting";
 }
 
-QStringList PointCloudViewerWidget::getLoadedScans() const {
+QStringList PointCloudViewerWidget::getLoadedScans() const
+{
     QStringList loadedScanIds;
-    for (const auto& scan : m_loadedScans) {
-        if (scan.isLoaded) {
+    for (const auto& scan : m_loadedScans)
+    {
+        if (scan.isLoaded)
+        {
             loadedScanIds.append(scan.scanId);
         }
     }
     return loadedScanIds;
 }
 
-void PointCloudViewerWidget::renderMultipleScans() {
-    if (m_loadedScans.empty()) {
+void PointCloudViewerWidget::renderMultipleScans()
+{
+    if (m_loadedScans.empty())
+    {
         return;
     }
 
     qDebug() << "Rendering" << m_loadedScans.size() << "scans";
 
     // Render each scan with its unique color
-    for (const auto& scan : m_loadedScans) {
-        if (!scan.isLoaded || scan.pointData.empty()) {
+    for (const auto& scan : m_loadedScans)
+    {
+        if (!scan.isLoaded || scan.pointData.empty())
+        {
             continue;
         }
 
@@ -2688,7 +2874,8 @@ void PointCloudViewerWidget::renderMultipleScans() {
         QVector3D scanColor(scan.color.redF(), scan.color.greenF(), scan.color.blueF());
 
         // Use shader program
-        if (!m_shaderProgram->bind()) {
+        if (!m_shaderProgram->bind())
+        {
             qWarning() << "Failed to bind shader program for scan" << scan.scanId;
             continue;
         }
@@ -2701,10 +2888,10 @@ void PointCloudViewerWidget::renderMultipleScans() {
 
         // Create temporary VBO for this scan
         QOpenGLBuffer tempBuffer(QOpenGLBuffer::VertexBuffer);
-        if (tempBuffer.create()) {
+        if (tempBuffer.create())
+        {
             tempBuffer.bind();
-            tempBuffer.allocate(scan.pointData.data(),
-                              static_cast<int>(scan.pointData.size() * sizeof(float)));
+            tempBuffer.allocate(scan.pointData.data(), static_cast<int>(scan.pointData.size() * sizeof(float)));
 
             // Set vertex attributes
             glEnableVertexAttribArray(0);
@@ -2722,15 +2909,20 @@ void PointCloudViewerWidget::renderMultipleScans() {
     qDebug() << "Multi-scan rendering completed";
 }
 
-void PointCloudViewerWidget::updateScanOctrees() {
-    for (auto& scan : m_loadedScans) {
-        if (scan.isLoaded && !scan.pointData.empty() && scan.octree) {
+void PointCloudViewerWidget::updateScanOctrees()
+{
+    for (auto& scan : m_loadedScans)
+    {
+        if (scan.isLoaded && !scan.pointData.empty() && scan.octree)
+        {
             // Convert point data to PointFullData format for octree
             std::vector<PointFullData> points;
             points.reserve(scan.pointData.size() / 3);
 
-            for (size_t i = 0; i < scan.pointData.size(); i += 3) {
-                if (i + 2 < scan.pointData.size()) {
+            for (size_t i = 0; i < scan.pointData.size(); i += 3)
+            {
+                if (i + 2 < scan.pointData.size())
+                {
                     PointFullData point;
                     point.x = scan.pointData[i];
                     point.y = scan.pointData[i + 1];
@@ -2745,14 +2937,14 @@ void PointCloudViewerWidget::updateScanOctrees() {
 
             // Build octree for this scan
             scan.octree->build(points);
-            qDebug() << "Built octree for scan" << scan.scanId
-                     << "- Points:" << points.size()
+            qDebug() << "Built octree for scan" << scan.scanId << "- Points:" << points.size()
                      << "Nodes:" << scan.octree->getNodeCount();
         }
     }
 }
 
-QColor PointCloudViewerWidget::generateScanColor(int scanIndex) {
+QColor PointCloudViewerWidget::generateScanColor(int scanIndex)
+{
     // Generate distinct colors for different scans
     static const QColor predefinedColors[] = {
         QColor(255, 100, 100),  // Red
@@ -2769,12 +2961,15 @@ QColor PointCloudViewerWidget::generateScanColor(int scanIndex) {
 
     const int numPredefined = sizeof(predefinedColors) / sizeof(predefinedColors[0]);
 
-    if (scanIndex < numPredefined) {
+    if (scanIndex < numPredefined)
+    {
         return predefinedColors[scanIndex];
-    } else {
+    }
+    else
+    {
         // Generate procedural colors for additional scans
-        float hue = (scanIndex * 137.5f) / 360.0f; // Golden angle for good distribution
-        hue = hue - std::floor(hue); // Keep in [0,1] range
+        float hue = (scanIndex * 137.5f) / 360.0f;  // Golden angle for good distribution
+        hue = hue - std::floor(hue);                // Keep in [0,1] range
 
         return QColor::fromHsvF(hue, 0.8f, 0.9f);
     }
@@ -2785,16 +2980,19 @@ std::vector<Point> PointCloudViewerWidget::getCurrentPointCloudData() const
 {
     std::vector<Point> points;
 
-    if (!m_hasData || m_pointData.empty()) {
+    if (!m_hasData || m_pointData.empty())
+    {
         return points;
     }
 
     // Convert internal point data to Point structures for export
     points.reserve(m_pointCount);
 
-    for (int i = 0; i < m_pointCount; ++i) {
+    for (int i = 0; i < m_pointCount; ++i)
+    {
         size_t index = i * 3;
-        if (index + 2 < m_pointData.size()) {
+        if (index + 2 < m_pointData.size())
+        {
             Point point;
 
             // Apply inverse global offset to get original coordinates
@@ -2810,7 +3008,8 @@ std::vector<Point> PointCloudViewerWidget::getCurrentPointCloudData() const
             point.intensity = 1.0f;
 
             // If we have vertex data with attributes, use those instead
-            if (i < static_cast<int>(m_vertexData.size())) {
+            if (i < static_cast<int>(m_vertexData.size()))
+            {
                 const VertexData& vertexData = m_vertexData[i];
                 point.r = static_cast<uint8_t>(vertexData.color.x() * 255);
                 point.g = static_cast<uint8_t>(vertexData.color.y() * 255);

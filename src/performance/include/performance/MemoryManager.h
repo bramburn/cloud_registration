@@ -1,63 +1,69 @@
 #ifndef MEMORYMANAGER_H
 #define MEMORYMANAGER_H
 
-#include <QObject>
 #include <QMutex>
+#include <QObject>
 #include <QTimer>
-#include <memory>
-#include <vector>
-#include <unordered_map>
 #include <queue>
+
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include "core/pointdata.h"
 
 /**
  * @brief Advanced memory management system for large point cloud datasets
- * 
+ *
  * This class provides smart memory management utilities including:
  * - Memory pooling for PointFullData objects
  * - Streaming algorithms for datasets larger than RAM
  * - Garbage collection and memory monitoring
  * - Memory usage tracking and optimization
- * 
+ *
  * Sprint 7 Requirements:
  * - Handle 100M+ point datasets efficiently
  * - Reduce allocation/deallocation overhead
  * - Streaming support for large files
  * - Memory leak prevention and monitoring
  */
-class MemoryManager : public QObject {
+class MemoryManager : public QObject
+{
     Q_OBJECT
 
 public:
     /**
      * @brief Memory pool configuration
      */
-    struct PoolConfig {
-        size_t initialSize = 1024;      // Initial pool size
-        size_t maxSize = 10240;         // Maximum pool size
-        size_t chunkSize = 256;         // Allocation chunk size
-        bool autoGrow = true;           // Allow pool growth
-        bool enableGC = true;           // Enable garbage collection
+    struct PoolConfig
+    {
+        size_t initialSize = 1024;  // Initial pool size
+        size_t maxSize = 10240;     // Maximum pool size
+        size_t chunkSize = 256;     // Allocation chunk size
+        bool autoGrow = true;       // Allow pool growth
+        bool enableGC = true;       // Enable garbage collection
     };
 
     /**
      * @brief Memory usage statistics
      */
-    struct MemoryStats {
-        size_t totalAllocated = 0;      // Total memory allocated
-        size_t poolMemory = 0;          // Memory in pools
-        size_t activeObjects = 0;       // Active object count
-        size_t poolHits = 0;            // Pool allocation hits
-        size_t poolMisses = 0;          // Pool allocation misses
-        double hitRatio = 0.0;          // Pool hit ratio
-        size_t gcCollections = 0;       // GC collection count
-        size_t gcFreedBytes = 0;        // Bytes freed by GC
+    struct MemoryStats
+    {
+        size_t totalAllocated = 0;  // Total memory allocated
+        size_t poolMemory = 0;      // Memory in pools
+        size_t activeObjects = 0;   // Active object count
+        size_t poolHits = 0;        // Pool allocation hits
+        size_t poolMisses = 0;      // Pool allocation misses
+        double hitRatio = 0.0;      // Pool hit ratio
+        size_t gcCollections = 0;   // GC collection count
+        size_t gcFreedBytes = 0;    // Bytes freed by GC
     };
 
     /**
      * @brief Streaming chunk for large dataset processing
      */
-    struct StreamingChunk {
+    struct StreamingChunk
+    {
         std::vector<PointFullData> points;
         size_t chunkIndex = 0;
         size_t totalChunks = 0;
@@ -68,7 +74,8 @@ public:
     /**
      * @brief Memory pool for PointFullData objects
      */
-    class PointDataPool {
+    class PointDataPool
+    {
     public:
         explicit PointDataPool(const PoolConfig& config);
         ~PointDataPool();
@@ -132,14 +139,14 @@ private slots:
 private:
     std::unique_ptr<PointDataPool> m_pointPool;
     PoolConfig m_poolConfig;
-    
+
     // Streaming state
     bool m_streamingActive;
     size_t m_totalStreamingPoints;
     size_t m_streamingChunkSize;
     size_t m_currentStreamingIndex;
     std::vector<StreamingChunk> m_streamingChunks;
-    
+
     // Memory monitoring
     bool m_monitoringEnabled;
     size_t m_memoryThreshold;
@@ -147,14 +154,14 @@ private:
     QTimer* m_gcTimer;
     mutable QMutex m_statsMutex;
     MemoryStats m_stats;
-    
+
     // Garbage collection
     bool m_autoGCEnabled;
     std::vector<PointFullData*> m_gcCandidates;
-    
+
     void updateMemoryUsage();
     void checkMemoryThreshold();
     size_t calculateObjectMemoryUsage(const PointFullData* point) const;
 };
 
-#endif // MEMORYMANAGER_H
+#endif  // MEMORYMANAGER_H

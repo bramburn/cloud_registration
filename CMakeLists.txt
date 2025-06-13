@@ -96,6 +96,71 @@ else()
     set(GTEST_AVAILABLE FALSE)
 endif()
 
+# ============================================================================
+# CLANG-FORMAT AND CLANG-TIDY INTEGRATION
+# ============================================================================
+
+# Find clang-format executable
+find_program(CLANG_FORMAT_EXE clang-format)
+
+if(CLANG_FORMAT_EXE)
+    message(STATUS "clang-format found: ${CLANG_FORMAT_EXE}")
+
+    # Define files to format (all C++ source and header files)
+    file(GLOB_RECURSE PROJECT_FORMAT_FILES
+        "${CMAKE_SOURCE_DIR}/src/*.h"
+        "${CMAKE_SOURCE_DIR}/src/*.hpp"
+        "${CMAKE_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_SOURCE_DIR}/src/*.cxx"
+        "${CMAKE_SOURCE_DIR}/src/*.cc"
+        "${CMAKE_SOURCE_DIR}/tests/*.h"
+        "${CMAKE_SOURCE_DIR}/tests/*.hpp"
+        "${CMAKE_SOURCE_DIR}/tests/*.cpp"
+        "${CMAKE_SOURCE_DIR}/tests/*.cxx"
+        "${CMAKE_SOURCE_DIR}/tests/*.cc"
+    )
+
+    # Create format_all target
+    add_custom_target(format_all
+        COMMAND ${CLANG_FORMAT_EXE} -i ${PROJECT_FORMAT_FILES}
+        COMMENT "Formatting all C++ source files with clang-format"
+        VERBATIM
+    )
+
+    # Create format_check target for CI/CD (dry-run)
+    add_custom_target(format_check
+        COMMAND ${CLANG_FORMAT_EXE} --Werror --dry-run ${PROJECT_FORMAT_FILES}
+        COMMENT "Checking C++ source files formatting with clang-format"
+        VERBATIM
+    )
+else()
+    message(WARNING "clang-format not found - formatting targets will not be available")
+endif()
+
+# Enable compilation database generation for clang-tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Find clang-tidy executable
+find_program(CLANG_TIDY_EXE clang-tidy)
+
+if(CLANG_TIDY_EXE)
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+
+    # Create run_clang_tidy target
+    add_custom_target(run_clang_tidy
+        COMMAND ${CLANG_TIDY_EXE} ${PROJECT_FORMAT_FILES} -- -p=${CMAKE_BINARY_DIR} -std=c++17
+        COMMENT "Running clang-tidy analysis on C++ source files"
+        VERBATIM
+    )
+
+    # Ensure the main application is built first to generate up-to-date compile_commands.json
+    if(TARGET CloudRegistration)
+        add_dependencies(run_clang_tidy CloudRegistration)
+    endif()
+else()
+    message(WARNING "clang-tidy not found - static analysis targets will not be available")
+endif()
+
 # Sprint 1: Add subdirectories for all top-level logical components
 # Order is important for dependencies
 add_subdirectory(src/core)

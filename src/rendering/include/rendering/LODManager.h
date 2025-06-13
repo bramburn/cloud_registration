@@ -1,11 +1,12 @@
 #ifndef LODMANAGER_H
 #define LODMANAGER_H
 
+#include <QMatrix4x4>
 #include <QObject>
 #include <QVector3D>
-#include <QMatrix4x4>
-#include <vector>
+
 #include <memory>
+#include <vector>
 
 // Forward declarations
 class Octree;
@@ -13,11 +14,11 @@ class CameraController;
 
 /**
  * @brief LODManager - Level of Detail management for performance optimization
- * 
- * This class implements the Level of Detail (LOD) logic required for rendering 
- * large datasets performantly. It acts as the decision-maker for what gets 
+ *
+ * This class implements the Level of Detail (LOD) logic required for rendering
+ * large datasets performantly. It acts as the decision-maker for what gets
  * rendered each frame.
- * 
+ *
  * Sprint 1 Requirements:
  * - Distance-based culling and detail selection
  * - Frustum culling for out-of-view geometry
@@ -65,13 +66,19 @@ public:
      * @brief Enable or disable frustum culling
      * @param enabled True to enable frustum culling
      */
-    void setFrustumCullingEnabled(bool enabled) { m_frustumCullingEnabled = enabled; }
+    void setFrustumCullingEnabled(bool enabled)
+    {
+        m_frustumCullingEnabled = enabled;
+    }
 
     /**
      * @brief Enable or disable distance-based LOD
      * @param enabled True to enable distance-based LOD
      */
-    void setDistanceLODEnabled(bool enabled) { m_distanceLODEnabled = enabled; }
+    void setDistanceLODEnabled(bool enabled)
+    {
+        m_distanceLODEnabled = enabled;
+    }
 
     /**
      * @brief Get visible points for current frame
@@ -106,7 +113,10 @@ public:
      * @brief Get current quality level
      * @return Quality level between 0.0 and 1.0
      */
-    float getQualityLevel() const { return m_qualityLevel; }
+    float getQualityLevel() const
+    {
+        return m_qualityLevel;
+    }
 
     /**
      * @brief Enable adaptive quality based on performance
@@ -163,16 +173,13 @@ private:
     mutable int m_lastCulledNodes;
 
     // Helper methods
-    bool isNodeInFrustum(const QVector3D& nodeCenter, float nodeSize, 
-                        const QMatrix4x4& viewProjectionMatrix) const;
+    bool isNodeInFrustum(const QVector3D& nodeCenter, float nodeSize, const QMatrix4x4& viewProjectionMatrix) const;
     float calculateNodeDistance(const QVector3D& nodeCenter) const;
     int calculateLODLevel(float distance) const;
     void updateAdaptiveQuality();
     std::vector<int> traverseOctreeForLOD(float aspectRatio);
-    void extractFrustumPlanes(const QMatrix4x4& viewProjectionMatrix, 
-                             std::vector<QVector4D>& planes) const;
-    bool isPointInFrustum(const QVector3D& point, 
-                         const std::vector<QVector4D>& planes) const;
+    void extractFrustumPlanes(const QMatrix4x4& viewProjectionMatrix, std::vector<QVector4D>& planes) const;
+    bool isPointInFrustum(const QVector3D& point, const std::vector<QVector4D>& planes) const;
 };
 
-#endif // LODMANAGER_H
+#endif  // LODMANAGER_H

@@ -1,9 +1,6 @@
 #include "ui/sqlitemanager.h"
 
-SQLiteManager::SQLiteManager(QObject *parent)
-    : QObject(parent)
-{
-}
+SQLiteManager::SQLiteManager(QObject* parent) : QObject(parent) {}
 
 bool SQLiteManager::openDatabase(const QString& databasePath)
 {
@@ -15,7 +12,8 @@ bool SQLiteManager::openDatabase(const QString& databasePath)
 
 void SQLiteManager::closeDatabase()
 {
-    if (m_isOpen) {
+    if (m_isOpen)
+    {
         m_isOpen = false;
         emit databaseClosed();
         m_currentDatabasePath.clear();

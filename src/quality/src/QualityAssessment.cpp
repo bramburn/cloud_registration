@@ -1,15 +1,14 @@
 #include "quality/QualityAssessment.h"
-#include <QDebug>
+
 #include <QDateTime>
+#include <QDebug>
 #include <QElapsedTimer>
 #include <QtMath>
+
 #include <algorithm>
 #include <numeric>
 
-QualityAssessment::QualityAssessment(QObject* parent)
-    : QObject(parent)
-{
-}
+QualityAssessment::QualityAssessment(QObject* parent) : QObject(parent) {}
 
 QualityAssessment::~QualityAssessment() = default;
 
@@ -36,104 +35,111 @@ QString QualityReport::generateDetailedReport() const
     report += QString("  Description: %1\n").arg(description);
     report += QString("  Assessment Time: %1\n").arg(timestamp);
     report += QString("  Processing Time: %1 seconds\n\n").arg(metrics.processingTime, 0, 'f', 2);
-    
+
     report += QString("Alignment Accuracy:\n");
     report += QString("  RMS Error: %1 mm\n").arg(metrics.rmsError * 1000, 0, 'f', 3);
     report += QString("  Mean Error: %1 mm\n").arg(metrics.meanError * 1000, 0, 'f', 3);
     report += QString("  Standard Deviation: %1 mm\n").arg(metrics.standardDeviation * 1000, 0, 'f', 3);
     report += QString("  Min Error: %1 mm\n").arg(metrics.minError * 1000, 0, 'f', 3);
     report += QString("  Max Error: %1 mm\n\n").arg(metrics.maxError * 1000, 0, 'f', 3);
-    
+
     report += QString("Coverage Analysis:\n");
     report += QString("  Overlap Percentage: %1%\n").arg(metrics.overlapPercentage, 0, 'f', 1);
     report += QString("  Total Correspondences: %1\n").arg(metrics.correspondenceCount);
     report += QString("  Valid Correspondences: %1\n\n").arg(metrics.validCorrespondences);
-    
+
     report += QString("Point Cloud Statistics:\n");
     report += QString("  Total Points: %1\n").arg(metrics.totalPoints);
     report += QString("  Average Density: %1 points/m²\n").arg(metrics.averagePointDensity, 0, 'f', 1);
     report += QString("  Density Variation: %1\n\n").arg(metrics.densityVariation, 0, 'f', 3);
-    
+
     report += QString("Geometric Features:\n");
     report += QString("  Planarity: %1\n").arg(metrics.planarity, 0, 'f', 3);
     report += QString("  Sphericity: %1\n").arg(metrics.sphericity, 0, 'f', 3);
     report += QString("  Linearity: %1\n\n").arg(metrics.linearity, 0, 'f', 3);
-    
+
     report += QString("Overall Assessment:\n");
     report += QString("  Quality Grade: %1\n").arg(metrics.qualityGrade);
     report += QString("  Confidence Score: %1%\n\n").arg(metrics.confidenceScore * 100, 0, 'f', 1);
-    
-    if (!recommendations.isEmpty()) {
+
+    if (!recommendations.isEmpty())
+    {
         report += QString("Recommendations:\n");
-        for (const QString& rec : recommendations) {
+        for (const QString& rec : recommendations)
+        {
             report += QString("  • %1\n").arg(rec);
         }
     }
-    
+
     return report;
 }
 
 QualityMetrics QualityAssessment::calculateErrorMetrics(const std::vector<QualityCorrespondence>& correspondences)
 {
     QualityMetrics metrics;
-    
-    if (correspondences.empty()) {
+
+    if (correspondences.empty())
+    {
         qWarning() << "QualityAssessment: No correspondences provided";
         return metrics;
     }
-    
+
     emit assessmentProgress(10, "Calculating error metrics");
-    
+
     // Calculate all distances
     std::vector<float> errors = calculateAllDistances(correspondences);
-    
+
     // Calculate statistics
     metrics = calculateStatistics(errors);
     metrics.correspondenceCount = correspondences.size();
     metrics.validCorrespondences = errors.size();
-    
+
     emit assessmentProgress(30, "Error metrics calculated");
     return metrics;
 }
 
-float QualityAssessment::calculateOverlapPercentage(const std::vector<QualityPoint>& cloud1, 
-                                                   const std::vector<QualityPoint>& cloud2, 
-                                                   float tolerance)
+float QualityAssessment::calculateOverlapPercentage(const std::vector<QualityPoint>& cloud1,
+                                                    const std::vector<QualityPoint>& cloud2,
+                                                    float tolerance)
 {
-    if (cloud1.empty() || cloud2.empty()) {
+    if (cloud1.empty() || cloud2.empty())
+    {
         return 0.0f;
     }
-    
+
     emit assessmentProgress(40, "Calculating overlap percentage");
-    
+
     size_t overlapCount = 0;
     const float toleranceSquared = tolerance * tolerance;
-    
+
     // For each point in cloud1, check if there's a nearby point in cloud2
-    for (const auto& p1 : cloud1) {
+    for (const auto& p1 : cloud1)
+    {
         QVector3D point1 = p1.toVector3D();
-        
-        for (const auto& p2 : cloud2) {
+
+        for (const auto& p2 : cloud2)
+        {
             QVector3D point2 = p2.toVector3D();
             float distanceSquared = (point1 - point2).lengthSquared();
-            
-            if (distanceSquared <= toleranceSquared) {
+
+            if (distanceSquared <= toleranceSquared)
+            {
                 overlapCount++;
-                break; // Found a match, move to next point
+                break;  // Found a match, move to next point
             }
         }
     }
-    
+
     float percentage = (static_cast<float>(overlapCount) / static_cast<float>(cloud1.size())) * 100.0f;
     emit assessmentProgress(60, "Overlap percentage calculated");
-    
+
     return percentage;
 }
 
 QualityReport QualityAssessment::assessRegistration(const std::vector<QualityPoint>& sourceCloud,
-                                                   const std::vector<QualityPoint>& targetCloud,
-                                                   const QMatrix4x4& transformation,
-                                                   const std::vector<QualityCorrespondence>& correspondences)
+                                                    const std::vector<QualityPoint>& targetCloud,
+                                                    const QMatrix4x4& transformation,
+                                                    const std::vector<QualityCorrespondence>& correspondences)
 {
     QElapsedTimer timer;
     timer.start();
@@ -144,26 +150,27 @@ QualityReport QualityAssessment::assessRegistration(const std::vector<QualityPoi
     QualityReport report;
     report.timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
 
-    try {
+    try
+    {
         // Transform source cloud
         auto transformedSource = transformPointCloud(sourceCloud, transformation);
 
         // Calculate error metrics from correspondences
-        if (!correspondences.empty()) {
+        if (!correspondences.empty())
+        {
             report.metrics = calculateErrorMetrics(correspondences);
         }
 
         // Calculate overlap percentage
-        report.metrics.overlapPercentage = calculateOverlapPercentage(transformedSource, targetCloud, m_toleranceThreshold);
+        report.metrics.overlapPercentage =
+            calculateOverlapPercentage(transformedSource, targetCloud, m_toleranceThreshold);
 
         // Calculate density metrics
         report.metrics.averagePointDensity = calculateDensityMetrics(targetCloud);
 
         // Calculate geometric features
-        calculateGeometricFeatures(targetCloud,
-                                 report.metrics.planarity,
-                                 report.metrics.sphericity,
-                                 report.metrics.linearity);
+        calculateGeometricFeatures(
+            targetCloud, report.metrics.planarity, report.metrics.sphericity, report.metrics.linearity);
 
         // Set point counts
         report.metrics.totalPoints = sourceCloud.size() + targetCloud.size();
@@ -179,8 +186,9 @@ QualityReport QualityAssessment::assessRegistration(const std::vector<QualityPoi
 
         emit assessmentProgress(100, "Assessment completed");
         emit assessmentCompleted(report);
-
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         QString error = QString("Assessment failed: %1").arg(e.what());
         emit assessmentError(error);
         qCritical() << error;
@@ -192,13 +200,15 @@ QualityReport QualityAssessment::assessRegistration(const std::vector<QualityPoi
 
 float QualityAssessment::calculateRMSError(const std::vector<QualityCorrespondence>& correspondences)
 {
-    if (correspondences.empty()) {
+    if (correspondences.empty())
+    {
         return 0.0f;
     }
 
     float sumSquaredErrors = 0.0f;
 
-    for (const auto& corr : correspondences) {
+    for (const auto& corr : correspondences)
+    {
         float distance = calculatePointToPointDistance(corr.sourcePoint, corr.targetPoint);
         sumSquaredErrors += distance * distance;
     }
@@ -210,7 +220,8 @@ QualityMetrics QualityAssessment::calculateStatistics(const std::vector<float>& 
 {
     QualityMetrics metrics;
 
-    if (errors.empty()) {
+    if (errors.empty())
+    {
         return metrics;
     }
 
@@ -224,14 +235,16 @@ QualityMetrics QualityAssessment::calculateStatistics(const std::vector<float>& 
 
     // Calculate RMS error
     float sumSquared = 0.0f;
-    for (float error : errors) {
+    for (float error : errors)
+    {
         sumSquared += error * error;
     }
     metrics.rmsError = qSqrt(sumSquared / static_cast<float>(errors.size()));
 
     // Calculate standard deviation
     float sumSquaredDiff = 0.0f;
-    for (float error : errors) {
+    for (float error : errors)
+    {
         float diff = error - metrics.meanError;
         sumSquaredDiff += diff * diff;
     }
@@ -242,7 +255,8 @@ QualityMetrics QualityAssessment::calculateStatistics(const std::vector<float>& 
 
 float QualityAssessment::calculateDensityMetrics(const std::vector<QualityPoint>& cloud)
 {
-    if (cloud.size() < 10) {
+    if (cloud.size() < 10)
+    {
         return 0.0f;
     }
 
@@ -251,7 +265,8 @@ float QualityAssessment::calculateDensityMetrics(const std::vector<QualityPoint>
     std::vector<float> densities;
     densities.reserve(sampleSize);
 
-    for (size_t i = 0; i < sampleSize; ++i) {
+    for (size_t i = 0; i < sampleSize; ++i)
+    {
         size_t index = (i * cloud.size()) / sampleSize;
         QVector3D point = cloud[index].toVector3D();
         float density = calculateLocalDensity(cloud, point, m_densityRadius);
@@ -264,11 +279,14 @@ float QualityAssessment::calculateDensityMetrics(const std::vector<QualityPoint>
 }
 
 void QualityAssessment::calculateGeometricFeatures(const std::vector<QualityPoint>& cloud,
-                                                  float& planarity, float& sphericity, float& linearity)
+                                                   float& planarity,
+                                                   float& sphericity,
+                                                   float& linearity)
 {
     planarity = sphericity = linearity = 0.0f;
 
-    if (cloud.size() < 3) {
+    if (cloud.size() < 3)
+    {
         return;
     }
 
@@ -278,15 +296,17 @@ void QualityAssessment::calculateGeometricFeatures(const std::vector<QualityPoin
     // Calculate eigenvalues
     std::vector<float> eigenvalues = calculateEigenvalues(covariance);
 
-    if (eigenvalues.size() == 3) {
+    if (eigenvalues.size() == 3)
+    {
         std::sort(eigenvalues.begin(), eigenvalues.end(), std::greater<float>());
 
-        float e1 = eigenvalues[0]; // Largest
-        float e2 = eigenvalues[1]; // Middle
-        float e3 = eigenvalues[2]; // Smallest
+        float e1 = eigenvalues[0];  // Largest
+        float e2 = eigenvalues[1];  // Middle
+        float e3 = eigenvalues[2];  // Smallest
 
         float sum = e1 + e2 + e3;
-        if (sum > 1e-6f) {
+        if (sum > 1e-6f)
+        {
             linearity = (e1 - e2) / sum;
             planarity = (e2 - e3) / sum;
             sphericity = e3 / sum;
@@ -297,18 +317,27 @@ void QualityAssessment::calculateGeometricFeatures(const std::vector<QualityPoin
 char QualityAssessment::calculateQualityGrade(const QualityMetrics& metrics)
 {
     // Grading based on RMS error (in meters)
-    float rmsErrorMM = metrics.rmsError * 1000.0f; // Convert to mm
+    float rmsErrorMM = metrics.rmsError * 1000.0f;  // Convert to mm
 
-    if (rmsErrorMM <= 1.0f && metrics.overlapPercentage >= 80.0f) {
-        return 'A'; // Excellent
-    } else if (rmsErrorMM <= 2.0f && metrics.overlapPercentage >= 70.0f) {
-        return 'B'; // Good
-    } else if (rmsErrorMM <= 5.0f && metrics.overlapPercentage >= 60.0f) {
-        return 'C'; // Acceptable
-    } else if (rmsErrorMM <= 10.0f && metrics.overlapPercentage >= 50.0f) {
-        return 'D'; // Poor
-    } else {
-        return 'F'; // Fail
+    if (rmsErrorMM <= 1.0f && metrics.overlapPercentage >= 80.0f)
+    {
+        return 'A';  // Excellent
+    }
+    else if (rmsErrorMM <= 2.0f && metrics.overlapPercentage >= 70.0f)
+    {
+        return 'B';  // Good
+    }
+    else if (rmsErrorMM <= 5.0f && metrics.overlapPercentage >= 60.0f)
+    {
+        return 'C';  // Acceptable
+    }
+    else if (rmsErrorMM <= 10.0f && metrics.overlapPercentage >= 50.0f)
+    {
+        return 'D';  // Poor
+    }
+    else
+    {
+        return 'F';  // Fail
     }
 }
 
@@ -318,17 +347,20 @@ float QualityAssessment::calculateConfidenceScore(const QualityMetrics& metrics)
 
     // Penalize high RMS error
     float rmsErrorMM = metrics.rmsError * 1000.0f;
-    if (rmsErrorMM > 1.0f) {
+    if (rmsErrorMM > 1.0f)
+    {
         score *= qMax(0.1f, 1.0f - (rmsErrorMM - 1.0f) / 10.0f);
     }
 
     // Penalize low overlap
-    if (metrics.overlapPercentage < 80.0f) {
+    if (metrics.overlapPercentage < 80.0f)
+    {
         score *= metrics.overlapPercentage / 100.0f;
     }
 
     // Penalize insufficient correspondences
-    if (metrics.correspondenceCount < m_minCorrespondences) {
+    if (metrics.correspondenceCount < m_minCorrespondences)
+    {
         score *= static_cast<float>(metrics.correspondenceCount) / static_cast<float>(m_minCorrespondences);
     }
 
@@ -341,28 +373,36 @@ QStringList QualityAssessment::generateRecommendations(const QualityMetrics& met
 
     float rmsErrorMM = metrics.rmsError * 1000.0f;
 
-    if (rmsErrorMM > 5.0f) {
+    if (rmsErrorMM > 5.0f)
+    {
         recommendations << "High RMS error detected. Consider adding more correspondence points.";
         recommendations << "Check for systematic errors in the registration process.";
     }
 
-    if (metrics.overlapPercentage < 60.0f) {
+    if (metrics.overlapPercentage < 60.0f)
+    {
         recommendations << "Low overlap percentage. Ensure sufficient overlap between scans.";
         recommendations << "Consider repositioning scans for better coverage.";
     }
 
-    if (metrics.correspondenceCount < m_minCorrespondences) {
+    if (metrics.correspondenceCount < m_minCorrespondences)
+    {
         recommendations << QString("Insufficient correspondences (%1). Minimum recommended: %2.")
-                            .arg(metrics.correspondenceCount).arg(m_minCorrespondences);
+                               .arg(metrics.correspondenceCount)
+                               .arg(m_minCorrespondences);
     }
 
-    if (metrics.standardDeviation > metrics.meanError * 2.0f) {
+    if (metrics.standardDeviation > metrics.meanError * 2.0f)
+    {
         recommendations << "High error variation detected. Check for outlier correspondences.";
     }
 
-    if (metrics.qualityGrade >= 'C') {
+    if (metrics.qualityGrade >= 'C')
+    {
         recommendations << "Registration quality is acceptable for most applications.";
-    } else {
+    }
+    else
+    {
         recommendations << "Registration quality needs improvement before use.";
     }
 
@@ -371,12 +411,13 @@ QStringList QualityAssessment::generateRecommendations(const QualityMetrics& met
 
 // Helper methods implementation
 std::vector<QualityPoint> QualityAssessment::transformPointCloud(const std::vector<QualityPoint>& cloud,
-                                                                const QMatrix4x4& transformation)
+                                                                 const QMatrix4x4& transformation)
 {
     std::vector<QualityPoint> transformedCloud;
     transformedCloud.reserve(cloud.size());
 
-    for (const auto& point : cloud) {
+    for (const auto& point : cloud)
+    {
         QVector3D original(point.x, point.y, point.z);
         QVector3D transformed = transformation * original;
 
@@ -402,7 +443,8 @@ std::vector<float> QualityAssessment::calculateAllDistances(const std::vector<Qu
     std::vector<float> distances;
     distances.reserve(correspondences.size());
 
-    for (const auto& corr : correspondences) {
+    for (const auto& corr : correspondences)
+    {
         float distance = calculatePointToPointDistance(corr.sourcePoint, corr.targetPoint);
         distances.push_back(distance);
     }
@@ -412,26 +454,31 @@ std::vector<float> QualityAssessment::calculateAllDistances(const std::vector<Qu
 
 QMatrix3x3 QualityAssessment::calculateCovarianceMatrix(const std::vector<QualityPoint>& cloud)
 {
-    if (cloud.empty()) {
+    if (cloud.empty())
+    {
         return QMatrix3x3();
     }
 
     // Calculate centroid
     QVector3D centroid(0, 0, 0);
-    for (const auto& point : cloud) {
+    for (const auto& point : cloud)
+    {
         centroid += point.toVector3D();
     }
     centroid /= static_cast<float>(cloud.size());
 
     // Calculate covariance matrix
     QMatrix3x3 covariance;
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
             covariance(i, j) = 0.0f;
         }
     }
 
-    for (const auto& point : cloud) {
+    for (const auto& point : cloud)
+    {
         QVector3D p = point.toVector3D() - centroid;
 
         covariance(0, 0) += p.x() * p.x();
@@ -446,8 +493,10 @@ QMatrix3x3 QualityAssessment::calculateCovarianceMatrix(const std::vector<Qualit
     }
 
     float n = static_cast<float>(cloud.size());
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
             covariance(i, j) /= n;
         }
     }
@@ -470,14 +519,17 @@ std::vector<float> QualityAssessment::calculateEigenvalues(const QMatrix3x3& mat
 }
 
 float QualityAssessment::calculateLocalDensity(const std::vector<QualityPoint>& cloud,
-                                             const QVector3D& point, float radius)
+                                               const QVector3D& point,
+                                               float radius)
 {
     size_t count = 0;
     float radiusSquared = radius * radius;
 
-    for (const auto& p : cloud) {
+    for (const auto& p : cloud)
+    {
         QVector3D diff = p.toVector3D() - point;
-        if (diff.lengthSquared() <= radiusSquared) {
+        if (diff.lengthSquared() <= radiusSquared)
+        {
             count++;
         }
     }
