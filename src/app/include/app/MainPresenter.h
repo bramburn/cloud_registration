@@ -23,6 +23,7 @@ class BundleAdjustmentProgressDialog;
 class QualityAssessment;
 class PDFReportGenerator;
 struct QualityReport;
+class ICPProgressWidget;
 
 namespace Registration {
     class PoseGraph;
@@ -253,6 +254,14 @@ public slots:
      * and initiates the ICP computation if parameters are accepted.
      */
     void handleAutomaticAlignmentClicked();
+
+    /**
+     * @brief Cancel currently running automatic alignment
+     *
+     * This slot is connected to ICPProgressWidget::cancelRequested signal
+     * and cancels the ongoing ICP computation.
+     */
+    void cancelAutomaticAlignment();
 
     /**
      * @brief Connect to a RegistrationWorkflowWidget
@@ -529,6 +538,9 @@ private:
     QualityAssessment* m_qualityAssessment;
     PDFReportGenerator* m_reportGenerator;
     QualityReport m_lastQualityReport;
+
+    // Sprint 4.2: ICP Progress monitoring
+    ICPProgressWidget* m_icpProgressWidget;
 };
 
 #endif  // MAINPRESENTER_H

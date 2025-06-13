@@ -310,6 +310,9 @@ void AlignmentEngine::startAutomaticAlignment(const QString& sourceScanId,
         emit alignmentResultUpdated(m_currentResult);
         emit alignmentStateChanged(AlignmentState::Computing, m_currentResult.message);
 
+        // Relay progress signal for ICPProgressWidget
+        emit progressUpdated(iteration, rmsError, transformation);
+
         qDebug() << "ICP progress:" << iteration << "iterations, RMS:" << rmsError;
     });
 
@@ -338,6 +341,9 @@ void AlignmentEngine::startAutomaticAlignment(const QString& sourceScanId,
         emit qualityMetricsUpdated(finalError);
         emit alignmentResultUpdated(m_currentResult);
         emit alignmentStateChanged(m_currentResult.state, m_currentResult.message);
+
+        // Relay completion signal for ICPProgressWidget
+        emit computationFinished(success, finalTransform, finalError, iterations);
 
         qDebug() << "ICP computation finished. Success:" << success
                  << "Iterations:" << iterations
