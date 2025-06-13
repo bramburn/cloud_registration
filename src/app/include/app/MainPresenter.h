@@ -19,11 +19,16 @@ struct ExportResult;
 class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
+class BundleAdjustmentProgressDialog;
 
 namespace Registration {
     class PoseGraph;
     class PoseGraphBuilder;
     class RegistrationProject;
+}
+
+namespace Optimization {
+    class BundleAdjustment;
 }
 
 /**
@@ -250,6 +255,16 @@ public slots:
      * @brief Rebuild the pose graph from current registration project
      */
     void rebuildPoseGraph();
+
+    /**
+     * @brief Handle Bundle Adjustment request
+     */
+    void handleRunBundleAdjustment();
+
+    /**
+     * @brief Handle Bundle Adjustment cancellation request
+     */
+    void cancelBundleAdjustment();
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -304,8 +319,23 @@ private slots:
          * @param totalBytes Total memory usage in bytes.
          */
     void onMemoryUsageChanged(size_t totalBytes);
+
     // Sprint 3.2: Export functionality slots
     void onExportCompleted(const ExportResult& result);
+
+    /**
+     * @brief Handle Bundle Adjustment progress updates
+     * @param iteration Current iteration number
+     * @param currentError Current optimization error
+     * @param lambda Current lambda value
+     */
+    void onBundleAdjustmentProgress(int iteration, double currentError, double lambda);
+
+    /**
+     * @brief Handle Bundle Adjustment completion
+     * @param result Bundle adjustment result
+     */
+    void onBundleAdjustmentCompleted(const Optimization::BundleAdjustment::Result& result);
 
     /**
      * @brief Handle deviation map toggle (Sprint 6.1)
@@ -415,6 +445,10 @@ private:
     PoseGraphViewerWidget* m_poseGraphViewer;
     std::unique_ptr<Registration::PoseGraph> m_currentPoseGraph;
     std::unique_ptr<Registration::PoseGraphBuilder> m_poseGraphBuilder;
+
+    // Bundle Adjustment Management
+    std::unique_ptr<Optimization::BundleAdjustment> m_bundleAdjustment;
+    std::unique_ptr<BundleAdjustmentProgressDialog> m_baProgressDialog;
 };
 
 #endif  // MAINPRESENTER_H

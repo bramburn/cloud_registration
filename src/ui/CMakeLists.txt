@@ -24,6 +24,9 @@ set(UI_SOURCES
     # Sprint 7.1: Pose Graph Visualization
     ${CMAKE_CURRENT_SOURCE_DIR}/src/PoseGraphViewerWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RegistrationTabWidget.cpp
+
+    # Sprint 7.2: Bundle Adjustment Progress Dialog
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BundleAdjustmentProgressDialog.cpp
 )
 
 # Define header files for the UI library (now includes migrated headers from src/ root)
@@ -49,6 +52,9 @@ set(UI_HEADERS
     # Sprint 7.1: Pose Graph Visualization
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/PoseGraphViewerWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/RegistrationTabWidget.h
+
+    # Sprint 7.2: Bundle Adjustment Progress Dialog
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/BundleAdjustmentProgressDialog.h
 )
 
 # Create UI static library
@@ -59,13 +65,14 @@ target_include_directories(UI PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CloudRegistration/ui>
 )
 
-# UI library dependencies: Core, Algorithms, Parsers, Rendering, Registration, Qt UI components
+# UI library dependencies: Core, Algorithms, Parsers, Rendering, Registration, Optimization, Qt UI components
 target_link_libraries(UI PUBLIC
     Core
     Algorithms  # UI components like AlignmentControlPanel might use algorithms directly
     Parsers     # UI components for import/export might use parsers
     Rendering   # UI components interact with viewer/rendering settings
     Registration  # UI components for pose graph visualization
+    Optimization  # UI components for Bundle Adjustment progress dialog
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

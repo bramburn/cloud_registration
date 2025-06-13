@@ -31,12 +31,14 @@ PoseGraphViewerWidget::PoseGraphViewerWidget(QWidget* parent)
       m_fitToViewButton(nullptr),
       m_resetViewButton(nullptr),
       m_exportButton(nullptr),
+      m_runBundleAdjustmentButton(nullptr),
       m_showLabelsCheckBox(nullptr),
       m_showWeightsCheckBox(nullptr),
       m_statusLabel(nullptr),
       m_showNodeLabels(true),
       m_showEdgeWeights(false),
-      m_currentZoom(1.0)
+      m_currentZoom(1.0),
+      m_currentGraph(nullptr)
 {
     setupUI();
 }
@@ -68,6 +70,10 @@ void PoseGraphViewerWidget::createToolbar()
     // Export button
     m_exportButton = new QPushButton("Export");
 
+    // Bundle Adjustment button
+    m_runBundleAdjustmentButton = new QPushButton("Run Bundle Adjustment");
+    m_runBundleAdjustmentButton->setEnabled(false); // Initially disabled
+
     // Display options
     m_showLabelsCheckBox = new QCheckBox("Show Labels");
     m_showLabelsCheckBox->setChecked(m_showNodeLabels);
@@ -85,6 +91,8 @@ void PoseGraphViewerWidget::createToolbar()
     m_toolbarLayout->addWidget(m_resetViewButton);
     m_toolbarLayout->addSeparator();
     m_toolbarLayout->addWidget(m_exportButton);
+    m_toolbarLayout->addSeparator();
+    m_toolbarLayout->addWidget(m_runBundleAdjustmentButton);
     m_toolbarLayout->addSeparator();
     m_toolbarLayout->addWidget(m_showLabelsCheckBox);
     m_toolbarLayout->addWidget(m_showWeightsCheckBox);
@@ -123,6 +131,9 @@ void PoseGraphViewerWidget::setupConnections()
         }
     });
 
+    // Bundle Adjustment button connection
+    connect(m_runBundleAdjustmentButton, &QPushButton::clicked, this, &PoseGraphViewerWidget::onRunBundleAdjustment);
+
     // Checkbox connections
     connect(m_showLabelsCheckBox, &QCheckBox::toggled, this, &PoseGraphViewerWidget::onToggleNodeLabels);
     connect(m_showWeightsCheckBox, &QCheckBox::toggled, this, &PoseGraphViewerWidget::onToggleEdgeWeights);
@@ -135,8 +146,12 @@ void PoseGraphViewerWidget::displayGraph(const Registration::PoseGraph& graph)
 {
     clearGraph();
 
+    // Store reference to current graph for Bundle Adjustment validation
+    m_currentGraph = &graph;
+
     if (graph.isEmpty()) {
         m_statusLabel->setText("Empty graph");
+        updateBundleAdjustmentButtonState();
         return;
     }
 
@@ -156,6 +171,9 @@ void PoseGraphViewerWidget::displayGraph(const Registration::PoseGraph& graph)
     // Update status
     m_statusLabel->setText(QString("Nodes: %1, Edges: %2").arg(graph.nodeCount()).arg(graph.edgeCount()));
 
+    // Update Bundle Adjustment button state
+    updateBundleAdjustmentButtonState();
+
     emit viewUpdated();
 }
 
@@ -167,8 +185,12 @@ void PoseGraphViewerWidget::clearGraph()
     m_labelItems.clear();
     m_edgeItems.clear();
     m_weightItems.clear();
-    
+
+    // Clear graph reference
+    m_currentGraph = nullptr;
+
     m_statusLabel->setText("No graph loaded");
+    updateBundleAdjustmentButtonState();
 }
 
 void PoseGraphViewerWidget::calculateNodePositions(const Registration::PoseGraph& graph)
@@ -408,6 +430,40 @@ void PoseGraphViewerWidget::onToggleNodeLabels(bool visible)
 void PoseGraphViewerWidget::onToggleEdgeWeights(bool visible)
 {
     setShowEdgeWeights(visible);
+}
+
+void PoseGraphViewerWidget::onRunBundleAdjustment()
+{
+    if (isBundleAdjustmentEnabled()) {
+        emit bundleAdjustmentRequested();
+    }
+}
+
+void PoseGraphViewerWidget::updateBundleAdjustmentButtonState()
+{
+    bool enabled = isBundleAdjustmentEnabled();
+    m_runBundleAdjustmentButton->setEnabled(enabled);
+
+    if (!enabled && m_currentGraph) {
+        QString tooltip;
+        if (m_currentGraph->nodeCount() < 3) {
+            tooltip = QString("Bundle Adjustment requires at least 3 nodes (current: %1)")
+                     .arg(m_currentGraph->nodeCount());
+        } else if (m_currentGraph->edgeCount() < 2) {
+            tooltip = QString("Bundle Adjustment requires at least 2 edges (current: %1)")
+                     .arg(m_currentGraph->edgeCount());
+        }
+        m_runBundleAdjustmentButton->setToolTip(tooltip);
+    } else {
+        m_runBundleAdjustmentButton->setToolTip("Run Bundle Adjustment to optimize pose graph globally");
+    }
+}
+
+bool PoseGraphViewerWidget::isBundleAdjustmentEnabled() const
+{
+    return m_currentGraph &&
+           m_currentGraph->nodeCount() >= 3 &&
+           m_currentGraph->edgeCount() >= 2;
 }
 
 void PoseGraphViewerWidget::onSceneSelectionChanged()
