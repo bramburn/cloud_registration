@@ -306,6 +306,24 @@ signals:
      */
     void targetDetectionError(const QString& error);
 
+    // ICP Progress signals
+    /**
+     * @brief Emitted during ICP iterations to report progress
+     * @param iteration Current iteration number
+     * @param rmsError Current RMS error
+     * @param transformation Current transformation estimate
+     */
+    void progressUpdated(int iteration, float rmsError, const QMatrix4x4& transformation);
+
+    /**
+     * @brief Emitted when ICP computation completes
+     * @param success True if converged successfully
+     * @param finalTransformation Final transformation matrix
+     * @param finalRMSError Final RMS error
+     * @param iterations Number of iterations performed
+     */
+    void computationFinished(bool success, const QMatrix4x4& finalTransformation, float finalRMSError, int iterations);
+
 private slots:
     /**
      * @brief Perform actual alignment computation (called by timer for async execution)

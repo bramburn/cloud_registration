@@ -23,6 +23,7 @@ class BundleAdjustmentProgressDialog;
 class QualityAssessment;
 class PDFReportGenerator;
 struct QualityReport;
+class ICPProgressWidget;
 
 namespace Registration {
     class PoseGraph;
@@ -255,6 +256,14 @@ public slots:
     void handleAutomaticAlignmentClicked();
 
     /**
+     * @brief Cancel currently running automatic alignment
+     *
+     * This slot is connected to ICPProgressWidget::cancelRequested signal
+     * and cancels the ongoing ICP computation.
+     */
+    void cancelAutomaticAlignment();
+
+    /**
      * @brief Connect to a RegistrationWorkflowWidget
      * @param workflowWidget Pointer to the workflow widget to connect
      */
@@ -482,6 +491,17 @@ private:
      */
     void handleAlignmentResultUpdated(const AlignmentEngine::AlignmentResult& result);
 
+    /**
+     * @brief Handle alignment state changes from AlignmentEngine (Sprint 2.3)
+     *
+     * This slot receives alignment state changes and forwards them to the
+     * AlignmentControlPanel for UI updates.
+     *
+     * @param state New alignment state
+     * @param message Status message
+     */
+    void handleAlignmentStateChanged(AlignmentEngine::AlignmentState state, const QString& message);
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -534,6 +554,9 @@ private:
     QualityAssessment* m_qualityAssessment;
     PDFReportGenerator* m_reportGenerator;
     QualityReport m_lastQualityReport;
+
+    // Sprint 4.2: ICP Progress monitoring
+    ICPProgressWidget* m_icpProgressWidget;
 };
 
 #endif  // MAINPRESENTER_H

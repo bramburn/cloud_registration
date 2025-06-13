@@ -67,6 +67,7 @@ set(ALL_TESTS
     IntegrationTests
     EndToEndIntegrationTests
     TargetDetectionIntegrationTests
+    ManualAlignmentE2ETests
 
     # Performance Tests
     PerformanceOptimizationTests
