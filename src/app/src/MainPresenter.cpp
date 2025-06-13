@@ -12,7 +12,7 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
-#include "registration/TargetManager.h"
+es#include "registration/TargetManager.h"
 #include "registration/AlignmentEngine.h"
 #include "ui/AlignmentControlPanel.h"
 #include "ui/PoseGraphViewerWidget.h"
