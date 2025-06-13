@@ -1,6 +1,7 @@
 #include "rendering/pointcloudviewerwidget.h"
 
 #include "core/performance_profiler.h"
+#include "core/profiling_macros.h"  // Sprint 7.3: Profiling macros
 // Sprint 6: Include for Point struct
 #include <QBrush>
 #include <QCoreApplication>
@@ -276,6 +277,8 @@ void PointCloudViewerWidget::resizeGL(int w, int h)
 
 void PointCloudViewerWidget::paintGL()
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     // Clear buffers with error checking (User Story 2)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     GLenum error = glGetError();

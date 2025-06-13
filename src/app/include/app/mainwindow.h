@@ -246,6 +246,9 @@ private slots:
     // Sprint 6.1: Deviation map slot
     void onShowDeviationMapToggled(bool enabled);
 
+    // Sprint 7.3: Performance profiling slot
+    void onGeneratePerformanceReport();
+
 private:
     void setupUI();
     void setupMenuBar();
@@ -295,6 +298,9 @@ private:
     // Sprint 2.2: Performance statistics display
     void onStatsUpdated(float fps, int visiblePoints);
 
+    // Sprint 7.3: Performance profiling action state management
+    void updatePerformanceReportActionState();
+
     // Main UI Components
     QStackedWidget* m_centralStack;
     ProjectHubWidget* m_projectHub;
@@ -335,6 +341,9 @@ private:
 
     // Sprint 6.1: Deviation map action
     QAction* m_showDeviationMapAction;
+
+    // Sprint 7.3: Performance profiling action
+    QAction* m_generatePerformanceReportAction;
 
     // Sprint 1.2: Import guidance widgets
     QWidget* m_importGuidanceWidget;

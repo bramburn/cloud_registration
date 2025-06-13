@@ -33,6 +33,11 @@
 #include "quality/QualityAssessment.h"
 #include "quality/PDFReportGenerator.h"
 
+// Sprint 7.3: Performance profiling includes
+#include "core/performance_profiler.h"
+#include "ui/UserPreferences.h"
+#include <QDateTime>
+
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
                              IE57Writer* e57Writer,
@@ -76,6 +81,11 @@ void MainPresenter::initialize()
     setupConnections();
     updateUIState();
     updateWindowTitle();
+
+    // Sprint 7.3: Initialize performance profiler based on preferences
+    bool profilingEnabled = UserPreferences::instance().getValue("advanced/profilingEnabled", false).toBool();
+    PerformanceProfiler::instance().setEnabled(profilingEnabled);
+    qDebug() << "Performance profiler initialized, enabled:" << profilingEnabled;
 }
 
 void MainPresenter::setProjectManager(ProjectManager* projectManager)
@@ -1916,4 +1926,68 @@ void MainPresenter::onBundleAdjustmentCompleted(const Optimization::BundleAdjust
     // Clean up
     m_bundleAdjustment.reset();
     // Note: Don't reset m_baProgressDialog here as it may still be showing results
+}
+
+// Sprint 7.3: Performance Report Generation Implementation
+void MainPresenter::handleGeneratePerformanceReportClicked()
+{
+    qDebug() << "MainPresenter::handleGeneratePerformanceReportClicked() called";
+
+    // Check if profiling is enabled
+    bool profilingEnabled = UserPreferences::instance().getValue("advanced/profilingEnabled", false).toBool();
+    if (!profilingEnabled) {
+        showError("Performance Report",
+                  "Performance profiling is disabled. Please enable it in the advanced preferences first.");
+        return;
+    }
+
+    // Check if we have any profiling data
+    if (!PerformanceProfiler::instance().isEnabled()) {
+        showError("Performance Report",
+                  "Performance profiler is not enabled. No profiling data available.");
+        return;
+    }
+
+    // Prompt for save path
+    QString defaultName = QString("PerformanceReport_%1.txt")
+                         .arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+
+    QString filePath = m_view->askForSaveFilePath("Save Performance Report",
+                                                  "Text files (*.txt);;All files (*)",
+                                                  defaultName);
+
+    if (filePath.isEmpty()) {
+        return; // User cancelled
+    }
+
+    try {
+        // Generate the performance report
+        PerformanceProfiler::instance().generateReport(filePath);
+
+        // Display success message
+        showInfo("Performance Report Generated",
+                 QString("Performance report has been successfully generated and saved to:\n%1").arg(filePath));
+
+        if (m_view) {
+            m_view->updateStatusBar("Performance report generated successfully");
+        }
+
+        qDebug() << "Performance report generated successfully at:" << filePath;
+    }
+    catch (const std::exception& e) {
+        showError("Performance Report Error",
+                  QString("Failed to generate performance report:\n%1").arg(e.what()));
+
+        if (m_view) {
+            m_view->updateStatusBar("Performance report generation failed");
+        }
+    }
+    catch (...) {
+        showError("Performance Report Error",
+                  "An unknown error occurred while generating the performance report.");
+
+        if (m_view) {
+            m_view->updateStatusBar("Performance report generation failed");
+        }
+    }
 }

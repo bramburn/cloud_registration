@@ -12,6 +12,7 @@
 #include <E57Format/E57Format.h>  // Add proper E57Format include
 
 #include "core/performance_profiler.h"  // Sprint 2.2: Performance profiling
+#include "core/profiling_macros.h"      // Sprint 7.3: Profiling macros
 
 // Constructor
 E57ParserLib::E57ParserLib(QObject* parent)
@@ -392,23 +393,32 @@ std::vector<IE57Parser::PointData> E57ParserLib::extractEnhancedPointData(int sc
 // Simplified implementation methods - delegate to core parser
 void E57ParserLib::performParsing()
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     emit progressUpdated(0, "Initializing E57 parser...");
 
     try
     {
-        // Use the core parser for all operations
-        if (!m_parserCore->openFile(m_currentFilePath.toStdString()))
         {
-            setError(m_parserCore->getLastError());
-            emit parsingFinished(false, getLastError(), std::vector<float>());
-            return;
+            PROFILE_SECTION("E57::OpenFile");
+            // Use the core parser for all operations
+            if (!m_parserCore->openFile(m_currentFilePath.toStdString()))
+            {
+                setError(m_parserCore->getLastError());
+                emit parsingFinished(false, getLastError(), std::vector<float>());
+                return;
+            }
         }
 
         emit progressUpdated(20, "Extracting point data...");
 
-        // Extract point data using core parser
-        CoreLoadingSettings coreSettings = convertLoadingSettings(m_currentSettings);
-        std::vector<float> points = m_parserCore->extractXYZData(0, coreSettings);
+        std::vector<float> points;
+        {
+            PROFILE_SECTION("E57::ExtractPointData");
+            // Extract point data using core parser
+            CoreLoadingSettings coreSettings = convertLoadingSettings(m_currentSettings);
+            points = m_parserCore->extractXYZData(0, coreSettings);
+        }
 
         if (points.empty())
         {

@@ -8,6 +8,7 @@
 #include <random>
 
 #include "LeastSquaresAlignment.h"
+#include "core/profiling_macros.h"  // Sprint 7.3: Performance profiling
 
 // PointCloud implementation
 PointCloud::PointCloud(const std::vector<float>& pointData)
@@ -203,6 +204,8 @@ QMatrix4x4 ICPRegistration::compute(const PointCloud& source,
                                     const QMatrix4x4& initialGuess,
                                     const ICPParams& params)
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     if (source.empty() || target.empty())
     {
         qWarning() << "Cannot perform ICP on empty point clouds";

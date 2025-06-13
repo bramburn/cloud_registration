@@ -48,6 +48,7 @@
 #include "quality/PDFReportGenerator.h"
 #include "quality/QualityAssessment.h"
 #include "ui/ExportDialog.h"
+#include "ui/UserPreferences.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -692,6 +693,13 @@ void MainWindow::setupMenuBar()
     m_generateReportAction->setStatusTip("Generate PDF quality assessment report");
     connect(m_generateReportAction, &QAction::triggered, this, &MainWindow::onGenerateQualityReport);
 
+    // Sprint 7.3: Add performance report action
+    m_generatePerformanceReportAction = qualityMenu->addAction("Generate &Performance Report...");
+    m_generatePerformanceReportAction->setShortcut(QKeySequence("Ctrl+Shift+P"));
+    m_generatePerformanceReportAction->setEnabled(false);
+    m_generatePerformanceReportAction->setStatusTip("Generate performance profiling report");
+    connect(m_generatePerformanceReportAction, &QAction::triggered, this, &MainWindow::onGeneratePerformanceReport);
+
     qualityMenu->addSeparator();
 
     // Sprint 6.1: Add deviation map toggle
@@ -724,6 +732,9 @@ void MainWindow::setupMenuBar()
                                    "Built with Qt6 and OpenGL");
             });
     helpMenu->addAction(aboutAction);
+
+    // Sprint 7.3: Update performance report action state based on preferences
+    updatePerformanceReportActionState();
 }
 
 void MainWindow::setupStatusBar()
@@ -2982,7 +2993,33 @@ void MainWindow::onShowDeviationMapToggled(bool enabled)
     }
 }
 
+// Sprint 7.3: Performance report generation implementation
+void MainWindow::onGeneratePerformanceReport()
+{
+    qDebug() << "Generate performance report requested";
+
+    if (m_presenter)
+    {
+        m_presenter->handleGeneratePerformanceReportClicked();
+    }
+    else
+    {
+        QMessageBox::warning(this, "Performance Report Error", "Presenter not available for performance report generation");
+    }
+}
+
 AlignmentControlPanel* MainWindow::getAlignmentControlPanel()
 {
     return m_alignmentControlPanel;
+}
+
+// Sprint 7.3: Update performance report action state based on preferences
+void MainWindow::updatePerformanceReportActionState()
+{
+    if (m_generatePerformanceReportAction)
+    {
+        bool profilingEnabled = UserPreferences::instance().getValue("advanced/profilingEnabled", false).toBool();
+        m_generatePerformanceReportAction->setEnabled(profilingEnabled);
+        qDebug() << "Performance report action enabled:" << profilingEnabled;
+    }
 }

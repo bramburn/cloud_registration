@@ -396,6 +396,11 @@ private slots:
      */
     void handleGenerateReportClicked();
 
+    /**
+     * @brief Handle generate performance report request (Sprint 7.3)
+     */
+    void handleGeneratePerformanceReportClicked();
+
 private slots:
     /**
      * @brief Handle quality assessment completion (Sprint 6.2)

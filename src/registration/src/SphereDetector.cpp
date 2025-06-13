@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "registration/Target.h"
+#include "core/profiling_macros.h"  // Sprint 7.3: Performance profiling
 
 SphereDetector::SphereDetector(QObject* parent)
     : TargetDetectionBase(parent), m_randomGenerator(std::chrono::steady_clock::now().time_since_epoch().count())
@@ -17,6 +18,8 @@ SphereDetector::SphereDetector(QObject* parent)
 TargetDetectionBase::DetectionResult SphereDetector::detect(const std::vector<PointFullData>& points,
                                                             const DetectionParams& params)
 {
+    PROFILE_FUNCTION();  // Sprint 7.3: Performance profiling
+
     DetectionResult result;
     auto startTime = std::chrono::high_resolution_clock::now();
 
