@@ -119,6 +119,5 @@ target_include_directories(PoseGraphViewerWidgetTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core       # Core headers
 )
 add_test(NAME PoseGraphViewerWidgetTests COMMAND PoseGraphViewerWidgetTests)
->>>>>>> 66b07497000abee3dd88a1de819520b56d73c104
 
 message(STATUS "Configuring UI tests...")

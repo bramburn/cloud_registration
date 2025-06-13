@@ -595,7 +595,8 @@ void MainWindow::setupMenuBar()
     m_exportPointCloudAction->setShortcut(QKeySequence("Ctrl+E"));
     m_exportPointCloudAction->setEnabled(false);
     m_exportPointCloudAction->setStatusTip("Export point cloud to various formats");
-    connect(m_exportPointCloudAction, &QAction::triggered, this, &MainWindow::onExportPointCloud);
+    connect(m_exportPointCloudAction, &QAction::triggered,
+            [this]() { if (m_presenter) m_presenter->handleExportPointCloud(); });
 
     fileMenu->addSeparator();
 
@@ -945,22 +946,28 @@ void MainWindow::onLoadingFinished(bool success, const QString& message)
     cleanupProgressDialog();
     updateUIAfterParsing(success, message);
 
-    // Sprint 6: Enable export and quality assessment when data is loaded
+    // Sprint 3.2: Enable export when project is open and data is loaded
     if (success && m_viewer)
     {
         std::vector<Point> currentData = m_viewer->getCurrentPointCloudData();
         bool hasData = !currentData.empty();
+        bool hasProject = (m_currentProject != nullptr);
+
+        // Export should be enabled when: project is open AND data is loaded
+        // TODO: Add registration check when RegistrationProject integration is complete
+        bool enableExport = hasProject && hasData;
 
         if (m_exportPointCloudAction)
         {
-            m_exportPointCloudAction->setEnabled(hasData);
+            m_exportPointCloudAction->setEnabled(enableExport);
         }
         if (m_qualityAssessmentAction)
         {
             m_qualityAssessmentAction->setEnabled(hasData);
         }
 
-        qDebug() << "Sprint 6: Export and quality actions enabled:" << hasData;
+        qDebug() << "Sprint 3.2: Export action enabled:" << enableExport
+                 << "(hasProject:" << hasProject << ", hasData:" << hasData << ")";
     }
 }
 

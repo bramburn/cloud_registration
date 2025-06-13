@@ -14,6 +14,8 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class RegistrationProject;
+struct ExportResult;
 class TargetManager;
 class AlignmentEngine;
 class PoseGraphViewerWidget;
@@ -238,6 +240,9 @@ public slots:
      */
     void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
 
+    // Sprint 3.2: Export functionality
+    void handleExportPointCloud();
+
     // Pose Graph Management
     /**
      * @brief Set the registration project for pose graph operations
@@ -314,6 +319,8 @@ private slots:
          * @param totalBytes Total memory usage in bytes.
          */
     void onMemoryUsageChanged(size_t totalBytes);
+    // Sprint 3.2: Export functionality slots
+    void onExportCompleted(const ExportResult& result);
 
     /**
      * @brief Handle deviation map toggle (Sprint 6.1)
@@ -392,8 +399,10 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
-        TargetManager* m_targetManager;
-        AlignmentEngine* m_alignmentEngine;
+    // Sprint 3.2: Export functionality
+    RegistrationProject* m_currentProject;
+    TargetManager* m_targetManager;
+    AlignmentEngine* m_alignmentEngine;
 
          // Application state
     QString m_currentProjectPath;
