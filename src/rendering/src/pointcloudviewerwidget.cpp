@@ -378,6 +378,12 @@ void PointCloudViewerWidget::paintGL()
 
     // Sprint 2.3: Always draw overlay for state feedback
     paintOverlayGL();
+
+    // Sprint 6.1: Render deviation map legend if visible
+    if (m_legendVisible)
+    {
+        renderDeviationMapLegend(m_legendMaxDistance);
+    }
 }
 
 void PointCloudViewerWidget::setupShaders()
@@ -3124,4 +3130,175 @@ void PointCloudViewerWidget::initializePointSelector()
 
         qDebug() << "Point selector initialized";
     }
+}
+
+// Sprint 6.1: Deviation map implementation
+void PointCloudViewerWidget::loadColorizedPointCloud(const std::vector<PointFullData>& colorizedPoints)
+{
+    qDebug() << "Loading colorized point cloud with" << colorizedPoints.size() << "points";
+
+    // Store original points if not already stored
+    if (m_originalSourcePoints.empty() && m_hasData)
+    {
+        // Convert current point data to PointFullData for backup
+        // This is a simplified implementation - in practice, we'd need to properly
+        // store the original source points when they're first loaded
+        m_originalSourcePoints.clear();
+        for (size_t i = 0; i < static_cast<size_t>(m_pointCount) && i * 3 + 2 < m_pointData.size(); ++i)
+        {
+            PointFullData point;
+            point.x = m_pointData[i * 3];
+            point.y = m_pointData[i * 3 + 1];
+            point.z = m_pointData[i * 3 + 2];
+            point.r = 255;
+            point.g = 255;
+            point.b = 255;
+            m_originalSourcePoints.push_back(point);
+        }
+    }
+
+    // Store colorized points
+    m_colorizedPoints = colorizedPoints;
+    m_renderDeviationMap = true;
+
+    // Convert colorized points to float array for rendering
+    std::vector<float> colorizedFloatData;
+    colorizedFloatData.reserve(colorizedPoints.size() * 6); // XYZ + RGB
+
+    for (const auto& point : colorizedPoints)
+    {
+        // Position
+        colorizedFloatData.push_back(point.x);
+        colorizedFloatData.push_back(point.y);
+        colorizedFloatData.push_back(point.z);
+
+        // Color (normalized to 0-1)
+        colorizedFloatData.push_back(point.r.value_or(255) / 255.0f);
+        colorizedFloatData.push_back(point.g.value_or(255) / 255.0f);
+        colorizedFloatData.push_back(point.b.value_or(255) / 255.0f);
+    }
+
+    // Update OpenGL buffers with colorized data
+    makeCurrent();
+
+    // Update vertex buffer with new data
+    m_vertexBuffer.bind();
+    m_vertexBuffer.allocate(colorizedFloatData.data(), static_cast<int>(colorizedFloatData.size() * sizeof(float)));
+    m_vertexBuffer.release();
+
+    m_pointCount = static_cast<int>(colorizedPoints.size());
+
+    doneCurrent();
+
+    // Trigger repaint
+    update();
+
+    qDebug() << "Colorized point cloud loaded successfully";
+}
+
+void PointCloudViewerWidget::revertToOriginalColors()
+{
+    qDebug() << "Reverting to original colors";
+
+    m_renderDeviationMap = false;
+
+    if (!m_originalSourcePoints.empty())
+    {
+        // Convert original points back to float array
+        std::vector<float> originalFloatData;
+        originalFloatData.reserve(m_originalSourcePoints.size() * 3); // XYZ only for now
+
+        for (const auto& point : m_originalSourcePoints)
+        {
+            originalFloatData.push_back(point.x);
+            originalFloatData.push_back(point.y);
+            originalFloatData.push_back(point.z);
+        }
+
+        // Update OpenGL buffers with original data
+        makeCurrent();
+
+        m_vertexBuffer.bind();
+        m_vertexBuffer.allocate(originalFloatData.data(), static_cast<int>(originalFloatData.size() * sizeof(float)));
+        m_vertexBuffer.release();
+
+        m_pointCount = static_cast<int>(m_originalSourcePoints.size());
+        m_pointData = originalFloatData;
+
+        doneCurrent();
+    }
+
+    // Clear colorized data
+    m_colorizedPoints.clear();
+
+    // Trigger repaint
+    update();
+
+    qDebug() << "Reverted to original colors successfully";
+}
+
+void PointCloudViewerWidget::setDeviationMapLegendVisible(bool visible, float maxDistance)
+{
+    m_legendVisible = visible;
+    m_legendMaxDistance = maxDistance;
+
+    qDebug() << "Deviation map legend visibility set to" << visible << "with max distance" << maxDistance;
+
+    // Trigger repaint to show/hide legend
+    update();
+}
+
+void PointCloudViewerWidget::renderDeviationMapLegend(float maxDistance)
+{
+    if (!m_legendVisible)
+        return;
+
+    // Use QPainter for 2D overlay rendering
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // Legend dimensions and position
+    const int legendWidth = 200;
+    const int legendHeight = 20;
+    const int legendMargin = 20;
+    const int legendX = width() - legendWidth - legendMargin;
+    const int legendY = legendMargin;
+
+    // Draw legend background
+    painter.fillRect(legendX - 10, legendY - 10, legendWidth + 20, legendHeight + 60,
+                     QColor(0, 0, 0, 180));
+
+    // Draw color gradient
+    QLinearGradient gradient(legendX, legendY, legendX + legendWidth, legendY);
+    gradient.setColorAt(0.0, QColor(0, 255, 0));    // Green (low deviation)
+    gradient.setColorAt(0.5, QColor(255, 255, 0));  // Yellow (medium deviation)
+    gradient.setColorAt(1.0, QColor(255, 0, 0));    // Red (high deviation)
+
+    painter.fillRect(legendX, legendY, legendWidth, legendHeight, gradient);
+
+    // Draw border around gradient
+    painter.setPen(QPen(Qt::white, 1));
+    painter.drawRect(legendX, legendY, legendWidth, legendHeight);
+
+    // Draw labels
+    painter.setPen(Qt::white);
+    painter.setFont(QFont("Arial", 10));
+
+    // Min label (0 mm)
+    painter.drawText(legendX, legendY + legendHeight + 15, "0 mm");
+
+    // Max label
+    QString maxLabel = QString("%1 mm").arg(maxDistance * 1000, 0, 'f', 1);
+    QFontMetrics fm(painter.font());
+    int maxLabelWidth = fm.horizontalAdvance(maxLabel);
+    painter.drawText(legendX + legendWidth - maxLabelWidth, legendY + legendHeight + 15, maxLabel);
+
+    // Middle label
+    QString midLabel = QString("%1 mm").arg(maxDistance * 500, 0, 'f', 1);
+    int midLabelWidth = fm.horizontalAdvance(midLabel);
+    painter.drawText(legendX + (legendWidth - midLabelWidth) / 2, legendY + legendHeight + 15, midLabel);
+
+    // Title
+    painter.setFont(QFont("Arial", 12, QFont::Bold));
+    painter.drawText(legendX, legendY - 5, "Deviation Distance");
 }

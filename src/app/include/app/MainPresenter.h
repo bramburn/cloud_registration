@@ -14,6 +14,15 @@ class IE57Writer;
 class IPointCloudViewer;
 class ProjectManager;
 class PointCloudLoadManager;
+class TargetManager;
+class AlignmentEngine;
+class PoseGraphViewerWidget;
+
+namespace Registration {
+    class PoseGraph;
+    class PoseGraphBuilder;
+    class RegistrationProject;
+}
 
 /**
  * @brief MainPresenter - Presentation layer for the main application window
@@ -68,6 +77,17 @@ class MainPresenter : public QObject
          * @param loadManager Pointer to load manager.
          */
     void setPointCloudLoadManager(PointCloudLoadManager* loadManager);
+    /**
+     * @brief Set the target manager.
+     * @param targetManager Pointer to target manager.
+     */
+    void setTargetManager(TargetManager* targetManager);
+
+    /**
+     * @brief Set the alignment engine.
+     * @param alignmentEngine Pointer to alignment engine.
+     */
+    void setAlignmentEngine(AlignmentEngine* alignmentEngine);
 
 public slots:
         /**
@@ -117,6 +137,15 @@ public slots:
          * @brief Handle application exit request.
          */
     void handleExit();
+        /**
+         * @brief Handle alignment acceptance request.
+         */
+    void handleAcceptAlignment();
+
+        /**
+         * @brief Handle alignment cancellation request.
+         */
+    void handleCancelAlignment();
 
          // Sidebar-related handlers
     /**
@@ -206,6 +235,28 @@ public slots:
      */
     void connectToWorkflowWidget(class RegistrationWorkflowWidget* workflowWidget);
 
+    // Pose Graph Management
+    /**
+     * @brief Set the registration project for pose graph operations
+     * @param project Pointer to the registration project
+     */
+    void setRegistrationProject(Registration::RegistrationProject* project);
+
+    /**
+     * @brief Set the pose graph viewer widget
+     * @param viewer Pointer to the pose graph viewer widget
+     */
+    void setPoseGraphViewer(PoseGraphViewerWidget* viewer);
+
+    /**
+     * @brief Handle project load completion and rebuild pose graph
+     */
+    void handleLoadProjectCompleted();
+
+    /**
+     * @brief Rebuild the pose graph from current registration project
+     */
+    void rebuildPoseGraph();
 private slots:
         /**
          * @brief Handle E57 parsing progress updates.
@@ -261,6 +312,11 @@ private slots:
          */
     void onMemoryUsageChanged(size_t totalBytes);
 
+    /**
+     * @brief Handle deviation map toggle (Sprint 6.1)
+     * @param enabled Whether to show or hide the deviation map
+     */
+    void handleShowDeviationMapToggled(bool enabled);
 private:
         /**
          * @brief Set up signal-slot connections between components.
@@ -303,6 +359,15 @@ private:
          */
     void clearPointCloudData();
 
+    /**
+     * @brief Trigger alignment computation preview
+     *
+     * This slot is connected to AlignmentControlPanel::alignmentRequested() signal.
+     * It retrieves correspondences from TargetManager and initiates alignment computation
+     * through AlignmentEngine.
+     */
+    void triggerAlignmentPreview();
+
 private:
          // Interface pointers (not owned by this class)
     IMainView* m_view;
@@ -313,6 +378,8 @@ private:
          // Manager pointers (not owned by this class)
     ProjectManager* m_projectManager;
         PointCloudLoadManager* m_loadManager;
+        TargetManager* m_targetManager;
+        AlignmentEngine* m_alignmentEngine;
 
          // Application state
     QString m_currentProjectPath;
@@ -332,6 +399,16 @@ private:
         QStringList m_lockedClusters;
         // Workflow widget integration
         class RegistrationWorkflowWidget* m_connectedWorkflowWidget;
+
+    // Alignment state management
+    QString m_currentSourceScanId;
+        QString m_currentTargetScanId;
+
+    // Pose Graph Management
+    Registration::RegistrationProject* m_registrationProject;
+    PoseGraphViewerWidget* m_poseGraphViewer;
+    std::unique_ptr<Registration::PoseGraph> m_currentPoseGraph;
+    std::unique_ptr<Registration::PoseGraphBuilder> m_poseGraphBuilder;
 };
 
 #endif  // MAINPRESENTER_H

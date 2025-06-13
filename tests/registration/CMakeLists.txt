@@ -163,4 +163,24 @@ target_include_directories(RegistrationWorkflowWidgetTests PRIVATE
 )
 add_test(NAME RegistrationWorkflowWidgetTests COMMAND RegistrationWorkflowWidgetTests)
 
+# Sprint 7.1: Pose Graph Builder Tests
+add_executable(PoseGraphBuilderTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_posegraphbuilder.cpp
+)
+target_link_libraries(PoseGraphBuilderTests PRIVATE
+    Registration
+    Core
+    GTest::gtest_main
+    GMock::gmock
+    Qt6::Test
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+)
+target_include_directories(PoseGraphBuilderTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/registration/include/registration
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core
+)
+add_test(NAME PoseGraphBuilderTests COMMAND PoseGraphBuilderTests)
+
 message(STATUS "Configuring Registration tests...")

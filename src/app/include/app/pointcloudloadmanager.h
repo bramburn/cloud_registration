@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "core/octree.h"
+
 /**
  * @brief PointCloudLoadManager - Manages point cloud loading operations
  *
@@ -32,6 +34,9 @@ public:
     bool loadScan(const QString& scanId);
     bool unloadScan(const QString& scanId);
     bool isScanLoaded(const QString& scanId) const;
+
+    // Sprint 6.1: Get loaded point data for deviation analysis
+    std::vector<PointFullData> getLoadedPointFullData(const QString& scanId) const;
 
 signals:
     void loadingStarted(const QString& filePath);
