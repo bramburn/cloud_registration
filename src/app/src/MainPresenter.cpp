@@ -104,6 +104,8 @@ void MainPresenter::setAlignmentEngine(AlignmentEngine* alignmentEngine)
     {
         connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
                 this, &MainPresenter::handleAlignmentResultUpdated);
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentStateChanged,
+                this, &MainPresenter::handleAlignmentStateChanged);
 
         qDebug() << "MainPresenter: AlignmentEngine set and signals connected";
     }
@@ -204,6 +206,15 @@ void MainPresenter::setupConnections()
         if (alignmentPanel)
         {
             connect(alignmentPanel, &AlignmentControlPanel::alignmentRequested, this, &MainPresenter::triggerAlignmentPreview);
+
+            // Sprint 2.3: Connect configuration signals to AlignmentEngine
+            if (m_alignmentEngine)
+            {
+                connect(alignmentPanel, &AlignmentControlPanel::autoRecomputeChanged,
+                        m_alignmentEngine, &AlignmentEngine::setAutoRecompute);
+                connect(alignmentPanel, &AlignmentControlPanel::qualityThresholdsChanged,
+                        m_alignmentEngine, &AlignmentEngine::setQualityThresholds);
+            }
         }
     }
 
@@ -212,6 +223,8 @@ void MainPresenter::setupConnections()
     {
         connect(m_alignmentEngine, &AlignmentEngine::alignmentResultUpdated,
                 this, &MainPresenter::handleAlignmentResultUpdated);
+        connect(m_alignmentEngine, &AlignmentEngine::alignmentStateChanged,
+                this, &MainPresenter::handleAlignmentStateChanged);
     }
 }
 }
@@ -1740,6 +1753,23 @@ void MainPresenter::handleAlignmentResultUpdated(const AlignmentEngine::Alignmen
         }
 
         m_view->updateStatusBar(statusMessage);
+    }
+}
+
+// Sprint 2.3: Enhanced Status & Diagnostics implementation
+void MainPresenter::handleAlignmentStateChanged(AlignmentEngine::AlignmentState state, const QString& message)
+{
+    qDebug() << "MainPresenter::handleAlignmentStateChanged() called with state:" << static_cast<int>(state) << "message:" << message;
+
+    // Update AlignmentControlPanel with state changes
+    if (m_view)
+    {
+        auto* alignmentPanel = m_view->getAlignmentControlPanel();
+        if (alignmentPanel)
+        {
+            alignmentPanel->updateAlignmentState(state, message);
+            qDebug() << "Alignment control panel updated with state change";
+        }
     }
 }
 
