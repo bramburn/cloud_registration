@@ -12,9 +12,6 @@
 #include "interfaces/IE57Writer.h"
 #include "interfaces/IMainView.h"
 #include "interfaces/IPointCloudViewer.h"
-#include "registration/TargetManager.h"
-#include "registration/AlignmentEngine.h"
-#include "ui/AlignmentControlPanel.h"
 
 MainPresenter::MainPresenter(IMainView* view,
                              IE57Parser* e57Parser,
@@ -36,7 +33,13 @@ MainPresenter::MainPresenter(IMainView* view,
       m_isParsingInProgress(false),
       m_currentMemoryUsage(0),
       m_currentFPS(0.0f),
-      m_currentVisiblePoints(0)
+      m_currentVisiblePoints(0),
+      m_currentSourceScanId(""),
+      m_currentTargetScanId(""),
+      m_registrationProject(nullptr),
+      m_poseGraphViewer(nullptr),
+      m_currentPoseGraph(nullptr),
+      m_poseGraphBuilder(std::make_unique<Registration::PoseGraphBuilder>())
 {
     if (m_view)
     {
@@ -907,38 +910,5 @@ void MainPresenter::handleDragDropOperation(const QStringList& draggedItems,
     else
     {
         showError("Drag and Drop", "This drag and drop operation is not supported.");
-    }
-}
-
-void MainPresenter::triggerAlignmentPreview()
-{
-    if (!m_targetManager)
-    {
-        showError("Alignment Preview", "Target manager is not available.");
-        return;
-    }
-
-    if (!m_alignmentEngine)
-    {
-        showError("Alignment Preview", "Alignment engine is not available.");
-        return;
-    }
-
-    // Retrieve correspondences from TargetManager
-    QList<TargetCorrespondence> correspondences = m_targetManager->getAllCorrespondences();
-
-    if (correspondences.size() < 3)
-    {
-        showError("Alignment Preview", "At least 3 point correspondences are required for alignment computation.");
-        return;
-    }
-
-    // Trigger alignment computation through AlignmentEngine
-    m_alignmentEngine->recomputeAlignment();
-
-    // Update status
-    if (m_view)
-    {
-        m_view->updateStatusBar("Alignment computation started...");
     }
 }
