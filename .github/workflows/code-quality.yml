@@ -1,0 +1,122 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  code-formatting:
+    name: Code Formatting Check
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        vcpkgGitCommitId: '2024.01.12'
+        
+    - name: Install dependencies
+      run: |
+        vcpkg install qt6-base qt6-3d qt6-charts eigen3 gtest xerces-c libe57format --triplet x64-windows
+        
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        
+    - name: Check code formatting
+      run: |
+        cmake --build build --target format_check
+        
+  static-analysis:
+    name: Static Analysis
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        vcpkgGitCommitId: '2024.01.12'
+        
+    - name: Install dependencies
+      run: |
+        vcpkg install qt6-base qt6-3d qt6-charts eigen3 gtest xerces-c libe57format --triplet x64-windows
+        
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        
+    - name: Build project for analysis
+      run: |
+        cmake --build build --config Release --target CloudRegistration
+        
+    - name: Run clang-tidy analysis
+      run: |
+        cmake --build build --target run_clang_tidy
+      continue-on-error: true
+      
+    - name: Upload analysis results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: static-analysis-results
+        path: build/
+        retention-days: 7
+
+  build-and-test:
+    name: Build and Test
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        vcpkgGitCommitId: '2024.01.12'
+        
+    - name: Install dependencies
+      run: |
+        vcpkg install qt6-base qt6-3d qt6-charts eigen3 gtest xerces-c libe57format --triplet x64-windows
+        
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        
+    - name: Build project
+      run: |
+        cmake --build build --config Release
+        
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --config Release
+      continue-on-error: true
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: build/Testing/
+        retention-days: 7

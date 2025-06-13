@@ -1,25 +1,28 @@
 #ifndef MOCKPROJECTMANAGER_H
 #define MOCKPROJECTMANAGER_H
 
-#include <gmock/gmock.h>
 #include <QObject>
 #include <QString>
 #include <QStringList>
+
 #include "../../src/projectmanager.h"
+
+#include <gmock/gmock.h>
 
 /**
  * @brief MockProjectManager - Mock implementation of ProjectManager for testing
- * 
+ *
  * This mock class provides a test double for ProjectManager, allowing unit tests
  * to verify interactions with the project management system without requiring
  * actual database operations or file system access.
- * 
+ *
  * Sprint 4 Testing Requirements:
  * - Enables testing of MainPresenter sidebar integration
  * - Provides controllable responses for cluster operations
  * - Supports verification of method calls and parameters
  */
-class MockProjectManager : public QObject {
+class MockProjectManager : public QObject
+{
     Q_OBJECT
 
 public:
@@ -32,49 +35,45 @@ public:
     MOCK_METHOD(bool, renameCluster, (const QString& clusterId, const QString& newName), ());
     MOCK_METHOD(QStringList, getScansInCluster, (const QString& clusterId), ());
     MOCK_METHOD(bool, moveScanToCluster, (const QString& scanId, const QString& clusterId), ());
-    
+
     // Sprint 4: Scan management methods
     MOCK_METHOD(bool, deleteScan, (const QString& scanId, bool deletePhysicalFile), ());
-    
+
     // Sprint 4: Cluster locking methods
     MOCK_METHOD(bool, setClusterLockState, (const QString& clusterId, bool isLocked), ());
     MOCK_METHOD(bool, getClusterLockState, (const QString& clusterId), ());
-    
+
     // Sprint 4: Enhanced deletion methods
     MOCK_METHOD(bool, deleteClusterRecursive, (const QString& clusterId, bool deletePhysicalFiles), ());
 
     // Helper methods for test setup
-    void setupSuccessfulClusterCreation(const QString& expectedClusterId) {
-        ON_CALL(*this, createCluster(testing::_, testing::_))
-            .WillByDefault(testing::Return(expectedClusterId));
+    void setupSuccessfulClusterCreation(const QString& expectedClusterId)
+    {
+        ON_CALL(*this, createCluster(testing::_, testing::_)).WillByDefault(testing::Return(expectedClusterId));
     }
-    
-    void setupFailedClusterCreation() {
-        ON_CALL(*this, createCluster(testing::_, testing::_))
-            .WillByDefault(testing::Return(QString()));
+
+    void setupFailedClusterCreation()
+    {
+        ON_CALL(*this, createCluster(testing::_, testing::_)).WillByDefault(testing::Return(QString()));
     }
-    
-    void setupSuccessfulClusterOperations() {
-        ON_CALL(*this, deleteCluster(testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*this, renameCluster(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*this, setClusterLockState(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*this, deleteScan(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*this, deleteClusterRecursive(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
+
+    void setupSuccessfulClusterOperations()
+    {
+        ON_CALL(*this, deleteCluster(testing::_)).WillByDefault(testing::Return(true));
+        ON_CALL(*this, renameCluster(testing::_, testing::_)).WillByDefault(testing::Return(true));
+        ON_CALL(*this, setClusterLockState(testing::_, testing::_)).WillByDefault(testing::Return(true));
+        ON_CALL(*this, deleteScan(testing::_, testing::_)).WillByDefault(testing::Return(true));
+        ON_CALL(*this, deleteClusterRecursive(testing::_, testing::_)).WillByDefault(testing::Return(true));
     }
-    
-    void setupClusterWithScans(const QString& clusterId, const QStringList& scanIds) {
-        ON_CALL(*this, getScansInCluster(clusterId))
-            .WillByDefault(testing::Return(scanIds));
+
+    void setupClusterWithScans(const QString& clusterId, const QStringList& scanIds)
+    {
+        ON_CALL(*this, getScansInCluster(clusterId)).WillByDefault(testing::Return(scanIds));
     }
-    
-    void setupClusterLockState(const QString& clusterId, bool isLocked) {
-        ON_CALL(*this, getClusterLockState(clusterId))
-            .WillByDefault(testing::Return(isLocked));
+
+    void setupClusterLockState(const QString& clusterId, bool isLocked)
+    {
+        ON_CALL(*this, getClusterLockState(clusterId)).WillByDefault(testing::Return(isLocked));
     }
 
 signals:
@@ -89,33 +88,40 @@ signals:
 
 public:
     // Helper methods to emit signals for testing
-    void emitClusterCreated(const ClusterInfo& cluster) {
+    void emitClusterCreated(const ClusterInfo& cluster)
+    {
         emit clusterCreated(cluster);
     }
-    
-    void emitClusterDeleted(const QString& clusterId) {
+
+    void emitClusterDeleted(const QString& clusterId)
+    {
         emit clusterDeleted(clusterId);
     }
-    
-    void emitClusterRenamed(const QString& clusterId, const QString& newName) {
+
+    void emitClusterRenamed(const QString& clusterId, const QString& newName)
+    {
         emit clusterRenamed(clusterId, newName);
     }
-    
-    void emitScanMovedToCluster(const QString& scanId, const QString& clusterId) {
+
+    void emitScanMovedToCluster(const QString& scanId, const QString& clusterId)
+    {
         emit scanMovedToCluster(scanId, clusterId);
     }
-    
-    void emitClusterLockStateChanged(const QString& clusterId, bool isLocked) {
+
+    void emitClusterLockStateChanged(const QString& clusterId, bool isLocked)
+    {
         emit clusterLockStateChanged(clusterId, isLocked);
     }
-    
-    void emitScanDeleted(const QString& scanId) {
+
+    void emitScanDeleted(const QString& scanId)
+    {
         emit scanDeleted(scanId);
     }
-    
-    void emitClusterDeletedRecursive(const QString& clusterId) {
+
+    void emitClusterDeletedRecursive(const QString& clusterId)
+    {
         emit clusterDeletedRecursive(clusterId);
     }
 };
 
-#endif // MOCKPROJECTMANAGER_H
+#endif  // MOCKPROJECTMANAGER_H

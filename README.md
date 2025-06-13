@@ -365,13 +365,19 @@ For large point cloud files:
    - Qt Creator (optional, for UI design)
    - Configure IntelliSense with CMake integration
 
-2. **Code Style**
-   - Follow Qt coding conventions
+2. **Code Quality Tools**
+   - **clang-format**: Automatic code formatting (see [Code Quality Setup](docs/code-quality-setup.md))
+   - **clang-tidy**: Static code analysis
+   - **Pre-commit hooks**: Automated quality checks
+   - **CI/CD integration**: Continuous quality monitoring
+
+3. **Code Style**
+   - Follow Qt coding conventions with clang-format enforcement
    - Use meaningful variable and function names
    - Document public APIs with Doxygen comments
    - Include unit tests for new functionality
 
-3. **Testing Requirements**
+4. **Testing Requirements**
    - All new features must include unit tests
    - Integration tests for file format support
    - Performance benchmarks for optimization work
