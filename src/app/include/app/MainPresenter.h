@@ -124,6 +124,15 @@ public slots:
          * @brief Handle application exit request.
          */
     void handleExit();
+        /**
+         * @brief Handle alignment acceptance request.
+         */
+    void handleAcceptAlignment();
+
+        /**
+         * @brief Handle alignment cancellation request.
+         */
+    void handleCancelAlignment();
 
          // Sidebar-related handlers
     /**
@@ -348,6 +357,11 @@ private:
          // Sidebar state management
     QStringList m_loadedScans;
         QStringList m_lockedClusters;
+
+    // Alignment state management
+    QString m_currentSourceScanId;
+        QString m_currentTargetScanId;
+
     // Pose Graph Management
     Registration::RegistrationProject* m_registrationProject;
     PoseGraphViewerWidget* m_poseGraphViewer;
