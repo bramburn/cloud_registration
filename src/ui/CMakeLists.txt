@@ -5,6 +5,7 @@
 set(UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/AlignmentControlPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ExportDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ICPParameterDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ICPProgressWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TargetDetectionDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UIThemeManager.cpp
@@ -33,6 +34,7 @@ set(UI_SOURCES
 set(UI_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/AlignmentControlPanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ExportDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ICPParameterDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/ICPProgressWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/TargetDetectionDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui/UIThemeManager.h

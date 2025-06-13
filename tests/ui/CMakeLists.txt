@@ -58,6 +58,27 @@ target_include_directories(ExportDialogTests PRIVATE
 )
 add_test(NAME ExportDialogTests COMMAND ExportDialogTests)
 
+# ICP Parameter Dialog Tests
+add_executable(ICPParameterDialogTests
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_icpparameterdialog.cpp
+)
+target_link_libraries(ICPParameterDialogTests PRIVATE
+    UI                  # Link against the UI library
+    Core                # Indirect dependency through UI
+    Algorithms          # For ICPRegistration and PointCloud
+    GTest::gtest_main   # Google Test framework
+    Qt6::Test           # Qt Test module
+    Qt6::Core           # For QObject, QString
+    Qt6::Gui            # For QVector3D, QMatrix4x4
+    Qt6::Widgets        # For QWidget components
+)
+target_include_directories(ICPParameterDialogTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ui/include/ui           # UI headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/core       # Core headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/algorithms/include     # Algorithm headers
+)
+add_test(NAME ICPParameterDialogTests COMMAND ICPParameterDialogTests)
+
 # AlignmentControlPanel Tests (MVP3 S3.1)
 add_executable(AlignmentControlPanelTests
     ${CMAKE_CURRENT_SOURCE_DIR}/test_alignmentcontrolpanel.cpp
