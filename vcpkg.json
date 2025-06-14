@@ -1,0 +1,8 @@
+{
+    "name": "pointcloudapplication",
+    "version": "1.0.0",
+    "description": "Point Cloud Application - A high-performance desktop application for point cloud visualization, manipulation, and registration",
+    "dependencies": [
+        "gtest"
+    ]
+}
