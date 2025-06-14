@@ -1,4 +1,115 @@
-.doc-pdf
-.idea
-.qt
-.vscode
+# IDE and editor files
+.idea/
+.vscode/
+.qt/
+*.user
+*.autosave
+.doc-pdf/
+
+# C++ build outputs
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.out
+*.app
+
+# Build directories
+build/
+debug/
+release/
+x64/
+Win32/
+[Bb]uild*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+
+# Qt specific
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qm
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+.qmake.stash
+.qmake.cache
+
+# vcpkg specific
+vcpkg_installed/
+.vcpkg/
+vcpkg-manifest-install.log
+
+# Google Test generated files
+*.gcno
+*.gcda
+*.gcov
+Testing/
+googletest/
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Dependency directories
+dependencies/
+external/
+third_party/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# CMake generated files
+CMakeSettings.json
+compile_commands.json
+conanbuildinfo.*
+conaninfo.*
+graph_info.json
+
+# Visual Studio specific
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Code coverage
+*.coverage
+*.coveragexml
+coverage/
