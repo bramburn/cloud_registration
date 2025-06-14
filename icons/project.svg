@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-  <path d="M3 2h10v12H3z" fill="#FF9800" stroke="#F57C00" stroke-width="1"/>
-  <path d="M4 3h8v1H4z" fill="#FFB74D"/>
-  <path d="M4 5h8v1H4z" fill="#FFB74D"/>
-  <path d="M4 7h6v1H4z" fill="#FFB74D"/>
-  <path d="M4 9h8v1H4z" fill="#FFB74D"/>
-  <path d="M4 11h5v1H4z" fill="#FFB74D"/>
-</svg>

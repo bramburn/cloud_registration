@@ -1,0 +1,60 @@
+{
+    "cmake.configureOnOpen": false,
+    "cmake.configureOnEdit": false,
+    "cmake.buildBeforeRun": true,
+    "cmake.clearOutputBeforeBuild": true,
+    "cmake.saveBeforeBuild": true,
+    "cmake.showSystemKits": false,
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.preferredGenerators": [
+        "Visual Studio 17 2022",
+        "Visual Studio 16 2019"
+    ],
+    "cmake.defaultVariants": {
+        "buildType": {
+            "default": "debug",
+            "description": "The build type",
+            "choices": {
+                "debug": {
+                    "short": "Debug",
+                    "long": "Emit debug information without performing optimizations"
+                },
+                "release": {
+                    "short": "Release",
+                    "long": "Enable optimizations, omit debug info"
+                }
+            }
+        }
+    },
+    "cmake.useCMakePresets": "always",
+    "cmake.allowCommentsInPresetsFile": true,
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.intelliSenseMode": "msvc-x64",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.cStandard": "c17",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.intelliSenseEngine": "default",
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp",
+        "*.hpp": "cpp",
+        "*.c": "c",
+        "CMakeLists.txt": "cmake",
+        "*.cmake": "cmake"
+    },
+    "files.exclude": {
+        "**/build/**": false,
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+    "search.exclude": {
+        "**/build/**": true,
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/*.code-search": true
+    }
+}

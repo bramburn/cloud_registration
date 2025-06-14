@@ -1,0 +1,156 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake Configure Debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--preset", "msvc-debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake Configure Release",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--preset", "msvc-release"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake Build Debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build", "build/debug", "--config", "Debug"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": "CMake Configure Debug",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "CMake Build Release",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build", "build/release", "--config", "Release"
+      ],
+      "group": "build",
+      "dependsOn": "CMake Configure Release",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Clean Debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build", "build/debug", "--target", "clean"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean Release",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build", "build/release", "--target", "clean"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests Debug",
+      "type": "shell",
+      "command": "ctest",
+      "args": [
+        "--test-dir", "build/debug", "--output-on-failure"
+      ],
+      "group": "test",
+      "dependsOn": "CMake Build Debug",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests Release",
+      "type": "shell",
+      "command": "ctest",
+      "args": [
+        "--test-dir", "build/release", "--output-on-failure"
+      ],
+      "group": "test",
+      "dependsOn": "CMake Build Release",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}
